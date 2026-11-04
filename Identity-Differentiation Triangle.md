@@ -367,6 +367,49 @@ generation space to how the non-selective node divides itself between EM and
 the weak force, at the Z mass. The Standard Model contains no such link. The
 test above makes this unlikely to be needed.
 
+## Level two: mass differentiates the copies within an entity
+
+Selection organizes the entities; within each entity the three generations
+are identical by force (to 0.3%, LEP) and differ only by mass. Mass within
+an entity is written in Brannen's form of Koide,
+
+    sqrt(m_k) = mu (1 + A cos(delta + 2 pi k / 3)),  k = 0, 1, 2
+
+with mu the identity scale (the (1,1,1) part), A how strongly the copies
+are differentiated (A = sqrt 2 is Koide's Q = 2/3) and delta the direction
+of differentiation. This reintroduces mass deliberately, at the level where
+it is the only thing that differs.
+
+| Entity | A | delta | Q |
+|---|---|---|---|
+| Charged leptons | 1.41421 (= sqrt 2) | 0.22222 | 0.66666 |
+| Down quarks | 1.545 | 0.110 | 0.731 |
+| Up quarks | 1.759 | 0.075 | 0.849 |
+
+(Quark rows depend on the quark mass scheme.)
+
+**Tau mass test.** Q = 2/3 fixes the tau mass from the electron and muon
+alone: 1776.969 MeV (a 1981 prediction, so a check rather than a new one).
+PDG 2024 average 1776.93 +- 0.09 (-0.43 sigma), Belle II 2023
+1777.09 +- 0.14 (+0.89 sigma), BESIII 2014 1776.91 +- 0.17 (-0.36 sigma).
+
+**Direction test.** delta = 0.2222248 +- 0.0000063 against Brannen's 2/9 =
+0.2222222 (0.4 sigma). With A = sqrt 2 and delta = 2/9, the mass ratios are
+fixed: m_mu/m_e = 206.770 (measured 206.768), m_tau/m_e = 3477.47 (measured
+3477.37). These are the same finding as the delta match, not a second one.
+
+**Look-elsewhere test for 2/9.** Against 125 simple numbers (p/q and
+p/q times pi, q <= 12) a random delta at this precision lands within
+2 sigma of one in **0.15%** of cases. Unlike the 1/3 (7%), this is not easily
+dismissed as chance, though 2/9 was still noticed after the fact and the
+target set is a choice.
+
+**Open science here:** a mechanism for A = sqrt 2 and delta = 2/9 in the
+charged leptons, and why the other entities do not share them. Sharpest
+live test: future tau mass measurements (Belle II, BESIII, a future tau-charm
+factory) against 1776.969 MeV. Computed by `origin generations`; chart
+`experiments/generations/tau-prediction.png`.
+
 ## How it fails
 
 - A measured property that makes a pole engage a second force at accessible

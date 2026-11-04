@@ -1,0 +1,8 @@
+delta = 0.2222248 +- 6.3e-06; 2/9 = 0.2222222; pull 0.41 sigma
+simple targets in [0, 2pi/3): 125 (p/q and p/q * pi, q <= 12)
+chance a random delta lands within 2 sigma of one: 0.0015 (0.15%)
+
+Koide tau prediction 1776.969 MeV vs measurements:
+  PDG 2024 average   1776.930 +- 0.090  pull -0.43 sigma
+  Belle II (2023)    1777.090 +- 0.136  pull +0.89 sigma
+  BESIII (2014)      1776.910 +- 0.165  pull -0.36 sigma
