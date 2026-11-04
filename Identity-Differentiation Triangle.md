@@ -59,12 +59,52 @@ Script and charts: `experiments/lepton-separation/` (`strengths.py`,
   weak mixing angle; it moves to 0.11 when the W is included, so it is not
   treated as meaningful.
 
+## Predictions
+
+1. **The empty corner (open question).** The force triangle has three
+   corners but only two poles: neutrinos at the weak corner, quarks at the
+   strong corner. No known fermion sits at the electromagnetic corner. The
+   framework must either
+   - **predict an EM-only fermion** (a millicharged particle with no weak or
+     strong interaction), searched for by milliQan (LHC), SENSEI and FerMINI;
+     a detection would complete the triangle; or
+   - **be two-pole by nature**, and explain why EM has no pole. (In the
+     Standard Model, electric charge comes with the weak force through
+     hypercharge, which is why no EM-only fermion exists.)
+
+   Which of these the framework claims is still to be decided.
+
+2. **Neutrinos stay unprojected.** A pure pole has no electromagnetic
+   coupling beyond the Standard Model's minimal amount: no neutrino magnetic
+   moment above about 1e-19 Bohr magnetons, and no electric charge. Current
+   limits are about 6e-12 Bohr magnetons (XENONnT, LZ). A detected moment
+   above the Standard Model level would put projection into a pole and
+   falsify the framework. Limitation: the Standard Model predicts the same
+   null result, so continued nulls support the framework without
+   distinguishing it.
+
+3. **Charged-lepton projection of exactly 1/3 (probably coincidence).** In
+   the main variant the share is 0.3334. Exactly 1/3 requires
+   sin^2(theta_W) = 0.231246 in the MS-bar scheme at m_Z; measured
+   0.23122 +- 0.00004 (0.7 sigma). It fails other definitions of the angle
+   (effective leptonic: 7 sigma; on-shell: 79 sigma), holds only at one
+   energy because the angle runs, and was found after looking at four
+   variants and several "nice" fractions. If staked as a claim, FCC-ee would
+   test it at about ten times current precision.
+
+Not predictions: the quark pole becomes less pure at higher energies and the
+structure dissolves near coupling unification (standard running, which sets
+the framework's range rather than testing it); sterile neutrinos feel no
+force and would sit outside the framework.
+
 ## How it fails
 
 - A measured fermion property that puts projection in a pole (neutrinos
   spread across forces, or quarks with comparable non-strong interactions at
   accessible energies).
 - A new fermion entity that fits neither a pole nor the projecting middle.
+- A neutrino magnetic moment or charge detected above the Standard Model
+  level (prediction 2).
 
 The result rests on measured couplings, but which axes count and how they are
 weighted are modelling choices, so it is a structural description more than a
