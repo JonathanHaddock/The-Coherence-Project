@@ -183,11 +183,40 @@ Z mass is consistent:
 | top mass | 172.6 | 0.3283 | 81 sigma |
 | Higgs field v | 246.2 | 0.3256 | 126 sigma |
 
-So if the rule is real, the data picks out the Z mass on its own. A physical
-reason fits: the weak mixing angle is the rotation that builds the photon and
-the Z from the two underlying fields, and m_Z is where EM and the weak force
-separate. The share is the charged lepton's division between exactly those
-two forces. (`experiments/weak-angle/which_scale.py`, `which-scale.png`.)
+So if the rule is real, the data picks out the Z mass on its own.
+(`experiments/weak-angle/which_scale.py`, `which-scale.png`.) Physical
+reasons the Z mass is the natural scale:
+
+1. **The Z is the one interaction all three entities select.**
+
+   | Force carrier | Neutrinos | Charged leptons | Quarks |
+   |---|---|---|---|
+   | Photon (EM) | no | yes | yes |
+   | Gluon (strong) | no | no | yes |
+   | W (charged weak) | yes | yes | yes, changing particle type |
+   | **Z (neutral weak)** | **yes** | **yes** | **yes** |
+
+   The Z is the only interaction every entity engages without changing what
+   it is: the shared link between the two selective poles and the
+   non-selective node. Its mass is where it exists as a real particle.
+
+2. **EM and the weak force stop interfering at the Z mass.** In
+   electron-positron collisions the photon and Z routes interfere, with an
+   interference term proportional to (s - m_Z^2), which vanishes exactly at
+   the Z mass. Below it EM dominates; at it the Z process is about 200 times
+   the photon process with no mixing between them. So m_Z is the one energy
+   where EM and the weak force act on charged leptons without interfering:
+   the clean place to define how the charged lepton divides itself between
+   them.
+
+Also relevant: the weak mixing angle is the rotation that builds the photon
+and the Z from the two underlying fields (m_W^2 / m_Z^2 = 1 - sin^2(theta_W)
+in the on-shell definition), and at the Z mass LEP counted the light
+neutrino generations from the Z's decay width (N = 2.996 +- 0.007).
+
+These make the Z mass non-arbitrary for the framework, but none of them
+produces the 1/3. Reason 2 is the closest to a mechanism: it explains where
+the division should be defined, not why it is 1/3 there.
 
 **Why 1/3 (open).** No derivation. Candidates:
 
