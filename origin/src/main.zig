@@ -12,6 +12,7 @@ const charge = @import("analysis/charge.zig");
 const majorana = @import("analysis/majorana.zig");
 const selection = @import("analysis/selection.zig");
 const universality = @import("analysis/universality.zig");
+const generations = @import("analysis/generations.zig");
 const export_ = @import("dataset/export.zig");
 const weak_svg = @import("visualization/weak_svg.zig");
 const kinematics = @import("analysis/kinematics.zig");
@@ -30,6 +31,7 @@ test {
     _ = majorana;
     _ = selection;
     _ = universality;
+    _ = generations;
     _ = export_;
     _ = weak_svg;
     _ = kinematics;
@@ -73,6 +75,7 @@ fn help() void {
         \\  origin majorana
         \\  origin export
         \\  origin universality
+        \\  origin generations
         \\  origin display [dataset] [event]
         \\  origin help
         \\
@@ -654,6 +657,64 @@ fn app(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !vo
     try writeAndOpen(io, gpa, "app.html", html, open_it);
 }
 
+fn generationsReport() void {
+    const g = generations;
+    std.debug.print(
+        \\
+        \\========================================
+        \\          MASS WITHIN AN ENTITY
+        \\========================================
+        \\
+        \\sqrt(m_k) = mu (1 + A cos(delta + 2 pi k/3))
+        \\  mu    identity scale (the (1,1,1) part)
+        \\  A     how differentiated the copies are (A = sqrt 2 is Koide's Q = 2/3)
+        \\  delta direction of differentiation
+        \\
+        \\  {s:<20} {s:>10} {s:>9} {s:>9} {s:>9}
+        \\
+    , .{ "ENTITY", "mu (MeV^.5)", "A", "delta", "Q" });
+    const lep = g.fit(1776.93, g.m_e, g.m_mu);
+    const fermions = [_]struct { name: []const u8, p: g.Params }{
+        .{ .name = "charged leptons", .p = lep },
+        .{ .name = "down quarks", .p = g.fit(particles.bottom.mass_kg / particles.mev_to_kg, particles.down.mass_kg / particles.mev_to_kg, particles.strange.mass_kg / particles.mev_to_kg) },
+        .{ .name = "up quarks", .p = g.fit(particles.top.mass_kg / particles.mev_to_kg, particles.up.mass_kg / particles.mev_to_kg, particles.charm.mass_kg / particles.mev_to_kg) },
+    };
+    for (fermions) |f| {
+        std.debug.print("  {s:<20} {d:>10.4} {d:>9.5} {d:>9.5} {d:>9.5}\n", .{ f.name, f.p.mu, f.p.a, f.p.delta, f.p.q });
+    }
+    std.debug.print("  (quark masses are scheme-dependent; quark rows are indicative)\n", .{});
+
+    const t = g.koideTau(g.m_e, g.m_mu);
+    std.debug.print(
+        \\
+        \\TAU MASS: Koide's prediction from the electron and muon alone
+        \\  prediction (Q = 2/3 exactly)       {d:.4} MeV
+        \\
+        \\  {s:<20} {s:>12} {s:>9} {s:>9}
+        \\
+    , .{ t, "MEASUREMENT", "MeV", "ERROR", "PULL" });
+    for (g.tau_measurements) |m| {
+        std.debug.print("  {s:<20} {d:>12.3} {d:>9.3} {d:>8.2}s\n", .{ m.name, m.value, m.err, (m.value - t) / m.err });
+    }
+
+    // delta and its uncertainty from the tau mass (electron, muon errors negligible).
+    const lo = g.fit(1776.93 - 0.09, g.m_e, g.m_mu).delta;
+    const hi = g.fit(1776.93 + 0.09, g.m_e, g.m_mu).delta;
+    const d_err = @abs(hi - lo) / 2;
+    const r = g.ratiosFrom(2.0 / 9.0);
+    std.debug.print(
+        \\
+        \\DIRECTION: Brannen's delta = 2/9 for charged leptons
+        \\  measured delta = {d:.7} +- {d:.7}    2/9 = {d:.7}    pull {d:.2}s
+        \\  With A = sqrt 2 and delta = 2/9 exactly, mass ratios are fixed:
+        \\    m_mu / m_e  predicted {d:.3}   measured {d:.3}
+        \\    m_tau / m_e predicted {d:.2}  measured {d:.2}
+        \\
+        \\  Caveat: 2/9 was noticed after the fact, among many simple fractions.
+        \\
+    , .{ lep.delta, d_err, 2.0 / 9.0, (lep.delta - 2.0 / 9.0) / d_err, r.mu_over_e, g.m_mu / g.m_e, r.tau_over_e, 1776.93 / g.m_e });
+}
+
 fn universalityReport() void {
     const r = universality.cmsRatio();
     std.debug.print(
@@ -1012,6 +1073,8 @@ pub fn main(init: std.process.Init) void {
         }
     } else if (std.mem.eql(u8, command, "display")) {
         display(init.io, init.gpa, args.next() orelse "Zmumu", args.next()) catch |err| fail(err);
+    } else if (std.mem.eql(u8, command, "generations")) {
+        generationsReport();
     } else if (std.mem.eql(u8, command, "universality")) {
         universalityReport();
     } else if (std.mem.eql(u8, command, "export")) {
