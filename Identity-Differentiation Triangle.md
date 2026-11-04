@@ -62,3 +62,5 @@ to being tested now.
 - `experiments/koide-projector/lepton-frame.png`: entities in the e, mu, tau
   triangle; the neutrino path shows where each lightest mass would put them.
 - `experiments/koide-projector/three-entities.png`: D by mass and by mixing.
+- `experiments/koide-projector/prediction-window.png`: neutrino D vs total
+  mass for both orderings, with the predicted window.
