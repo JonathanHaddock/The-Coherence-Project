@@ -9,9 +9,14 @@ The fermion entities are **nodes in a larger framework**:
 
 - **Neutrinos** and **quarks** are the poles. A pole is unprojected: it sits
   on a single axis with nothing projected onto the others.
-- **Charged leptons** sit between the poles. **All projection happens in
-  them**: they are the only entity spread across more than one axis.
+- **Charged leptons** are the third point, and the constraint that closes
+  the triangle. **All projection happens in them**: they are the only entity
+  spread across more than one axis.
 - Quarks are confined, so they count as one bound entity.
+
+The triangle's vertices are the three entities: neutrinos at the weak corner,
+quarks at the strong corner, charged leptons toward the electromagnetic
+corner.
 
 ## Measure
 
@@ -59,22 +64,42 @@ Script and charts: `experiments/lepton-separation/` (`strengths.py`,
   weak mixing angle; it moves to 0.11 when the W is included, so it is not
   treated as meaningful.
 
+## Charged leptons as the third point and the constraint
+
+**Third point.** In the main variant two-thirds of the charged-lepton
+interaction vector is electromagnetic, so they occupy the EM side of the
+triangle and no corner is empty. Two caveats:
+
+- They are not a pure point like the poles: they carry the projection
+  (0.11 to 0.33), so the third vertex is occupied but projected.
+- Their dominant axis depends on the weak definition: EM with the Z alone,
+  weak with Z plus W.
+
+**Constraint.** Within each generation the electric charges must sum to zero
+for the Standard Model to be consistent (gauge anomaly cancellation):
+
+| | Charge | Copies (colours) | Total |
+|---|---|---|---|
+| Neutrino | 0 | 1 | 0 |
+| Up quark | +2/3 | 3 | +2 |
+| Down quark | -1/3 | 3 | -1 |
+| **Charged lepton** | **-1** | 1 | **-1** |
+| **Sum** | | | **0** |
+
+The quarks alone leave +1; the charged lepton is exactly what cancels it.
+The other anomaly conditions (hypercharge cubed, mixed gravitational) also
+close only with leptons and quarks together. So the charged lepton's charge
+is fixed by the quarks, and the neutrino (charge 0) takes no part in the
+balance. This is measured: atoms are neutral because the electron's charge
+cancels the proton's, confirmed to better than about 1 part in 1e21.
+
+This is standard Standard-Model structure, so it supports the framework
+without being a new prediction. It replaces an earlier open question (an
+empty EM corner, which would have required an EM-only fermion).
+
 ## Predictions
 
-1. **The empty corner (open question).** The force triangle has three
-   corners but only two poles: neutrinos at the weak corner, quarks at the
-   strong corner. No known fermion sits at the electromagnetic corner. The
-   framework must either
-   - **predict an EM-only fermion** (a millicharged particle with no weak or
-     strong interaction), searched for by milliQan (LHC), SENSEI and FerMINI;
-     a detection would complete the triangle; or
-   - **be two-pole by nature**, and explain why EM has no pole. (In the
-     Standard Model, electric charge comes with the weak force through
-     hypercharge, which is why no EM-only fermion exists.)
-
-   Which of these the framework claims is still to be decided.
-
-2. **Neutrinos stay unprojected.** A pure pole has no electromagnetic
+1. **Neutrinos stay unprojected.** A pure pole has no electromagnetic
    coupling beyond the Standard Model's minimal amount: no neutrino magnetic
    moment above about 1e-19 Bohr magnetons, and no electric charge. Current
    limits are about 6e-12 Bohr magnetons (XENONnT, LZ). A detected moment
@@ -83,7 +108,7 @@ Script and charts: `experiments/lepton-separation/` (`strengths.py`,
    null result, so continued nulls support the framework without
    distinguishing it.
 
-3. **Charged-lepton projection of exactly 1/3 (probably coincidence).** In
+2. **Charged-lepton projection of exactly 1/3 (probably coincidence).** In
    the main variant the share is 0.3334. Exactly 1/3 requires
    sin^2(theta_W) = 0.231246 in the MS-bar scheme at m_Z; measured
    0.23122 +- 0.00004 (0.7 sigma). It fails other definitions of the angle
@@ -104,7 +129,10 @@ force and would sit outside the framework.
   accessible energies).
 - A new fermion entity that fits neither a pole nor the projecting middle.
 - A neutrino magnetic moment or charge detected above the Standard Model
-  level (prediction 2).
+  level (prediction 1).
+- A measured imbalance between electron and proton charge (matter not
+  exactly neutral), which would break the charged lepton's role as the
+  constraint.
 
 The result rests on measured couplings, but which axes count and how they are
 weighted are modelling choices, so it is a structural description more than a
