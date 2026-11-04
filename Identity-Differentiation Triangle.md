@@ -188,6 +188,38 @@ by mass.
    Model. Computed by `origin charge`; chart
    `experiments/neutrino-charge/eps-bounds.png`.
 
+4. **Neutrinos are their own antiparticles (Majorana).** A pole carrying no
+   charge of any kind is most naturally Majorana. This is an assumption
+   beyond selection (lepton number is not a force), stated here explicitly.
+   It links to prediction 3: with right-handed neutrinos, a Majorana mass
+   forces charge quantization, so Majorana neutrinos imply eps = 0 (Babu and
+   Mohapatra, 1989).
+
+   The signal is neutrinoless double-beta decay, whose rate is set by the
+   effective Majorana mass m_bb. Over all Majorana phases:
+
+   | Lightest mass | Normal ordering | Inverted ordering |
+   |---|---|---|
+   | 0 | 1.5 to 3.7 meV | 18.1 to 47.8 meV |
+   | 0.005 eV | 0 to 7.5 meV | 18.1 to 48.1 meV |
+   | 0.03 eV | 9.7 to 31.0 meV | 20.7 to 56.7 meV |
+
+   | Experiment | Reach in m_bb | Status |
+   |---|---|---|
+   | KamLAND-Zen 800 | 28 to 122 meV | current limit, T1/2 > 3.8e26 yr |
+   | LEGEND-1000 | 9 to 24 meV | planned |
+   | nEXO | 4.7 to 20.3 meV | planned |
+
+   A signal would confirm Majorana neutrinos (and eps = 0). No signal
+   refutes the framework only if the inverted ordering is established, and
+   even then only for the more favourable nuclear models: the inverted
+   minimum (18.1 meV) is just beyond the most pessimistic reach. In normal
+   ordering m_bb can cancel to zero, so Majorana neutrinos can hide from
+   every planned experiment. Limitation: the decay rate depends on neutrino
+   masses, which the framework excludes, so it predicts the yes/no nature
+   but not the rate. Computed by `origin majorana`; chart
+   `experiments/majorana/lobster.png`.
+
 Not predictions: quarks become less selective at higher energies and the
 weighting structure dissolves near coupling unification (standard running,
 which sets the framework's range rather than testing it); sterile neutrinos

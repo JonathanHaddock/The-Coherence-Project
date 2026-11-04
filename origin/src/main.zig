@@ -9,6 +9,7 @@ const koide = @import("analysis/koide.zig");
 const projector = @import("analysis/projector.zig");
 const weak = @import("analysis/weak.zig");
 const charge = @import("analysis/charge.zig");
+const majorana = @import("analysis/majorana.zig");
 const weak_svg = @import("visualization/weak_svg.zig");
 const kinematics = @import("analysis/kinematics.zig");
 const manifest = @import("dataset/manifest.zig");
@@ -23,6 +24,7 @@ test {
     _ = projector;
     _ = weak;
     _ = charge;
+    _ = majorana;
     _ = weak_svg;
     _ = kinematics;
     _ = manifest;
@@ -62,6 +64,7 @@ fn help() void {
         \\  origin app [--no-open]
         \\  origin weak [--no-open]
         \\  origin charge
+        \\  origin majorana
         \\  origin display [dataset] [event]
         \\  origin help
         \\
@@ -643,6 +646,47 @@ fn app(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !vo
     try writeAndOpen(io, gpa, "app.html", html, open_it);
 }
 
+fn majoranaReport() void {
+    std.debug.print(
+        \\
+        \\========================================
+        \\          MAJORANA TEST
+        \\========================================
+        \\
+        \\Framework: neutrinos are a pole carrying no charge of any kind, so
+        \\they are their own antiparticles (Majorana). Majorana neutrinos also
+        \\force charge quantization (eps = 0, target 1; Babu-Mohapatra 1989).
+        \\
+        \\Signal: neutrinoless double-beta decay, at a rate set by the effective
+        \\Majorana mass m_bb. Its range, scanning the two unknown phases:
+        \\
+        \\  {s:>10}   {s:>22}   {s:>22}
+        \\
+    , .{ "lightest", "normal ordering (meV)", "inverted ordering (meV)" });
+    for ([_]f64{ 0, 0.001, 0.003, 0.005, 0.01, 0.03, 0.1 }) |l| {
+        const n = majorana.band(l, .normal);
+        const i = majorana.band(l, .inverted);
+        std.debug.print("  {d:>7.3} eV   {d:>9.2} to {d:>9.2}   {d:>9.2} to {d:>9.2}\n", .{ l, n.min * 1e3, n.max * 1e3, i.min * 1e3, i.max * 1e3 });
+    }
+    std.debug.print("\nEXPERIMENTS (reach in m_bb; range = nuclear-model uncertainty)\n", .{});
+    for (majorana.experiments) |e| {
+        std.debug.print("  {s:<26} {d:>6.1} to {d:>6.1} meV   {s}\n", .{ e.name, e.lo * 1e3, e.hi * 1e3, e.status });
+    }
+    const io = majorana.band(0, .inverted);
+    std.debug.print(
+        \\
+        \\  Inverted ordering never drops below {d:.1} meV: within reach of
+        \\  LEGEND-1000 and nEXO for most nuclear models, just out of reach for the
+        \\  most pessimistic ones (24 and 20.3 meV). Normal ordering can cancel to
+        \\  zero for a lightest mass of a few meV, beyond any planned experiment.
+        \\
+        \\  A signal would confirm the framework's Majorana neutrinos (and eps = 0).
+        \\  No signal refutes it only if the inverted ordering is established;
+        \\  in normal ordering, Majorana neutrinos can still hide.
+        \\
+    , .{io.min * 1e3});
+}
+
 fn chargeReport() void {
     std.debug.print(
         \\
@@ -916,6 +960,8 @@ pub fn main(init: std.process.Init) void {
         }
     } else if (std.mem.eql(u8, command, "display")) {
         display(init.io, init.gpa, args.next() orelse "Zmumu", args.next()) catch |err| fail(err);
+    } else if (std.mem.eql(u8, command, "majorana")) {
+        majoranaReport();
     } else if (std.mem.eql(u8, command, "charge")) {
         chargeReport();
     } else if (std.mem.eql(u8, command, "weak")) {
