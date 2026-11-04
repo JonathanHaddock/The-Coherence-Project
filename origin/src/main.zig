@@ -545,6 +545,17 @@ fn koideReport() void {
     koideFamily("Down-type quarks", particles.down, particles.strange, particles.bottom);
     koideFamily("Up-type quarks", particles.up, particles.charm, particles.top);
 
+    // Quarks are confined, so also treat them as one bound entity: merge
+    // each generation's up and down partner (u+d, c+s, t+b).
+    const g1 = particles.up.mass_kg + particles.down.mass_kg;
+    const g2 = particles.charm.mass_kg + particles.strange.mass_kg;
+    const g3 = particles.top.mass_kg + particles.bottom.mass_kg;
+    const qq = koide.ratio(g1, g2, g3);
+    const dq = koide.organization(qq);
+    std.debug.print("  {s:<18} {d:>8.5} {d:>8.3} {d:>8.3} {d:>9.3}   (u+d, c+s, t+b)\n", .{
+        "Quarks, bound", qq, dq, koide.equilibrium(dq), koide.angleDegrees(g1, g2, g3),
+    });
+
     std.debug.print(
         \\
         \\NEUTRINOS: absolute masses unknown, so Q depends on the lightest mass.
