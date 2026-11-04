@@ -1,5 +1,6 @@
 const std = @import("std");
 const spectrum = @import("../analysis/spectrum.zig");
+const labels = @import("labels.zig");
 
 pub const Label = struct {
     name: []const u8,
@@ -15,7 +16,7 @@ const bottom = 70.0;
 
 /// Render a dimuon mass spectrum on log-log axes, with labelled peaks.
 /// Caller frees the returned SVG.
-pub fn render(gpa: std.mem.Allocator, title: []const u8, h: spectrum.LogHistogram, labels: []const Label) ![]u8 {
+pub fn render(gpa: std.mem.Allocator, title: []const u8, h: spectrum.LogHistogram, peaks: []const Label) ![]u8 {
     var out: std.Io.Writer.Allocating = .init(gpa);
     errdefer out.deinit();
     const w = &out.writer;
@@ -71,13 +72,15 @@ pub fn render(gpa: std.mem.Allocator, title: []const u8, h: spectrum.LogHistogra
     }
     try w.print("\"/>\n", .{});
 
-    for (labels, 0..) |label, i| {
-        const x = s.x(label.mass);
-        // Alternate label rows so neighbouring peaks (J/psi, psi(2S)) do not overlap.
-        const label_y = top + 18 + @as(f64, @floatFromInt(i % 2)) * 18;
-        try w.print("<line x1=\"{d:.1}\" y1=\"{d}\" x2=\"{d:.1}\" y2=\"{d}\" stroke=\"#ffca28\" stroke-dasharray=\"3 4\"/>\n", .{ x, label_y + 6, x, top + plot_h });
-        try w.print("<text x=\"{d:.1}\" y=\"{d}\" fill=\"#ffca28\" font-size=\"13\" text-anchor=\"middle\">{s}</text>\n", .{ x, label_y, label.name });
+    // Peak labels go through the label placer: no label overlaps another.
+    var placer = labels.Placer.init(gpa, .{ .x0 = left, .y0 = top, .x1 = left + plot_w, .y1 = top + plot_h });
+    defer placer.deinit();
+    placer.halo = "#080d18";
+    for (peaks) |peak| {
+        const x = s.x(peak.mass);
+        try w.print("<line x1=\"{d:.1}\" y1=\"{d}\" x2=\"{d:.1}\" y2=\"{d}\" stroke=\"#ffca28\" stroke-dasharray=\"3 4\"/>\n", .{ x, top + 30, x, top + plot_h });
     }
+    for (peaks) |peak| try placer.label(w, peak.name, 13, s.x(peak.mass), top + 30, 0, "#ffca28", "normal");
 
     try w.print(
         \\<rect x="{d}" y="{d}" width="{d}" height="{d}" fill="none" stroke="#35465d"/>

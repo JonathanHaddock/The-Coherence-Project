@@ -112,6 +112,42 @@ const points = [
   ...DATA.ckm_columns.map((v, i) => ({ label: ["d", "s", "b"][i], v, e: "quark" })),
 ];
 
+// Chart labelling rule (same as ORIGIN's labels.zig): text never overlaps
+// other text or marks. Marks reserve boxes first; each label then tries
+// right, left, above, below and the diagonals, stepping outward until free.
+class Placer {
+  constructor(bounds) { this.bounds = bounds; this.boxes = []; this.clashes = 0; }
+  static textBox(text, size, x, y, anchor) {
+    const w = text.length * size * 0.62;
+    const x0 = anchor === "start" ? x : anchor === "middle" ? x - w / 2 : x - w;
+    return [x0, y - size * 0.85, x0 + w, y + size * 0.25];
+  }
+  reserve(b) { this.boxes.push(b); }
+  reserveMark(x, y, r) { this.reserve([x - r, y - r, x + r, y + r]); }
+  reserveText(text, size, x, y, anchor) { this.reserve(Placer.textBox(text, size, x, y, anchor)); }
+  free(b) {
+    const [X0, Y0, X1, Y1] = this.bounds, p = 2;
+    if (b[0] < X0 || b[1] < Y0 || b[2] > X1 || b[3] > Y1) return false;
+    return this.boxes.every(o => !(b[0] - p < o[2] && o[0] < b[2] + p && b[1] - p < o[3] && o[1] < b[3] + p));
+  }
+  label(parent, text, size, x, y, r, attrs = {}) {
+    const dirs = [[1, 0], [-1, 0], [0, -1], [0, 1], [1, -1], [-1, -1], [1, 1], [-1, 1]];
+    for (const gap of [4, 12, 22, 36, 54, 78, 110, 150]) {
+      for (const [dx, dy] of dirs) {
+        const reach = r + gap, anchor = dx > 0 ? "start" : dx < 0 ? "end" : "middle";
+        const tx = x + dx * reach, ty = dy < 0 ? y - reach : dy > 0 ? y + reach + size * 0.85 : y + size * 0.32;
+        const b = Placer.textBox(text, size, tx, ty, anchor);
+        if (!this.free(b)) continue;
+        this.reserve(b);
+        if (gap > 14) el("line", { x1: x, y1: y, x2: Math.min(Math.max(x, b[0]), b[2]), y2: Math.min(Math.max(y, b[1]), b[3]), stroke: css("--ink-2"), "stroke-width": 0.8 }, parent);
+        return el("text", { x: tx, y: ty, "font-size": size, "text-anchor": anchor, fill: css("--ink"), stroke: css("--surface"), "stroke-width": 3, "paint-order": "stroke", ...attrs }, parent, text);
+      }
+    }
+    this.clashes++;
+    return null;
+  }
+}
+
 const NS = "http://www.w3.org/2000/svg";
 function el(tag, attrs, parent, text) {
   const n = document.createElementNS(NS, tag);
@@ -157,28 +193,32 @@ function drawTriangle() {
   for (const d of [0.1, 0.25, 0.5, 0.75]) {
     const dashed = d === 0.1 || d === 0.5;
     el("circle", { cx, cy, r: radius(d), fill: "none", stroke: dashed ? css("--ink-2") : css("--grid"), "stroke-dasharray": dashed ? "5 4" : "", "clip-path": "url(#triclip)" }, svg);
-    el("text", { x: cx + 4, y: cy - radius(d) + 13, fill: css("--ink-2"), "font-size": 11 }, svg, `D = ${d}`);
   }
   el("text", { x: cx, y: cy + 6, fill: css("--ink"), "font-size": 18, "text-anchor": "middle" }, svg, "+");
-  [["generation 1", "end", 20], ["generation 2", "start", 20], ["generation 3", "middle", -10]].forEach(([t, a, dy], k) =>
-    el("text", { x: C[k][0], y: C[k][1] + dy, fill: css("--ink-2"), "font-size": 13, "text-anchor": a }, svg, t));
-  const xy = v => { const s = v[0] + v[1] + v[2]; return [0, 1].map(j => v.reduce((acc, x, k) => acc + x / s * C[k][j], 0)); };
-  points.filter(p => shown[p.e]).forEach((p, i) => {
-    const [x, y] = xy(p.v), right = i % 2 === 0;
-    marker(svg, x, y, 12, p.e, tipFor(p.label, p.v, p.e));
-    el("text", { x: right ? x + 9 : x - 9, y: y + 4, fill: css("--ink"), "font-size": 11, "text-anchor": right ? "start" : "end" }, svg, p.label);
+  const placer = new Placer([4, 4, 636, 586]);
+  placer.reserveMark(cx, cy, 6);
+  [["generation 1", "end", 20], ["generation 2", "start", 20], ["generation 3", "middle", -10]].forEach(([t, a, dy], k) => {
+    el("text", { x: C[k][0], y: C[k][1] + dy, fill: css("--ink-2"), "font-size": 13, "text-anchor": a }, svg, t);
+    placer.reserveText(t, 13, C[k][0], C[k][1] + dy, a);
   });
-  if (shown.user && valid(vec)) {
-    const [x, y] = xy(vec);
-    marker(svg, x, y, 16, "user", tipFor("your vector", vec, "user"));
-    el("text", { x: x + 12, y: y - 8, fill: css("--ink"), "font-size": 12, "font-weight": "bold" }, svg, "yours");
-  }
+  const xy = v => { const s = v[0] + v[1] + v[2]; return [0, 1].map(j => v.reduce((acc, x, k) => acc + x / s * C[k][j], 0)); };
+  // Pass 1: every mark reserves its space before any label is placed.
+  const drawn = points.filter(p => shown[p.e]).map(p => ({ p, xy: xy(p.v) }));
+  drawn.forEach(({ p, xy: [x, y] }) => { marker(svg, x, y, 12, p.e, tipFor(p.label, p.v, p.e)); placer.reserveMark(x, y, 7); });
+  const userXY = shown.user && valid(vec) ? xy(vec) : null;
+  if (userXY) { marker(svg, userXY[0], userXY[1], 16, "user", tipFor("your vector", vec, "user")); placer.reserveMark(userXY[0], userXY[1], 10); }
+  // Pass 2: labels, most important first.
+  if (userXY) placer.label(svg, "yours", 12, userXY[0], userXY[1], 10, { "font-weight": "bold" });
+  drawn.forEach(({ p, xy: [x, y] }) => placer.label(svg, p.label, 11, x, y, 7));
+  placer.label(svg, "identity", 11, cx, cy, 6, { fill: css("--ink-2") });
+  for (const d of [0.1, 0.25, 0.5, 0.75]) placer.label(svg, `D = ${d}`, 11, cx, cy - radius(d), 0, { fill: css("--ink-2") });
+  svg.dataset.clashes = placer.clashes;
 }
 
 function drawAxis() {
   const svg = document.getElementById("axis");
   svg.innerHTML = "";
-  const x0 = 200, x1 = 740, top = 30, rowH = 58;
+  const x0 = 210, x1 = 730, top = 40, rowH = 72;
   const rows = [["nu", points.filter(p => p.e === "nu")], ["lep", points.filter(p => p.e === "lep")], ["quark", points.filter(p => p.e === "quark")]];
   if (valid(vec)) rows.push(["user", [{ label: "yours", v: vec, e: "user" }]]);
   const visible = rows.filter(([e]) => shown[e]);
@@ -186,26 +226,39 @@ function drawAxis() {
   svg.setAttribute("viewBox", `0 0 760 ${bottom + 50}`);
   const sx = d => x0 + (x1 - x0) * d;
   el("rect", { x: x0, y: top - 14, width: sx(0.1) - x0, height: bottom - top + 14, fill: css("--band") }, svg);
-  el("text", { x: x0 + 3, y: top - 18, fill: css("--ink-2"), "font-size": 10 }, svg, "identity band");
+  const placer = new Placer([4, 2, 756, bottom + 48]);
   for (const d of [0, 0.25, 0.5, 0.75, 1]) {
     el("line", { x1: sx(d), x2: sx(d), y1: top - 14, y2: bottom, stroke: d === 0.5 ? css("--ink-2") : css("--grid"), "stroke-dasharray": d === 0.5 ? "5 4" : "" }, svg);
     el("text", { x: sx(d), y: bottom + 16, fill: css("--ink-2"), "font-size": 11, "text-anchor": "middle" }, svg, d);
+    placer.reserveText(String(d), 11, sx(d), bottom + 16, "middle");
   }
-  el("text", { x: (x0 + x1) / 2, y: bottom + 36, fill: css("--ink-2"), "font-size": 12, "text-anchor": "middle" }, svg, "D   (0 = identity, 1 = differentiation)");
-  visible.forEach(([e, pts], r) => {
+  const axisTitle = "D   (0 = identity, 1 = differentiation)";
+  el("text", { x: (x0 + x1) / 2, y: bottom + 36, fill: css("--ink-2"), "font-size": 12, "text-anchor": "middle" }, svg, axisTitle);
+  placer.reserveText(axisTitle, 12, (x0 + x1) / 2, bottom + 36, "middle");
+  // Pass 1: marks and mean bars.
+  const rowsDrawn = visible.map(([e, pts], r) => {
     const y = top + rowH * (r + 0.5);
     el("line", { x1: x0, x2: x1, y1: y, y2: y, stroke: css("--grid") }, svg);
     el("text", { x: x0 - 10, y: y + 4, fill: css("--ink"), "font-size": 12, "text-anchor": "end" }, svg, ENTITY[e].name);
+    placer.reserveText(ENTITY[e].name, 12, x0 - 10, y + 4, "end");
     let mean = 0;
-    pts.forEach((p, i) => {
+    pts.forEach(p => {
       const d = split(p.v).d; mean += d;
       marker(svg, sx(d), y, 11, e, tipFor(p.label, p.v, e));
-      el("text", { x: sx(d), y: i % 2 ? y + 20 : y - 10, fill: css("--ink"), "font-size": 10, "text-anchor": "middle" }, svg, p.label);
+      placer.reserveMark(sx(d), y, 7);
     });
     mean /= pts.length;
     el("line", { x1: sx(mean), x2: sx(mean), y1: y - 20, y2: y + 20, stroke: css(ENTITY[e].color), "stroke-width": 3 }, svg);
-    el("text", { x: sx(mean) + 5, y: y - 14, fill: css("--ink"), "font-size": 11, "font-weight": "bold" }, svg, `mean ${fmt(mean, 2)}`);
+    placer.reserve([sx(mean) - 2, y - 20, sx(mean) + 2, y + 20]);
+    return { e, pts, y, mean };
   });
+  // Pass 2: labels.
+  rowsDrawn.forEach(({ pts, y, mean }) => {
+    placer.label(svg, `mean ${fmt(mean, 2)}`, 11, sx(mean), y - 20, 0, { "font-weight": "bold" });
+    pts.forEach(p => placer.label(svg, p.label, 10, sx(split(p.v).d), y, 6));
+  });
+  placer.label(svg, "identity band", 10, sx(0.05), top - 14, 0, { fill: css("--ink-2") });
+  svg.dataset.clashes = placer.clashes;
 }
 
 function drawTable() {

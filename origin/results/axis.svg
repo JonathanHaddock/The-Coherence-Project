@@ -1,61 +1,55 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="540" viewBox="0 0 1000 540" font-family="Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="520" viewBox="0 0 1000 520" font-family="Helvetica, Arial, sans-serif">
 <rect width="100%" height="100%" fill="#fcfcfb"/>
 <text x="24" y="38" fill="#1f1f1e" font-size="20" font-weight="bold">Entities on the identity-differentiation axis (no mass)</text>
-<rect x="260.0" y="70" width="70.0" height="380" fill="#1baf7a" fill-opacity="0.12"/>
-<text x="264.0" y="64" fill="#6b6a64" font-size="11">identity band</text>
-<line x1="260.0" y1="70" x2="260.0" y2="450" stroke="#e6e5e0"/>
-<text x="260.0" y="470" fill="#6b6a64" font-size="12" text-anchor="middle">0</text>
-<line x1="435.0" y1="70" x2="435.0" y2="450" stroke="#e6e5e0"/>
-<text x="435.0" y="470" fill="#6b6a64" font-size="12" text-anchor="middle">0.25</text>
-<line x1="610.0" y1="70" x2="610.0" y2="450" stroke="#6b6a64" stroke-dasharray="5 4"/>
-<text x="610.0" y="470" fill="#6b6a64" font-size="12" text-anchor="middle">0.5</text>
-<line x1="785.0" y1="70" x2="785.0" y2="450" stroke="#e6e5e0"/>
-<text x="785.0" y="470" fill="#6b6a64" font-size="12" text-anchor="middle">0.75</text>
-<line x1="960.0" y1="70" x2="960.0" y2="450" stroke="#e6e5e0"/>
-<text x="960.0" y="470" fill="#6b6a64" font-size="12" text-anchor="middle">1</text>
-<text x="610.0" y="494" fill="#6b6a64" font-size="13" text-anchor="middle">D   (0 = identity, 1 = differentiation)</text>
-<line x1="260.0" y1="135.0" x2="960.0" y2="135.0" stroke="#e6e5e0"/>
-<text x="246.0" y="139.0" fill="#1f1f1e" font-size="13" text-anchor="end">neutrinos (PMNS columns)</text>
-<polygon points="318.2,127.8 311.6,139.8 324.8,139.8" fill="#1baf7a" stroke="#fcfcfb" stroke-width="1.5"/>
-<text x="318.2" y="123.0" fill="#1f1f1e" font-size="11" text-anchor="middle">nu1</text>
-<polygon points="260.6,127.8 254.0,139.8 267.2,139.8" fill="#1baf7a" stroke="#fcfcfb" stroke-width="1.5"/>
-<text x="260.6" y="157.0" fill="#1f1f1e" font-size="11" text-anchor="middle">nu2</text>
-<polygon points="350.3,127.8 343.7,139.8 356.9,139.8" fill="#1baf7a" stroke="#fcfcfb" stroke-width="1.5"/>
-<text x="350.3" y="123.0" fill="#1f1f1e" font-size="11" text-anchor="middle">nu3</text>
-<line x1="309.7" y1="109.0" x2="309.7" y2="161.0" stroke="#1baf7a" stroke-width="3"/>
-<text x="309.7" y="103.0" fill="#1f1f1e" font-size="12" font-weight="bold" text-anchor="middle">mean 0.07</text>
-<line x1="260.0" y1="225.0" x2="960.0" y2="225.0" stroke="#e6e5e0"/>
-<text x="246.0" y="229.0" fill="#1f1f1e" font-size="13" text-anchor="end">charged leptons (PMNS rows)</text>
-<circle cx="364.9" cy="225.0" r="6.0" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"/>
-<text x="364.9" y="213.0" fill="#1f1f1e" font-size="11" text-anchor="middle">e</text>
-<circle cx="300.1" cy="225.0" r="6.0" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"/>
-<text x="300.1" y="247.0" fill="#1f1f1e" font-size="11" text-anchor="middle">mu</text>
-<circle cx="265.4" cy="225.0" r="6.0" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"/>
-<text x="265.4" y="213.0" fill="#1f1f1e" font-size="11" text-anchor="middle">tau</text>
-<line x1="310.1" y1="199.0" x2="310.1" y2="251.0" stroke="#2a78d6" stroke-width="3"/>
-<text x="310.1" y="193.0" fill="#1f1f1e" font-size="12" font-weight="bold" text-anchor="middle">mean 0.07</text>
-<line x1="260.0" y1="315.0" x2="960.0" y2="315.0" stroke="#e6e5e0"/>
-<text x="246.0" y="319.0" fill="#1f1f1e" font-size="13" text-anchor="end">quarks, bound (CKM rows and columns)</text>
-<rect x="629.4" y="309.0" width="12.0" height="12.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
-<text x="635.4" y="303.0" fill="#1f1f1e" font-size="11" text-anchor="middle">u</text>
-<rect x="586.7" y="309.0" width="12.0" height="12.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
-<text x="592.7" y="337.0" fill="#1f1f1e" font-size="11" text-anchor="middle">c</text>
-<rect x="858.5" y="309.0" width="12.0" height="12.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
-<text x="864.5" y="303.0" fill="#1f1f1e" font-size="11" text-anchor="middle">t</text>
-<rect x="623.8" y="309.0" width="12.0" height="12.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
-<text x="629.8" y="337.0" fill="#1f1f1e" font-size="11" text-anchor="middle">d</text>
-<rect x="587.3" y="309.0" width="12.0" height="12.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
-<text x="593.3" y="303.0" fill="#1f1f1e" font-size="11" text-anchor="middle">s</text>
-<rect x="866.1" y="309.0" width="12.0" height="12.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
-<text x="872.1" y="337.0" fill="#1f1f1e" font-size="11" text-anchor="middle">b</text>
-<line x1="698.0" y1="289.0" x2="698.0" y2="341.0" stroke="#eb6834" stroke-width="3"/>
-<text x="698.0" y="283.0" fill="#1f1f1e" font-size="12" font-weight="bold" text-anchor="middle">mean 0.63</text>
-<line x1="260.0" y1="405.0" x2="960.0" y2="405.0" stroke="#e6e5e0"/>
-<text x="246.0" y="409.0" fill="#1f1f1e" font-size="13" text-anchor="end">your vector</text>
-<polygon points="309.0,397.2 316.8,405.0 309.0,412.8 301.2,405.0" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="1.5"/>
-<text x="309.0" y="393.0" fill="#1f1f1e" font-size="11" text-anchor="middle">yours</text>
-<line x1="309.0" y1="379.0" x2="309.0" y2="431.0" stroke="#4a3aa7" stroke-width="3"/>
-<text x="309.0" y="373.0" fill="#1f1f1e" font-size="12" font-weight="bold" text-anchor="middle">mean 0.07</text>
-<text x="24" y="524" fill="#6b6a64" font-size="11">Mass-free: PMNS and CKM amplitudes, PDG 2024. D = (Q - 1/3)/(2/3), Q = |v|^2/(sum v)^2. Identity band D &lt;= 0.1. Bar = row mean.</text>
+<rect x="290.0" y="80" width="65.0" height="350" fill="#1baf7a" fill-opacity="0.12"/>
+<line x1="290.0" y1="80" x2="290.0" y2="430" stroke="#e6e5e0"/>
+<text x="290.0" y="450" fill="#6b6a64" font-size="12" text-anchor="middle">0</text>
+<line x1="452.5" y1="80" x2="452.5" y2="430" stroke="#e6e5e0"/>
+<text x="452.5" y="450" fill="#6b6a64" font-size="12" text-anchor="middle">0.25</text>
+<line x1="615.0" y1="80" x2="615.0" y2="430" stroke="#6b6a64" stroke-dasharray="5 4"/>
+<text x="615.0" y="450" fill="#6b6a64" font-size="12" text-anchor="middle">0.5</text>
+<line x1="777.5" y1="80" x2="777.5" y2="430" stroke="#e6e5e0"/>
+<text x="777.5" y="450" fill="#6b6a64" font-size="12" text-anchor="middle">0.75</text>
+<line x1="940.0" y1="80" x2="940.0" y2="430" stroke="#e6e5e0"/>
+<text x="940.0" y="450" fill="#6b6a64" font-size="12" text-anchor="middle">1</text>
+<text x="615.0" y="474" fill="#6b6a64" font-size="13" text-anchor="middle">D   (0 = identity, 1 = differentiation)</text>
+<line x1="290.0" y1="155.0" x2="940.0" y2="155.0" stroke="#e6e5e0"/>
+<text x="276.0" y="159.0" fill="#1f1f1e" font-size="13" text-anchor="end">neutrinos (PMNS columns)</text>
+<polygon points="344.0,147.8 337.4,159.8 350.6,159.8" fill="#1baf7a" stroke="#fcfcfb" stroke-width="1.5"/>
+<polygon points="290.5,147.8 283.9,159.8 297.1,159.8" fill="#1baf7a" stroke="#fcfcfb" stroke-width="1.5"/>
+<polygon points="373.8,147.8 367.2,159.8 380.4,159.8" fill="#1baf7a" stroke="#fcfcfb" stroke-width="1.5"/>
+<line x1="336.1" y1="133.0" x2="336.1" y2="177.0" stroke="#1baf7a" stroke-width="3"/>
+<line x1="290.0" y1="265.0" x2="940.0" y2="265.0" stroke="#e6e5e0"/>
+<text x="276.0" y="269.0" fill="#1f1f1e" font-size="13" text-anchor="end">charged leptons (PMNS rows)</text>
+<circle cx="387.4" cy="265.0" r="6.0" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"/>
+<circle cx="327.2" cy="265.0" r="6.0" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"/>
+<circle cx="295.0" cy="265.0" r="6.0" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"/>
+<line x1="336.5" y1="243.0" x2="336.5" y2="287.0" stroke="#2a78d6" stroke-width="3"/>
+<line x1="290.0" y1="375.0" x2="940.0" y2="375.0" stroke="#e6e5e0"/>
+<text x="276.0" y="379.0" fill="#1f1f1e" font-size="13" text-anchor="end">quarks, bound (CKM rows and columns)</text>
+<rect x="632.6" y="369.0" width="12.0" height="12.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
+<rect x="592.9" y="369.0" width="12.0" height="12.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
+<rect x="845.4" y="369.0" width="12.0" height="12.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
+<rect x="627.4" y="369.0" width="12.0" height="12.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
+<rect x="593.5" y="369.0" width="12.0" height="12.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
+<rect x="852.4" y="369.0" width="12.0" height="12.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
+<line x1="696.7" y1="353.0" x2="696.7" y2="397.0" stroke="#eb6834" stroke-width="3"/>
+<text x="340.1" y="136.8" fill="#1f1f1e" font-size="12" font-weight="bold" text-anchor="start" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">mean 0.07</text>
+<text x="354.0" y="174.4" fill="#1f1f1e" font-size="11" font-weight="normal" text-anchor="start" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">nu1</text>
+<text x="300.5" y="158.5" fill="#1f1f1e" font-size="11" font-weight="normal" text-anchor="start" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">nu2</text>
+<text x="383.8" y="158.5" fill="#1f1f1e" font-size="11" font-weight="normal" text-anchor="start" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">nu3</text>
+<text x="340.5" y="246.8" fill="#1f1f1e" font-size="12" font-weight="bold" text-anchor="start" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">mean 0.07</text>
+<text x="397.4" y="268.5" fill="#1f1f1e" font-size="11" font-weight="normal" text-anchor="start" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">e</text>
+<text x="317.2" y="284.4" fill="#1f1f1e" font-size="11" font-weight="normal" text-anchor="end" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">mu</text>
+<text x="285.0" y="284.4" fill="#1f1f1e" font-size="11" font-weight="normal" text-anchor="end" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">tau</text>
+<text x="700.7" y="356.8" fill="#1f1f1e" font-size="12" font-weight="bold" text-anchor="start" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">mean 0.63</text>
+<text x="648.6" y="378.5" fill="#1f1f1e" font-size="11" font-weight="normal" text-anchor="start" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">u</text>
+<text x="608.9" y="378.5" fill="#1f1f1e" font-size="11" font-weight="normal" text-anchor="start" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">c</text>
+<text x="841.4" y="378.5" fill="#1f1f1e" font-size="11" font-weight="normal" text-anchor="end" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">t</text>
+<text x="633.4" y="394.4" fill="#1f1f1e" font-size="11" font-weight="normal" text-anchor="middle" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">d</text>
+<text x="589.5" y="378.5" fill="#1f1f1e" font-size="11" font-weight="normal" text-anchor="end" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">s</text>
+<text x="868.4" y="378.5" fill="#1f1f1e" font-size="11" font-weight="normal" text-anchor="start" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">b</text>
+<text x="326.5" y="83.5" fill="#6b6a64" font-size="11" font-weight="normal" text-anchor="start" stroke="#fcfcfb" stroke-width="3" paint-order="stroke" stroke-linejoin="round">identity band</text>
+<text x="24" y="504" fill="#6b6a64" font-size="11">Mass-free: PMNS and CKM amplitudes, PDG 2024. D = (Q - 1/3)/(2/3), Q = |v|^2/(sum v)^2. Identity band D &lt;= 0.1. Bar = row mean.</text>
 </svg>

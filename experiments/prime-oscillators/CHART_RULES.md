@@ -31,3 +31,10 @@ styling charts by hand.
     and direct labels for the set under test.
 12. **Output:** numbered PNG files in `results/`, 10 x 6 inches at 110 dpi,
     with the numbers behind them in `results/summary.txt`.
+13. **Text never overlaps text or marks.** Every mark and label reserves a
+    box; each new label tries positions around its point (right, left, above,
+    below, diagonals), stepping outward until it finds free space, and gets a
+    leader line if it lands away from its point. Labels carry a halo in the
+    background colour so lines pass behind them. Implemented in ORIGIN as
+    `origin/src/visualization/labels.zig` (and the same algorithm in the app);
+    `zig build test` fails if any standard chart has a label clash.

@@ -25,6 +25,7 @@ test {
     _ = spectrum;
     _ = detector;
     _ = projector_svg;
+    _ = @import("visualization/labels.zig");
 }
 
 fn header() void {
