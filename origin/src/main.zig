@@ -8,6 +8,7 @@ const observations = @import("science/observations.zig");
 const koide = @import("analysis/koide.zig");
 const projector = @import("analysis/projector.zig");
 const weak = @import("analysis/weak.zig");
+const charge = @import("analysis/charge.zig");
 const weak_svg = @import("visualization/weak_svg.zig");
 const kinematics = @import("analysis/kinematics.zig");
 const manifest = @import("dataset/manifest.zig");
@@ -21,6 +22,7 @@ test {
     _ = koide;
     _ = projector;
     _ = weak;
+    _ = charge;
     _ = weak_svg;
     _ = kinematics;
     _ = manifest;
@@ -59,6 +61,7 @@ fn help() void {
         \\  origin chart [a b c] [--no-open]
         \\  origin app [--no-open]
         \\  origin weak [--no-open]
+        \\  origin charge
         \\  origin display [dataset] [event]
         \\  origin help
         \\
@@ -640,6 +643,56 @@ fn app(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !vo
     try writeAndOpen(io, gpa, "app.html", html, open_it);
 }
 
+fn chargeReport() void {
+    std.debug.print(
+        \\
+        \\========================================
+        \\          NEUTRINO CHARGE TEST
+        \\========================================
+        \\
+        \\With right-handed neutrinos, anomaly cancellation leaves one free
+        \\shift of all electric charges along B - L:  Q = Q_SM + eps (B - L).
+        \\
+        \\  Standard Model + right-handed neutrinos:  eps free (must be measured)
+        \\  Selection framework:                       eps = 0 exactly
+        \\     (neutrinos select only the weak force, so carry no charge)
+        \\
+        \\CHARGES AS A FUNCTION OF eps (checked by ORIGIN's tests)
+        \\  neutrino         -eps
+        \\  electron         -1 - eps
+        \\  up quark         2/3 + eps/3
+        \\  down quark      -1/3 + eps/3
+        \\  proton           1 + eps
+        \\  neutron          eps
+        \\  hydrogen atom    0 for every eps
+        \\  one generation   0 for every eps
+        \\
+        \\MEASUREMENTS CONVERTED TO eps (units of e)
+        \\
+        \\  {s:<34} {s:>12} {s:>11} {s:>8}
+        \\
+    , .{ "MEASUREMENT", "eps", "1 sigma", "PULL"});
+    for (charge.bounds) |b| {
+        if (!b.constrains) {
+            std.debug.print("  {s:<34} {s:>12} {s:>11} {s:>8}\n", .{ b.name, "no limit", "-", "-" });
+            continue;
+        }
+        std.debug.print("  {s:<34} {e:>12.2} {e:>11.2} {d:>7.2}s\n", .{ b.name, b.central, b.err, (b.central - 0) / b.err });
+    }
+    std.debug.print("\nSources:\n", .{});
+    for (charge.bounds) |b| std.debug.print("  {s}: {s}\n", .{ b.name, b.source });
+    std.debug.print(
+        \\
+        \\The framework's eps = 0 is consistent with every measurement. The best
+        \\test is the neutron's charge: |eps| below about 2e-21 e (2 sigma).
+        \\Matter neutrality (hydrogen) cannot test this shift at all.
+        \\Limitation: the minimal Standard Model (no right-handed neutrinos)
+        \\already forces eps = 0, so this separates the framework only from
+        \\the extended Standard Model.
+        \\
+    , .{});
+}
+
 fn weakReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
     var open_it = true;
     while (args.next()) |arg| {
@@ -863,6 +916,8 @@ pub fn main(init: std.process.Init) void {
         }
     } else if (std.mem.eql(u8, command, "display")) {
         display(init.io, init.gpa, args.next() orelse "Zmumu", args.next()) catch |err| fail(err);
+    } else if (std.mem.eql(u8, command, "charge")) {
+        chargeReport();
     } else if (std.mem.eql(u8, command, "weak")) {
         weakReport(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "app")) {

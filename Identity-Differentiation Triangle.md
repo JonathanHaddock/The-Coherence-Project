@@ -166,6 +166,28 @@ by mass.
    like this arises by chance in about 7% of cases and holds only in the
    MS-bar convention, so it is recorded as a likely coincidence.
 
+3. **Neutrinos carry exactly zero electric charge (charge dequantization
+   eps = 0).** With right-handed neutrinos, anomaly cancellation leaves one
+   free shift of all charges along B - L: Q = Q_SM + eps (B - L), giving
+   neutrino -eps, electron -1 - eps, proton 1 + eps, neutron eps, and a
+   hydrogen atom 0 for every eps. The Standard Model with right-handed
+   neutrinos leaves eps free; the framework (neutrinos select only the weak
+   force) requires eps = 0 exactly.
+
+   | Measurement | eps (units of e) | Source |
+   |---|---|---|
+   | Neutron charge | (-0.4 +- 1.1) x 10^-21 | arXiv:2406.19129 |
+   | Neutrino charge, lab neutrality | (-0.6 +- 3.2) x 10^-21 | arXiv:2406.19129 |
+   | Neutrino charge, reactor (GEMMA) | abs < 1.5 x 10^-12 | arXiv:1411.2279 |
+   | Hydrogen / matter neutrality | no bound (hydrogen is neutral for any eps) | |
+
+   eps = 0 is consistent with every measurement; the neutron's charge is the
+   sharpest test (abs(eps) < about 2.6 x 10^-21 at 2 sigma). Limitation:
+   without right-handed neutrinos the minimal Standard Model already forces
+   eps = 0, so this separates the framework only from the extended Standard
+   Model. Computed by `origin charge`; chart
+   `experiments/neutrino-charge/eps-bounds.png`.
+
 Not predictions: quarks become less selective at higher energies and the
 weighting structure dissolves near coupling unification (standard running,
 which sets the framework's range rather than testing it); sterile neutrinos
