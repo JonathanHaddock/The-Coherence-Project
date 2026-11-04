@@ -57,3 +57,14 @@ pub const photon = Particle{
     .mass_kg = 0.0,
     .charge_e = 0.0,
 };
+
+pub const catalogue = [_]Particle{ electron, muon, tau, proton, neutron, photon };
+
+/// Case-insensitive lookup by name ("muon") or symbol ("mu-").
+pub fn find(query: []const u8) ?Particle {
+    const std = @import("std");
+    for (catalogue) |p| {
+        if (std.ascii.eqlIgnoreCase(query, p.name) or std.ascii.eqlIgnoreCase(query, p.symbol)) return p;
+    }
+    return null;
+}

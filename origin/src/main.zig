@@ -5,6 +5,7 @@ const constants = @import("science/constants.zig");
 const units = @import("science/units.zig");
 const particles = @import("science/particles.zig");
 const observations = @import("science/observations.zig");
+const koide = @import("analysis/koide.zig");
 
 fn header() void {
     std.debug.print(
@@ -28,6 +29,7 @@ fn help() void {
         \\  origin observe <particle>
         \\  origin dataset
         \\  origin analyze
+        \\  origin koide
         \\  origin help
         \\
     , .{});
@@ -38,7 +40,7 @@ fn info() void {
         \\
         \\ORIGIN SYSTEM INFORMATION
         \\
-        \\Version:       0.2.0
+        \\Version:       0.3.0
         \\Language:      Zig 0.17.0
         \\Platform:      macOS
         \\Storage:       Local
@@ -230,6 +232,27 @@ fn analyze() void {
     });
 }
 
+fn koideReport() void {
+    const me = particles.electron.mass_kg;
+    const mm = particles.muon.mass_kg;
+    const mt = particles.tau.mass_kg;
+    const q = koide.ratio(me, mm, mt);
+
+    std.debug.print(
+        \\
+        \\========================================
+        \\          KOIDE ANALYSIS
+        \\========================================
+        \\
+        \\Charged leptons: e, mu, tau
+        \\Q measured:      {d:.8}
+        \\Q predicted:     {d:.8}  (2/3)
+        \\Deviation:       {e:.3}
+        \\Angle to (1,1,1): {d:.6} degrees  (45 if Q = 2/3)
+        \\
+    , .{ q, 2.0 / 3.0, q - 2.0 / 3.0, koide.angleDegrees(me, mm, mt) });
+}
+
 pub fn main(init: std.process.Init) void {
     var args = init.minimal.args.iterate();
     _ = args.skip();
@@ -261,21 +284,13 @@ pub fn main(init: std.process.Init) void {
             return;
         };
 
-        if (std.mem.eql(u8, name, "electron")) {
-            observe(particles.electron);
-        } else if (std.mem.eql(u8, name, "muon")) {
-            observe(particles.muon);
-        } else if (std.mem.eql(u8, name, "tau")) {
-            observe(particles.tau);
-        } else if (std.mem.eql(u8, name, "proton")) {
-            observe(particles.proton);
-        } else if (std.mem.eql(u8, name, "neutron")) {
-            observe(particles.neutron);
-        } else if (std.mem.eql(u8, name, "photon")) {
-            observe(particles.photon);
+        if (particles.find(name)) |p| {
+            observe(p);
         } else {
             std.debug.print("Unknown particle: {s}\n", .{name});
         }
+    } else if (std.mem.eql(u8, command, "koide")) {
+        koideReport();
     } else {
         std.debug.print("Unknown command: {s}\n", .{command});
         help();
