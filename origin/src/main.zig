@@ -10,6 +10,8 @@ const kinematics = @import("analysis/kinematics.zig");
 const manifest = @import("dataset/manifest.zig");
 const events = @import("dataset/events.zig");
 const store = @import("dataset/store.zig");
+const spectrum = @import("analysis/spectrum.zig");
+const spectrum_svg = @import("visualization/spectrum_svg.zig");
 
 test {
     _ = koide;
@@ -17,6 +19,7 @@ test {
     _ = manifest;
     _ = events;
     _ = store;
+    _ = spectrum;
 }
 
 fn header() void {
@@ -40,7 +43,7 @@ fn help() void {
         \\  origin constants
         \\  origin observe <particle>
         \\  origin dataset
-        \\  origin analyze
+        \\  origin analyze [dataset]
         \\  origin koide
         \\  origin help
         \\
@@ -234,31 +237,100 @@ fn dataset(io: std.Io, gpa: std.mem.Allocator) !void {
     }
 }
 
-fn analyze() void {
-    const vector = observations.Vector3{
-        .x = 3.0,
-        .y = 4.0,
-        .z = 0.0,
+const default_dataset = "Dimuon_DoubleMu";
+
+fn analyze(io: std.Io, gpa: std.mem.Allocator, name: []const u8) !void {
+    var cat = try store.Catalogue.load(io, gpa);
+    defer cat.deinit();
+    const entry = cat.find(name) orelse {
+        std.debug.print("\nUnknown dataset: {s}. Run 'origin dataset' to list them.\n", .{name});
+        return;
     };
+
+    const evs = try store.loadEvents(io, gpa, entry);
+    defer gpa.free(evs);
+
+    // Opposite-charge pairs only: a neutral resonance decays to mu+ mu-.
+    var masses: std.ArrayList(f64) = .empty;
+    defer masses.deinit(gpa);
+    for (evs) |ev| {
+        if (ev.oppositeCharge()) try masses.append(gpa, ev.mass());
+    }
+    std.mem.sort(f64, masses.items, {}, std.sort.asc(f64));
 
     std.debug.print(
         \\
         \\========================================
-        \\          ORIGIN ANALYSIS
+        \\          DIMUON MASS ANALYSIS
         \\========================================
         \\
-        \\VECTOR ANALYSIS
+        \\Dataset:            {s} (verified)
+        \\Events:             {d}
+        \\Opposite-charge:    {d}
+        \\Mass range:         {d:.3} - {d:.1} GeV
         \\
-        \\X: 3
-        \\Y: 4
-        \\Z: 0
-        \\Magnitude: {}
+        \\SPECTRUM (log scale, # = factor of ~1.25 in events)
         \\
-        \\Analysis status: BASIC CALCULATION
+    , .{ entry.name, evs.len, masses.items.len, masses.items[0], masses.items[masses.items.len - 1] });
+
+    var terminal = try spectrum.LogHistogram.init(gpa, 0.5, 200, 40);
+    defer terminal.deinit(gpa);
+    for (masses.items) |m| terminal.fill(m);
+    const scale = 50.0 / @log(@as(f64, @floatFromInt(@max(terminal.max(), 2))) + 1);
+    for (terminal.counts, 0..) |count, i| {
+        const bar: usize = @intFromFloat(@log(@as(f64, @floatFromInt(count)) + 1) * scale);
+        std.debug.print("  {d:>7.2} GeV {d:>6} ", .{ terminal.edge(i), count });
+        for (0..bar) |_| std.debug.print("#", .{});
+        std.debug.print("\n", .{});
+    }
+
+    std.debug.print(
         \\
-    , .{
-        observations.positionMagnitude(vector),
-    });
+        \\RESONANCES (measured peak vs PDG 2024)
+        \\
+        \\  {s:<12} {s:>10} {s:>10} {s:>9} {s:>8} {s:>9}
+        \\
+    , .{ "PARTICLE", "PDG GeV", "FOUND GeV", "DIFF %", "EVENTS", "PEAK/BKG" });
+
+    var labels: std.ArrayList(spectrum_svg.Label) = .empty;
+    defer labels.deinit(gpa);
+    for (spectrum.known) |r| {
+        // Detector resolution grows with mass; the Z needs a wider window.
+        const half_width: f64 = if (r.pdg_mass > 50) 0.04 else 0.015;
+        const peak = spectrum.findPeak(masses.items, r.pdg_mass, half_width) orelse continue;
+        if (peak.significance_ratio < 1.5) continue;
+        std.debug.print("  {s:<12} {d:>10.4} {d:>10.4} {d:>9.3} {d:>8} {d:>9.1}\n", .{
+            r.name, r.pdg_mass, peak.mass, 100 * (peak.mass - r.pdg_mass) / r.pdg_mass, peak.events, peak.significance_ratio,
+        });
+        try labels.append(gpa, .{ .name = r.name, .mass = peak.mass });
+    }
+    if (labels.items.len == 0) std.debug.print("  none found above background\n", .{});
+
+    // Results: a fine histogram as CSV and SVG.
+    var fine = try spectrum.LogHistogram.init(gpa, 0.25, 300, 300);
+    defer fine.deinit(gpa);
+    for (masses.items) |m| fine.fill(m);
+
+    const stem = entry.name[0 .. std.mem.lastIndexOfScalar(u8, entry.name, '.') orelse entry.name.len];
+    try std.Io.Dir.cwd().createDirPath(io, store.results_dir);
+
+    var csv: std.Io.Writer.Allocating = .init(gpa);
+    defer csv.deinit();
+    try csv.writer.print("mass_lo_gev,mass_hi_gev,events\n", .{});
+    for (fine.counts, 0..) |count, i| try csv.writer.print("{d:.5},{d:.5},{d}\n", .{ fine.edge(i), fine.edge(i + 1), count });
+    const csv_path = try std.fmt.allocPrint(gpa, "{s}/{s}-mass.csv", .{ store.results_dir, stem });
+    defer gpa.free(csv_path);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = csv_path, .data = csv.written() });
+
+    const title = try std.fmt.allocPrint(gpa, "CMS 2011 {s}: DIMUON MASS SPECTRUM ({d} pairs)", .{ stem, masses.items.len });
+    defer gpa.free(title);
+    const svg = try spectrum_svg.render(gpa, title, fine, labels.items);
+    defer gpa.free(svg);
+    const svg_path = try std.fmt.allocPrint(gpa, "{s}/{s}-mass.svg", .{ store.results_dir, stem });
+    defer gpa.free(svg_path);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = svg_path, .data = svg });
+
+    std.debug.print("\nWrote {s}\nWrote {s}\n", .{ csv_path, svg_path });
 }
 
 fn koideFamily(label: []const u8, a: particles.Particle, b: particles.Particle, c: particles.Particle) void {
@@ -345,7 +417,7 @@ pub fn main(init: std.process.Init) void {
     } else if (std.mem.eql(u8, command, "dataset")) {
         dataset(init.io, init.gpa) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "analyze")) {
-        analyze();
+        analyze(init.io, init.gpa, args.next() orelse default_dataset) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "observe")) {
         const name = args.next() orelse {
             std.debug.print("Usage: origin observe <particle>\n", .{});
