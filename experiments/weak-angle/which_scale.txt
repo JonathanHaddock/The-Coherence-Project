@@ -1,0 +1,9 @@
+d sin^2 / d ln(mu) near m_Z = 0.00499
+share = 1/3 at mu = 90.4 +- 0.7 GeV
+
+scale               mu (GeV)     sin^2    share  pull from rule
+W mass                 80.37   0.23066   0.3343           14.7s
+Z mass                 91.19   0.23129   0.3333           -1.1s
+Higgs mass            125.20   0.23288   0.3307          -40.7s
+top mass              172.60   0.23449   0.3283          -81.0s
+Higgs field (v)       246.20   0.23627   0.3256         -125.7s
