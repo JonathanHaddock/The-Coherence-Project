@@ -13,6 +13,7 @@ const events = @import("dataset/events.zig");
 const store = @import("dataset/store.zig");
 const spectrum = @import("analysis/spectrum.zig");
 const spectrum_svg = @import("visualization/spectrum_svg.zig");
+const projector_svg = @import("visualization/projector_svg.zig");
 
 test {
     _ = koide;
@@ -23,6 +24,7 @@ test {
     _ = store;
     _ = spectrum;
     _ = detector;
+    _ = projector_svg;
 }
 
 fn header() void {
@@ -49,6 +51,8 @@ fn help() void {
         \\  origin analyze [dataset]
         \\  origin koide
         \\  origin project [a b c]
+        \\  origin chart [a b c] [--no-open]
+        \\  origin app [--no-open]
         \\  origin display [dataset] [event]
         \\  origin help
         \\
@@ -492,6 +496,144 @@ fn projectReport(args: *std.process.Args.Iterator) void {
     , .{ lepton_d, quark_d });
 }
 
+/// Mass-free points for each entity, from the mixing matrices.
+fn mixingPoints(buf: *[12]projector_svg.Point) [3][]const projector_svg.Point {
+    const u = projector.pmns();
+    const v = projector.ckm;
+    const nu = [_][]const u8{ "nu1", "nu2", "nu3" };
+    const lep = [_][]const u8{ "e", "mu", "tau" };
+    const up = [_][]const u8{ "u", "c", "t" };
+    const down = [_][]const u8{ "d", "s", "b" };
+    for (0..3) |i| {
+        buf[i] = .{ .label = nu[i], .v = projector.column(u, i), .entity = projector_svg.neutrinos };
+        buf[3 + i] = .{ .label = lep[i], .v = projector.row(u, i), .entity = projector_svg.charged_leptons };
+        buf[6 + i] = .{ .label = up[i], .v = projector.row(v, i), .entity = projector_svg.quarks };
+        buf[9 + i] = .{ .label = down[i], .v = projector.column(v, i), .entity = projector_svg.quarks };
+    }
+    return .{ buf[0..3], buf[3..6], buf[6..12] };
+}
+
+fn writeAndOpen(io: std.Io, gpa: std.mem.Allocator, name: []const u8, svg: []const u8, open_it: bool) !void {
+    try std.Io.Dir.cwd().createDirPath(io, store.results_dir);
+    const path = try std.fmt.allocPrint(gpa, "{s}/{s}", .{ store.results_dir, name });
+    defer gpa.free(path);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = svg });
+    std.debug.print("Wrote {s}\n", .{path});
+    if (!open_it) return;
+    // macOS: show the chart in the default viewer.
+    const result = std.process.run(gpa, io, .{ .argv = &.{ "open", path } }) catch {
+        std.debug.print("  (could not open it automatically; open the file above)\n", .{});
+        return;
+    };
+    gpa.free(result.stdout);
+    gpa.free(result.stderr);
+}
+
+fn chart(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
+    std.debug.print(
+        \\
+        \\========================================
+        \\          CHARTS
+        \\========================================
+        \\
+        \\
+    , .{});
+
+    var open_it = true;
+    var custom: ?[3]f64 = null;
+    var values: [3]f64 = undefined;
+    var n: usize = 0;
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--no-open")) {
+            open_it = false;
+            continue;
+        }
+        if (n == 3) return badVector(arg);
+        values[n] = std.fmt.parseFloat(f64, arg) catch return badVector(arg);
+        n += 1;
+    }
+    if (n == 3) custom = values else if (n != 0) {
+        std.debug.print("Usage: origin chart [a b c] [--no-open]\n", .{});
+        return;
+    }
+
+    var buf: [12]projector_svg.Point = undefined;
+    const groups = mixingPoints(&buf);
+
+    var points: [13]projector_svg.Point = undefined;
+    @memcpy(points[0..12], &buf);
+    var count: usize = 12;
+    var entities: [4]projector_svg.Entity = .{ projector_svg.neutrinos, projector_svg.charged_leptons, projector_svg.quarks, projector_svg.user };
+    var entity_count: usize = 3;
+    if (custom) |v| {
+        points[12] = .{ .label = "yours", .v = v, .entity = projector_svg.user };
+        count = 13;
+        entity_count = 4;
+        const s = projector.split(v);
+        std.debug.print("Your vector ({d}, {d}, {d}): D = {d:.3}, identity share = {d:.3}\n\n", .{ v[0], v[1], v[2], s.d, s.identity });
+    }
+
+    const tri = try projector_svg.triangle(gpa, points[0..count], entities[0..entity_count]);
+    defer gpa.free(tri);
+    try writeAndOpen(io, gpa, "triangle.svg", tri, open_it);
+
+    var rows_buf: [4][]const projector_svg.Point = .{ groups[0], groups[1], groups[2], points[12..13] };
+    const rows = rows_buf[0 .. if (custom != null) 4 else 3];
+    const ax = try projector_svg.axis(gpa, rows);
+    defer gpa.free(ax);
+    try writeAndOpen(io, gpa, "axis.svg", ax, open_it);
+}
+
+const app_template = @embedFile("app/app.html");
+
+fn writeVectors(w: *std.Io.Writer, name: []const u8, vs: [3][3]f64, last: bool) !void {
+    try w.print("\"{s}\":[", .{name});
+    for (vs, 0..) |v, i| {
+        try w.print("[{d:.6},{d:.6},{d:.6}]{s}", .{ v[0], v[1], v[2], if (i < 2) "," else "" });
+    }
+    try w.print("]{s}", .{if (last) "" else ","});
+}
+
+/// Interactive explorer: the HTML template with ORIGIN's mixing data
+/// injected, written to results/ and opened in the browser.
+fn app(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
+    var open_it = true;
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--no-open")) open_it = false;
+    }
+    const u = projector.pmns();
+    const v = projector.ckm;
+    var cols_u: [3][3]f64 = undefined;
+    var cols_v: [3][3]f64 = undefined;
+    for (0..3) |i| {
+        cols_u[i] = projector.column(u, i);
+        cols_v[i] = projector.column(v, i);
+    }
+
+    var json: std.Io.Writer.Allocating = .init(gpa);
+    defer json.deinit();
+    const w = &json.writer;
+    try w.print("{{", .{});
+    try writeVectors(w, "pmns_rows", u, false);
+    try writeVectors(w, "pmns_columns", cols_u, false);
+    try writeVectors(w, "ckm_rows", v, false);
+    try writeVectors(w, "ckm_columns", cols_v, false);
+    try w.print("\"source\":\"Mixing amplitudes |U| (PMNS) and |V| (CKM), PDG 2024, from ORIGIN.\"}}", .{});
+
+    const html = try std.mem.replaceOwned(u8, gpa, app_template, "/*ORIGIN_DATA*/", json.written());
+    defer gpa.free(html);
+
+    std.debug.print(
+        \\
+        \\========================================
+        \\          ORIGIN EXPLORER
+        \\========================================
+        \\
+        \\
+    , .{});
+    try writeAndOpen(io, gpa, "app.html", html, open_it);
+}
+
 fn badVector(text: []const u8) void {
     std.debug.print("\nNot a number: {s}. Usage: origin project [a b c]\n", .{text});
 }
@@ -674,6 +816,10 @@ pub fn main(init: std.process.Init) void {
         }
     } else if (std.mem.eql(u8, command, "display")) {
         display(init.io, init.gpa, args.next() orelse "Zmumu", args.next()) catch |err| fail(err);
+    } else if (std.mem.eql(u8, command, "app")) {
+        app(init.io, init.gpa, &args) catch |err| fail(err);
+    } else if (std.mem.eql(u8, command, "chart")) {
+        chart(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "project")) {
         projectReport(&args);
     } else if (std.mem.eql(u8, command, "koide")) {

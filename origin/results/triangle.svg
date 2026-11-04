@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900" font-family="Helvetica, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#fcfcfb"/>
+<text x="24" y="38" fill="#1f1f1e" font-size="20" font-weight="bold">Identity-differentiation triangle (no mass)</text>
+<defs><clipPath id="tri"><polygon points="130.0,720.0 770.0,720.0 450.0,165.7"/></clipPath></defs>
+<polygon points="130.0,720.0 770.0,720.0 450.0,165.7" fill="#f3f2ee" stroke="#6b6a64" stroke-width="1.2"/>
+<circle cx="450.0" cy="535.2" r="116.8" fill="none" stroke="#6b6a64" stroke-width="1.2" stroke-dasharray="5 4" clip-path="url(#tri)"/>
+<text x="454.0" y="431.4" fill="#6b6a64" font-size="11">D = 0.1</text>
+<circle cx="450.0" cy="535.2" r="184.8" fill="none" stroke="#e6e5e0" stroke-width="1.2" clip-path="url(#tri)"/>
+<text x="454.0" y="363.5" fill="#6b6a64" font-size="11">D = 0.25</text>
+<circle cx="450.0" cy="535.2" r="261.3" fill="none" stroke="#6b6a64" stroke-width="1.2" stroke-dasharray="5 4" clip-path="url(#tri)"/>
+<text x="454.0" y="287.0" fill="#6b6a64" font-size="11">D = 0.5</text>
+<circle cx="450.0" cy="535.2" r="320.0" fill="none" stroke="#e6e5e0" stroke-width="1.2" clip-path="url(#tri)"/>
+<text x="454.0" y="228.2" fill="#6b6a64" font-size="11">D = 0.75</text>
+<circle cx="450.0" cy="535.2" r="116.8" fill="#1baf7a" fill-opacity="0.12"/>
+<text x="450.0" y="541.2" fill="#1f1f1e" font-size="18" text-anchor="middle">+</text>
+<text x="442.0" y="555.2" fill="#6b6a64" font-size="11" text-anchor="end">identity</text>
+<text x="130.0" y="742.0" fill="#6b6a64" font-size="13" text-anchor="end">generation 1</text>
+<text x="770.0" y="742.0" fill="#6b6a64" font-size="13" text-anchor="start">generation 2</text>
+<text x="450.0" y="153.7" fill="#6b6a64" font-size="13" text-anchor="middle">generation 3</text>
+<polygon points="345.0,545.0 337.8,558.0 352.1,558.0" fill="#1baf7a" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="355.0" y="556.8" fill="#1f1f1e" font-size="12" text-anchor="start">nu1 0.08</text>
+<polygon points="460.6,527.2 453.4,540.2 467.7,540.2" fill="#1baf7a" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="450.6" y="539.0" fill="#1f1f1e" font-size="12" text-anchor="end">nu2 0.00</text>
+<polygon points="572.4,476.2 565.3,489.2 579.6,489.2" fill="#1baf7a" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="582.4" y="488.0" fill="#1f1f1e" font-size="12" text-anchor="start">nu3 0.13</text>
+<circle cx="392.0" cy="666.0" r="6.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="382.0" y="670.0" fill="#1f1f1e" font-size="12" text-anchor="end">e 0.15</text>
+<circle cx="510.1" cy="470.4" r="6.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="520.1" y="474.4" fill="#1f1f1e" font-size="12" text-anchor="start">mu 0.06</text>
+<circle cx="467.5" cy="508.0" r="6.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="457.5" y="512.0" fill="#1f1f1e" font-size="12" text-anchor="end">tau 0.01</text>
+<rect x="244.2" y="711.8" width="13.0" height="13.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="260.7" y="722.3" fill="#1f1f1e" font-size="12" text-anchor="start">u 0.54</text>
+<rect x="636.7" y="694.8" width="13.0" height="13.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="633.2" y="705.3" fill="#1f1f1e" font-size="12" text-anchor="end">c 0.48</text>
+<rect x="453.4" y="185.5" width="13.0" height="13.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="469.9" y="196.0" fill="#1f1f1e" font-size="12" text-anchor="start">t 0.86</text>
+<rect x="244.9" y="709.6" width="13.0" height="13.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="241.4" y="720.1" fill="#1f1f1e" font-size="12" text-anchor="end">d 0.53</text>
+<rect x="636.7" y="695.1" width="13.0" height="13.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="653.2" y="705.6" fill="#1f1f1e" font-size="12" text-anchor="start">s 0.48</text>
+<rect x="455.2" y="183.4" width="13.0" height="13.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="451.7" y="193.9" fill="#1f1f1e" font-size="12" text-anchor="end">b 0.87</text>
+<polygon points="482.0,434.4 490.5,442.9 482.0,451.3 473.6,442.9" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="492.0" y="446.9" fill="#1f1f1e" font-size="12" text-anchor="start">yours 0.07</text>
+<polygon points="30.0,68.8 23.4,80.8 36.6,80.8" fill="#1baf7a" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="44.0" y="80.0" fill="#1f1f1e" font-size="13">neutrinos (PMNS columns)</text>
+<circle cx="30.0" cy="98.0" r="6.0" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="44.0" y="102.0" fill="#1f1f1e" font-size="13">charged leptons (PMNS rows)</text>
+<rect x="24.0" y="114.0" width="12.0" height="12.0" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="44.0" y="124.0" fill="#1f1f1e" font-size="13">quarks, bound (CKM rows and columns)</text>
+<polygon points="30.0,134.2 37.8,142.0 30.0,149.8 22.2,142.0" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="1.5"/>
+<text x="44.0" y="146.0" fill="#1f1f1e" font-size="13">your vector</text>
+<text x="24" y="880" fill="#6b6a64" font-size="11">Mass-free: PMNS and CKM amplitudes, PDG 2024. D = (Q - 1/3)/(2/3), Q = |v|^2/(sum v)^2. Identity band D &lt;= 0.1.</text>
+</svg>
