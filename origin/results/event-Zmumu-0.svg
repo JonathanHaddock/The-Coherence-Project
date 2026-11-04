@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1010" viewBox="0 0 900 1010" font-family="monospace">
+<rect width="100%" height="100%" fill="#080d18"/>
+<circle cx="450" cy="450" r="216.2" fill="none" stroke="#4a3b2a" stroke-width="10"/>
+<circle cx="450" cy="450" r="264.9" fill="none" stroke="#4a3b2a" stroke-width="10"/>
+<circle cx="450" cy="450" r="318.9" fill="none" stroke="#4a3b2a" stroke-width="10"/>
+<circle cx="450" cy="450" r="378.4" fill="none" stroke="#4a3b2a" stroke-width="10"/>
+<circle cx="450" cy="450" r="162.2" fill="none" stroke="#5c6b7e" stroke-width="3"/>
+<circle cx="450" cy="450" r="159.5" fill="#121a28" stroke="#35465d" stroke-width="1"/>
+<circle cx="450" cy="450" r="95.7" fill="#16233a" stroke="#35465d" stroke-width="1"/>
+<circle cx="450" cy="450" r="59.5" fill="#0d1524" stroke="#35465d" stroke-width="1"/>
+<circle cx="450" cy="450" r="4" fill="#ffffff"/>
+<path fill="none" stroke="#ff5252" stroke-width="2.5" d="M450.0 450.0 L449.5 449.7 L444.5 446.5 L440.4 443.9 L435.9 440.9 L431.4 438.0 L426.8 435.1 L422.3 432.1 L417.8 429.1 L413.3 426.2 L408.8 423.2 L404.3 420.2 L399.8 417.2 L395.3 414.2 L390.8 411.1 L386.3 408.1 L381.9 405.1 L377.4 402.0 L373.0 398.9 L368.5 395.9 L364.1 392.8 L359.6 389.7 L354.8 386.3 L350.3 383.2 L345.9 380.1 L341.5 376.9 L337.1 373.8 L332.7 370.7 L328.3 367.5 L323.9 364.3 L319.6 361.2 L315.2 358.0 L310.8 354.8 L306.5 351.6 L302.1 348.4 L297.7 345.3 L293.3 342.1 L288.9 339.0 L284.5 335.8 L280.2 332.6 L275.8 329.5 L271.4 326.4 L267.0 323.2 L262.6 320.1 L258.2 316.9 L253.7 313.8 L249.3 310.7 L244.9 307.6 L240.5 304.5 L236.1 301.4 L231.6 298.3 L227.2 295.2 L222.8 292.1 L218.4 289.0 L213.9 285.9 L209.5 282.8 L205.0 279.7 L200.6 276.7 L196.1 273.6 L191.7 270.5 L187.2 267.5 L182.8 264.4 L178.3 261.4 L173.8 258.3 L169.4 255.3 L164.9 252.2 L160.4 249.2 L156.0 246.2 L151.5 243.1 L147.0 240.1 L142.5 237.1 L138.0 234.1 L133.5 231.1 L129.0 228.1 L124.5 225.1 L120.5 222.4"/>
+<circle cx="120.5" cy="222.4" r="5" fill="#ff5252"/>
+<path fill="none" stroke="#42a5f5" stroke-width="2.5" d="M450.0 450.0 L450.5 450.3 L455.7 453.1 L460.0 455.4 L464.8 457.9 L469.5 460.5 L474.3 463.0 L479.1 465.5 L483.9 468.0 L488.7 470.4 L493.6 472.9 L498.4 475.3 L503.2 477.7 L508.1 480.1 L512.9 482.5 L517.8 484.9 L522.6 487.2 L527.5 489.5 L532.4 491.9 L537.3 494.2 L542.2 496.4 L547.1 498.7 L552.5 501.2 L557.4 503.4 L562.3 505.7 L567.3 507.9 L572.2 510.0 L577.2 512.2 L582.1 514.4 L587.1 516.5 L592.1 518.6 L597.1 520.7 L602.0 522.8 L607.0 524.9 L612.0 527.1 L617.0 529.2 L621.9 531.3 L626.9 533.5 L631.8 535.6 L636.8 537.8 L641.7 539.9 L646.7 542.1 L651.6 544.3 L656.6 546.5 L661.5 548.7 L666.5 550.9 L671.4 553.1 L676.3 555.3 L681.2 557.5 L686.2 559.8 L691.1 562.0 L696.0 564.3 L700.9 566.5 L705.8 568.8 L710.7 571.1 L715.6 573.3 L720.5 575.6 L725.4 577.9 L730.3 580.2 L735.2 582.5 L740.1 584.9 L744.9 587.2 L749.8 589.5 L754.7 591.9 L759.6 594.2 L764.4 596.6 L769.3 598.9 L774.1 601.3 L779.0 603.7 L783.8 606.1 L788.7 608.5 L793.5 610.9 L798.4 613.3 L803.2 615.7 L808.0 618.2 L812.4 620.3"/>
+<circle cx="812.4" cy="620.3" r="5" fill="#42a5f5"/>
+<text x="450" y="34" fill="#ffffff" font-size="20" text-anchor="middle">ORIGIN EVENT DISPLAY: CMS 2011 Zmumu #0</text>
+<text x="450" y="58" fill="#8ca5c5" font-size="13" text-anchor="middle">Run 165617  Event 74969122  |  dimuon mass 89.89 GeV  |  B = 3.8 T</text>
+<text x="40" y="930" fill="#ff5252" font-size="15">muon +   pt 54.71 GeV   phi 2.574 rad   E 59.90 GeV</text>
+<text x="40" y="956" fill="#42a5f5" font-size="15">muon -   pt 34.25 GeV   phi -0.499 rad   E 52.39 GeV</text>
+<text x="40" y="990" fill="#8ca5c5" font-size="12">Transverse view. Rings: tracker, ECAL, HCAL, solenoid, muon stations (brown). Field reverses in the return yoke.</text>
+</svg>

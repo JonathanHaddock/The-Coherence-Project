@@ -20,6 +20,7 @@ test {
     _ = events;
     _ = store;
     _ = spectrum;
+    _ = detector;
 }
 
 fn header() void {
@@ -45,6 +46,7 @@ fn help() void {
         \\  origin dataset
         \\  origin analyze [dataset]
         \\  origin koide
+        \\  origin display [dataset] [event]
         \\  origin help
         \\
     , .{});
@@ -55,7 +57,7 @@ fn info() void {
         \\
         \\ORIGIN SYSTEM INFORMATION
         \\
-        \\Version:       0.3.0
+        \\Version:       0.4.0
         \\Language:      Zig 0.17.0
         \\Platform:      macOS
         \\Storage:       Local
@@ -63,8 +65,9 @@ fn info() void {
         \\
         \\Scientific modules: ONLINE
         \\Particle catalogue: ONLINE
-        \\Dataset engine:     PENDING
-        \\Analysis engine:    INITIALIZING
+        \\Dataset engine:     ONLINE (CMS open data, adler32 verified)
+        \\Analysis engine:    ONLINE (Koide, invariant mass)
+        \\Event display:      ONLINE
         \\
     , .{});
 }
@@ -333,6 +336,60 @@ fn analyze(io: std.Io, gpa: std.mem.Allocator, name: []const u8) !void {
     std.debug.print("\nWrote {s}\nWrote {s}\n", .{ csv_path, svg_path });
 }
 
+fn display(io: std.Io, gpa: std.mem.Allocator, name: []const u8, index_arg: ?[]const u8) !void {
+    var cat = try store.Catalogue.load(io, gpa);
+    defer cat.deinit();
+    const entry = cat.find(name) orelse {
+        std.debug.print("\nUnknown dataset: {s}. Run 'origin dataset' to list them.\n", .{name});
+        return;
+    };
+
+    const evs = try store.loadEvents(io, gpa, entry);
+    defer gpa.free(evs);
+
+    // Default: the first opposite-charge event near the Z mass, the cleanest
+    // picture of a heavy particle decaying to two muons.
+    const index: usize = if (index_arg) |text| std.fmt.parseInt(usize, text, 10) catch {
+        std.debug.print("\nEvent number must be a non-negative integer, got: {s}\n", .{text});
+        return;
+    } else for (evs, 0..) |ev, i| {
+        if (ev.oppositeCharge() and @abs(ev.mass() - 91.19) < 3) break i;
+    } else 0;
+
+    if (index >= evs.len) {
+        std.debug.print("\nEvent {d} out of range; {s} has {d} events (0-{d}).\n", .{ index, entry.name, evs.len, evs.len - 1 });
+        return;
+    }
+    const ev = evs[index];
+
+    const stem = entry.name[0 .. std.mem.lastIndexOfScalar(u8, entry.name, '.') orelse entry.name.len];
+    const title = try std.fmt.allocPrint(gpa, "ORIGIN EVENT DISPLAY: CMS 2011 {s} #{d}", .{ stem, index });
+    defer gpa.free(title);
+    const svg = try detector.render(gpa, title, ev);
+    defer gpa.free(svg);
+
+    try std.Io.Dir.cwd().createDirPath(io, store.results_dir);
+    const path = try std.fmt.allocPrint(gpa, "{s}/event-{s}-{d}.svg", .{ store.results_dir, stem, index });
+    defer gpa.free(path);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = svg });
+
+    std.debug.print(
+        \\
+        \\========================================
+        \\          EVENT DISPLAY
+        \\========================================
+        \\
+        \\Dataset:  {s}, event {d} of {d}
+        \\Run {d}, event {d}
+        \\Muon 1:   charge {d:>2}  pt {d:>7.2} GeV
+        \\Muon 2:   charge {d:>2}  pt {d:>7.2} GeV
+        \\Mass:     {d:.3} GeV
+        \\
+        \\Wrote {s}
+        \\
+    , .{ entry.name, index, evs.len, ev.run, ev.event, ev.mu1.charge, ev.mu1.p.pt(), ev.mu2.charge, ev.mu2.p.pt(), ev.mass(), path });
+}
+
 fn koideFamily(label: []const u8, a: particles.Particle, b: particles.Particle, c: particles.Particle) void {
     const q = koide.ratio(a.mass_kg, b.mass_kg, c.mass_kg);
     std.debug.print("  {s:<18} Q = {d:.6}   angle = {d:>8.4} deg   Q - 2/3 = {e:>10.3}\n", .{
@@ -429,6 +486,8 @@ pub fn main(init: std.process.Init) void {
         } else {
             std.debug.print("Unknown particle: {s}\n", .{name});
         }
+    } else if (std.mem.eql(u8, command, "display")) {
+        display(init.io, init.gpa, args.next() orelse "Zmumu", args.next()) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "koide")) {
         koideReport();
     } else {
