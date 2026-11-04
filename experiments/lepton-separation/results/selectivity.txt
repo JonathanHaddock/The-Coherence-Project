@@ -1,0 +1,22 @@
+SELECTIVITY S = 1 - H/ln3 (1 = one force only, 0 = all equally)
+
+m_Z (91 GeV), weak = Z
+  neutrinos        S = 1.000
+  charged leptons  S = 0.383
+  quarks (bound)   S = 0.775
+
+m_Z (91 GeV), weak = Z + W
+  neutrinos        S = 1.000
+  charged leptons  S = 0.480
+  quarks (bound)   S = 0.589
+
+low energy (~2 GeV), weak = Z
+  neutrinos        S = 1.000
+  charged leptons  S = 0.383
+  quarks (bound)   S = 0.893
+
+low energy (~2 GeV), weak = Z + W
+  neutrinos        S = 1.000
+  charged leptons  S = 0.480
+  quarks (bound)   S = 0.780
+
