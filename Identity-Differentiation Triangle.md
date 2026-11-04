@@ -1,66 +1,92 @@
 # The Identity-Differentiation Triangle
 
-Jonathan Haddock, 2026-11-03. Predictions recorded before testing against
-future data. Supersedes the equilibrium framing in `Lepton coherence`.
+Jonathan Haddock, 2026-11-03. Supersedes the equilibrium framing in
+`Lepton coherence`.
 
 ## Hypothesis
 
 - **Neutrinos are identity.**
 - **Quarks are differentiation.** They are confined, so they count as one
-  bound entity (each generation's pair merged: u+d, c+s, t+b).
+  bound entity.
 - **Charged leptons span the frame.** e, mu and tau are the three axes on
   which the other entities are projected.
 
+The hypothesis is stated and tested **without mass**.
+
 ## Measure
 
-Each entity is a 3-vector over generations, v = (sqrt m1, sqrt m2, sqrt m3).
-The identity projector P1 = J/3 and the differentiation projector
-P2 = I - J/3 split it, giving
+Each entity is a 3-vector over generations, taken from the mixing matrices:
+neutrinos are the columns of the lepton mixing matrix |U| (PMNS), and quarks
+are the rows and columns of the quark mixing matrix |V| (CKM). The identity
+projector P1 = J/3 and the differentiation projector P2 = I - J/3 split each
+vector, giving
 
     D = (Q - 1/3) / (2/3),   Q = |v|^2 / (sum v)^2
 
 D = 0 is pure identity (centre of the triangle), D = 1 pure differentiation
-(a corner). Computed by `origin koide` and `origin project`.
+(a corner). Computed by `origin project`.
 
-"Identity" is fixed in advance as **D <= 0.1** (charged leptons are at 0.50,
-bound quarks at 0.76).
+"Identity" is fixed in advance as **D <= 0.1**.
 
-## Current values
+## Results (mass-free, PDG 2024)
 
-| Entity | D | Status |
+| Entity | Vectors | D |
 |---|---|---|
-| Neutrinos | 0 to 0.38 | depends on unmeasured lightest mass |
-| Charged leptons | 0.500 | measured |
-| Quarks, bound | 0.763 (0.746 adding roots) | measured |
-| Lepton mixing (PMNS) | 0.07 | measured, no mass |
-| Quark mixing (CKM) | 0.63 | measured, no mass |
+| Neutrinos | PMNS columns nu1, nu2, nu3 | 0.08, 0.00, 0.13, **mean 0.07** |
+| Quarks, bound | CKM rows and columns | **mean 0.63** |
+| Charged leptons | PMNS rows e, mu, tau | 0.15, 0.06, 0.01, mean 0.07 |
+
+Neutrinos sit inside the identity band and quarks on the differentiation
+side. **The hypothesis holds on current data.**
+
+Limit: charged leptons and neutrinos share one mixing matrix, so mixing data
+gives them the same D. That fits their roles (the frame is not a pole), but
+the frame role itself is not measured by this method.
 
 ## Predictions
 
-1. **Normal neutrino mass ordering.** Identity with inverted ordering needs a
-   total neutrino mass of at least 0.102 eV, above the DESI 2024 limit
-   (0.072 eV).
-2. **Total neutrino mass between 0.069 and 0.072 eV**, lightest neutrino at
-   least 0.0071 eV. The lower end comes from D <= 0.1; the upper end is the
-   current DESI limit.
-3. Lepton mixing stays closer to identity than quark mixing (holds now: 0.07
-   vs 0.63).
+1. As lepton mixing is measured more precisely (JUNO, DUNE, Hyper-K: the
+   theta23 octant and the CP phase), the neutrino mean D stays at or below 0.1.
+2. Quark mixing stays on the differentiation side (D above 0.5).
 
-## How it fails
+These follow from data already in hand, so they are weak tests. A strong test
+needs a mass-free observable that separates charged leptons from neutrinos.
 
-- Inverted ordering is established (JUNO, DUNE, Hyper-K).
-- The total neutrino mass is shown to be below 0.069 eV (cosmology: DESI,
-  Euclid, CMB-S4), or the lightest neutrino below 0.0071 eV.
-- Neutrinoless double-beta decay or KATRIN/Project 8 place masses outside the
-  window.
+## Mass: noted and abandoned
 
-Prediction 2 sits right against the current cosmology limit, so it is close
-to being tested now.
+Mass was used first, through Koide's vector v = (sqrt m1, sqrt m2, sqrt m3).
+Those results are recorded here for completeness:
+
+| Entity | D from mass |
+|---|---|
+| Neutrinos | 0 to 0.38, depending on the unmeasured lightest mass |
+| Charged leptons | 0.500 |
+| Quarks, bound (u+d, c+s, t+b) | 0.763 |
+
+Taken at face value, mass would require neutrinos to have normal mass ordering
+and a total mass of 0.069 to 0.072 eV (`prediction-window.png`).
+
+**Reasons for abandoning mass:**
+
+1. **The hypothesis is about organization, not mass.** The working premise
+   from `Lepton coherence` is that Q measures organizational structure and
+   mass is one manifestation of it. Using mass as the measure makes the test
+   depend on the thing the hypothesis says is secondary.
+2. **Neutrino masses are not measured.** Only their differences are. Placing
+   neutrinos by mass meant choosing the lightest mass, which made their
+   position a free parameter rather than a result.
+3. **Quark masses are not uniquely defined.** They depend on the
+   renormalization scheme and scale, so quark D from mass shifts with that
+   choice.
+4. **Mass moved the claims.** With mass, charged leptons sit at D = 1/2
+   (equilibrium); without it, the picture is two poles and a frame. The
+   mass-based prediction window also came from cosmology limits rather than
+   from the hypothesis itself.
 
 ## Charts
 
-- `experiments/koide-projector/lepton-frame.png`: entities in the e, mu, tau
-  triangle; the neutrino path shows where each lightest mass would put them.
+- `experiments/koide-projector/triangle.png`: mixing vectors in the triangle
+  (mass-free, the basis of the results above).
 - `experiments/koide-projector/three-entities.png`: D by mass and by mixing.
-- `experiments/koide-projector/prediction-window.png`: neutrino D vs total
-  mass for both orderings, with the predicted window.
+- `experiments/koide-projector/lepton-frame.png` and `prediction-window.png`:
+  the abandoned mass-based picture, kept for the record.
