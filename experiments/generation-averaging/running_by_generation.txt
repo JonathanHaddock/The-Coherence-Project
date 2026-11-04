@@ -1,0 +1,25 @@
+light-quark threshold 0.2 GeV: s^2(0) = 0.23865   (SM prediction 0.23873)
+light-quark threshold 0.3 GeV: s^2(0) = 0.23840   (SM prediction 0.23873)
+light-quark threshold 0.5 GeV: s^2(0) = 0.23803   (SM prediction 0.23873)
+
+FIXED POINT each fermion pulls toward, lambda = T3/(2Q):
+  charged lepton 0.250, up quark 0.375, down quark 0.750
+  one complete generation (sum N Q T3 / 2 sum N Q^2): 3/8 = 0.375, the grand-unification value
+
+SHIFT m_Z -> 0 (light-quark threshold 0.3 GeV): +0.00711   (SM: +0.00744)
+  m_Z -> m_W, W loops            -0.00063
+  e    generation 1          +0.00025
+  u    generation 1          +0.00180
+  d    generation 1          +0.00165
+  mu   generation 2          +0.00016
+  c    generation 2          +0.00134
+  s    generation 2          +0.00157
+  tau  generation 3          +0.00010
+  b    generation 3          +0.00087
+
+  generation 1: +0.00371  =  47.9% of the fermion shift   (its charged lepton:   6.8% of the generation)
+  generation 2: +0.00306  =  39.6% of the fermion shift   (its charged lepton:   5.1% of the generation)
+  generation 3: +0.00097  =  12.6% of the fermion shift   (its charged lepton:  10.4% of the generation)
+  all charged leptons: 6.6% of the fermion shift; quarks 93.4%
+
+Uncertainty from light-quark thresholds: s^2(0) varies by 0.00062.
