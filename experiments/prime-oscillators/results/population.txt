@@ -1,0 +1,6 @@
+POPULATION TEST. Best valid coherence over K=[0.1, 0.2, 0.3].
+primes: 0.151 (sd 0.013 over 10 runs)
+integer sets: mean 0.238; primes beat 18.1%
+correlation with ratio complexity: r = -0.785
+top 5: 2,3,6,9,12 (0.74); 2,4,6,8,12 (0.68); 4,6,8,10,12 (0.63); 2,4,5,8,12 (0.61); 3,4,6,9,12 (0.59)
+random reals: mean 0.249; primes beat 16.5%

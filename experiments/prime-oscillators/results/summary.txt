@@ -1,0 +1,28 @@
+Prime Oscillator Experiment. Noise D=0.01, mistuning 1%, T=100, 6 runs per point, harmonics up to 12.
+
+1. COUPLING SWEEP  K =   0.0  0.05   0.1  0.15   0.2  0.25   0.3  0.35   0.4   0.5   0.7   1.0
+  primes       coherence  0.17  0.15  0.14  0.14  0.14  0.13  0.15  0.14  0.17  0.77  1.00  1.00
+               distort %   0.4   0.4   0.5   0.8   2.4   3.2   4.5   4.8   6.5  75.4 100.0 100.0
+  primes+0.5   coherence  0.13  0.15  0.16  0.16  0.16  0.18  0.17  0.16  0.18  0.27  1.00  1.00
+               distort %   0.3   0.2   0.4   0.5   1.4   1.9   3.2   3.9   5.5  17.3 100.0 100.0
+  primes_x1.1  coherence  0.16  0.19  0.16  0.12  0.13  0.14  0.13  0.15  0.15  0.17  1.00  1.00
+               distort %   0.3   0.3   0.5   0.6   1.5   2.5   3.9   4.8   5.2   8.7 100.0 100.0
+  harmonic     coherence  0.31  0.40  0.44  0.34  0.30  0.72  1.00  1.00  1.00  1.00  1.00  1.00
+               distort %   0.6   0.5   1.2   2.8   5.7  64.4 100.0 100.0 100.0 100.0 100.0 100.0
+  composites   coherence  0.17  0.19  0.23  0.25  0.22  0.21  0.21  0.25  0.34  0.43  1.00  1.00
+               distort %   0.2   0.2   0.3   0.4   1.0   1.2   1.8   5.6   8.0  15.7 100.0 100.0
+  random       coherence  0.16  0.15  0.19  0.20  0.21  0.23  0.25  0.28  0.32  0.69  0.96  1.00
+               distort %   0.2   0.3   0.4   0.8   1.4   2.7   4.5   5.6   8.0  58.2  94.4 100.0
+  no-coupling baseline: 0.181
+
+2. PRIME PAIRS at K=0.25 (largest valid coupling), distortion 3.2%
+   3:2  locking 0.27
+   5:2  locking 0.17
+   7:2  locking 0.18
+  11:2  locking 0.09
+   5:3  locking 0.18
+   7:3  locking 0.12
+  11:3  locking 0.10
+   7:5  locking 0.13
+  11:5  locking 0.07
+  11:7  locking 0.06
