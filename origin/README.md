@@ -36,6 +36,7 @@ zig-out/bin/origin analyze
 | `charge` | Neutrino charge test: derives the B - L charge shift eps allowed with right-handed neutrinos, checks neutrality relations, and converts published limits to bounds on eps |
 | `majorana` | Majorana test: effective Majorana mass band for both orderings over all phases, compared with KamLAND-Zen, LEGEND-1000 and nEXO |
 | `export` | Writes derived datasets to `datasets/` with a checksummed manifest: per-event dilepton table (160,000 rows, regenerated, not committed), Z -> ee vs Z -> mumu spectra and summary, selection table |
+| `universality` | Lepton universality: ORIGIN's Z peak comparison, the CMS efficiency-corrected ee/mumu ratio, and LEP partial widths |
 | `app` | Opens ORIGIN Explorer in the browser: sliders and presets for your own vector, live triangle and D axis, hover details, data table |
 | `science` | Unit system demo |
 

@@ -147,6 +147,20 @@ because electrons and muons are measured by different detector systems,
 not because of the leptons. (`origin export`;
 `experiments/lepton-universality/z-ee-vs-mumu.png`.)
 
+The open-data files cannot give efficiency-corrected rates: they are
+outreach subsets capped at fixed event counts, with no published
+efficiencies for their selections. Published efficiency-corrected tests
+agree:
+
+| Test | Ratio (1 = identical by force) | Source |
+|---|---|---|
+| CMS sigma x B, ee / mumu | 1.025 +- 0.035 | arXiv:1107.4789 (2010 data) |
+| LEP Gamma(mumu) / Gamma(ee) | 1.0009 +- 0.0028 | PDG |
+| LEP Gamma(tautau) / Gamma(ee) | 1.0018 +- 0.0030 | PDG |
+
+So electrons, muons and taus couple to the Z identically to 0.3%.
+(`origin universality`; `experiments/lepton-universality/universality.png`.)
+
 ## Predictions
 
 1. **Neutrinos stay perfectly selective.** No electromagnetic coupling

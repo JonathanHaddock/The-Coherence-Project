@@ -11,6 +11,7 @@ const weak = @import("analysis/weak.zig");
 const charge = @import("analysis/charge.zig");
 const majorana = @import("analysis/majorana.zig");
 const selection = @import("analysis/selection.zig");
+const universality = @import("analysis/universality.zig");
 const export_ = @import("dataset/export.zig");
 const weak_svg = @import("visualization/weak_svg.zig");
 const kinematics = @import("analysis/kinematics.zig");
@@ -28,6 +29,7 @@ test {
     _ = charge;
     _ = majorana;
     _ = selection;
+    _ = universality;
     _ = export_;
     _ = weak_svg;
     _ = kinematics;
@@ -70,6 +72,7 @@ fn help() void {
         \\  origin charge
         \\  origin majorana
         \\  origin export
+        \\  origin universality
         \\  origin display [dataset] [event]
         \\  origin help
         \\
@@ -651,6 +654,50 @@ fn app(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !vo
     try writeAndOpen(io, gpa, "app.html", html, open_it);
 }
 
+fn universalityReport() void {
+    const r = universality.cmsRatio();
+    std.debug.print(
+        \\
+        \\========================================
+        \\          LEPTON UNIVERSALITY
+        \\========================================
+        \\
+        \\Are electrons, muons and taus identical by force? Three tests:
+        \\
+        \\1. ORIGIN, CMS open data (peak position only)
+        \\   Z peak: electrons 90.799 +- 0.080 GeV, muons 90.817 +- 0.037 GeV
+        \\   difference -0.019 +- 0.088 GeV (0.2 sigma, statistical)
+        \\   Event counts cannot be compared: the outreach files are subsets
+        \\   capped at fixed event counts, with no published efficiencies.
+        \\
+        \\2. CMS, efficiency-corrected (arXiv:1107.4789, 2010 data, 36 pb^-1)
+        \\   sigma x B(Z -> ee)     = {d:.3} +- {d:.3} (stat) +- {d:.3} (syst) nb
+        \\   sigma x B(Z -> mumu)   = {d:.3} +- {d:.3} (stat) +- {d:.3} (syst) nb
+        \\   acceptance: ee {d:.4}, mumu {d:.4};  ee selection efficiency {d:.1}%
+        \\   ratio ee / mumu        = {d:.3} +- {d:.3} (exp)  +- {d:.3} (incl. theory)
+        \\   (luminosity cancels; theory treated as uncorrelated, conservative)
+        \\
+        \\3. LEP, Z partial widths (PDG), the precision test
+        \\   Gamma(ee)     = {d:.2} +- {d:.2} MeV
+        \\   Gamma(mumu)   = {d:.2} +- {d:.2} MeV
+        \\   Gamma(tautau) = {d:.2} +- {d:.2} MeV
+        \\   Gamma(mumu) / Gamma(ee) = {d:.4} +- {d:.4}
+        \\
+        \\All three agree: the Z couples to electrons, muons and taus equally,
+        \\to 0.3% at LEP. Identical by force, as the framework says.
+        \\
+    , .{
+        universality.cms_ee.value,    universality.cms_ee.stat,    universality.cms_ee.syst,
+        universality.cms_mumu.value,  universality.cms_mumu.stat,  universality.cms_mumu.syst,
+        universality.cms_acceptance_ee, universality.cms_acceptance_mumu, universality.cms_efficiency_ee * 100,
+        r.value, r.err_no_theory, r.err_all,
+        universality.lep_ee[0], universality.lep_ee[1],
+        universality.lep_mumu[0], universality.lep_mumu[1],
+        universality.lep_tautau[0], universality.lep_tautau[1],
+        universality.lep_mumu_over_ee[0], universality.lep_mumu_over_ee[1],
+    });
+}
+
 fn majoranaReport() void {
     std.debug.print(
         \\
@@ -965,6 +1012,8 @@ pub fn main(init: std.process.Init) void {
         }
     } else if (std.mem.eql(u8, command, "display")) {
         display(init.io, init.gpa, args.next() orelse "Zmumu", args.next()) catch |err| fail(err);
+    } else if (std.mem.eql(u8, command, "universality")) {
+        universalityReport();
     } else if (std.mem.eql(u8, command, "export")) {
         std.debug.print("\n========================================\n          DATASET EXPORT\n========================================\n\n", .{});
         export_.run(init.io, init.gpa) catch |err| fail(err);
