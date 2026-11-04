@@ -6,6 +6,18 @@ const units = @import("science/units.zig");
 const particles = @import("science/particles.zig");
 const observations = @import("science/observations.zig");
 const koide = @import("analysis/koide.zig");
+const kinematics = @import("analysis/kinematics.zig");
+const manifest = @import("dataset/manifest.zig");
+const events = @import("dataset/events.zig");
+const store = @import("dataset/store.zig");
+
+test {
+    _ = koide;
+    _ = kinematics;
+    _ = manifest;
+    _ = events;
+    _ = store;
+}
 
 fn header() void {
     std.debug.print(
@@ -174,30 +186,52 @@ fn science() void {
         \\Test vector magnitude: {}
         \\
         \\Scientific modules: ONLINE
-        \\Particle entries: 6
+        \\Particle entries: {d}
         \\
     , .{
         units.metersToKilometers(1000.0),
         observations.positionMagnitude(vector),
+        particles.catalogue.len,
     });
 }
 
-fn dataset() void {
+fn dataset(io: std.Io, gpa: std.mem.Allocator) !void {
     std.debug.print(
         \\
         \\========================================
         \\          DATASET ENGINE
         \\========================================
         \\
-        \\Storage mode: LOCAL
-        \\Raw datasets:       data/raw/
-        \\Processed datasets: data/processed/
-        \\Manifests:          data/manifests/
-        \\Results:            results/
+        \\Manifests: {s}/   Raw data: {s}/
         \\
-        \\Dataset engine: NOT IMPLEMENTED
+        \\  {s:<22} {s:>10}  {s:>9}  {s:>8}  {s}
         \\
-    , .{});
+    , .{ store.manifests_dir, store.raw_dir, "DATASET", "BYTES", "EVENTS", "ADLER32", "STATUS" });
+
+    var cat = try store.Catalogue.load(io, gpa);
+    defer cat.deinit();
+
+    var missing: usize = 0;
+    for (cat.entries) |entry| {
+        const check = try store.verify(io, gpa, entry);
+        switch (check.status) {
+            .missing => {
+                missing += 1;
+                std.debug.print("  {s:<22} {d:>10}  {s:>9}  {x:0>8}  MISSING\n", .{ entry.name, entry.size, "-", entry.adler32 });
+            },
+            .wrong_size => std.debug.print("  {s:<22} {d:>10}  {s:>9}  {x:0>8}  WRONG SIZE (expected {d})\n", .{ entry.name, check.actual_size, "-", check.actual_adler32, entry.size }),
+            .bad_checksum => std.debug.print("  {s:<22} {d:>10}  {s:>9}  {x:0>8}  BAD CHECKSUM (expected {x:0>8})\n", .{ entry.name, check.actual_size, "-", check.actual_adler32, entry.adler32 }),
+            .ok => {
+                const evs = try store.loadEvents(io, gpa, entry);
+                defer gpa.free(evs);
+                std.debug.print("  {s:<22} {d:>10}  {d:>9}  {x:0>8}  VERIFIED\n", .{ entry.name, check.actual_size, evs.len, check.actual_adler32 });
+            },
+        }
+    }
+
+    if (missing > 0) {
+        std.debug.print("\n{d} dataset(s) missing. Download with: scripts/fetch.sh\n", .{missing});
+    }
 }
 
 fn analyze() void {
@@ -278,6 +312,15 @@ fn koideReport() void {
     , .{koide.ratio(koide.neutrinoMasses(0.0)[0], koide.neutrinoMasses(0.0)[1], koide.neutrinoMasses(0.0)[2])});
 }
 
+fn fail(err: anyerror) void {
+    switch (err) {
+        error.FileNotFound => std.debug.print("\nError: file not found. Run origin from the origin/ project folder.\n", .{}),
+        error.DatasetMissing => std.debug.print("\nError: dataset not downloaded. Run scripts/fetch.sh\n", .{}),
+        error.DatasetCorrupt => std.debug.print("\nError: dataset failed verification. Delete it from data/raw/ and re-run scripts/fetch.sh\n", .{}),
+        else => std.debug.print("\nError: {s}\n", .{@errorName(err)}),
+    }
+}
+
 pub fn main(init: std.process.Init) void {
     var args = init.minimal.args.iterate();
     _ = args.skip();
@@ -300,7 +343,7 @@ pub fn main(init: std.process.Init) void {
     } else if (std.mem.eql(u8, command, "constants")) {
         printConstants();
     } else if (std.mem.eql(u8, command, "dataset")) {
-        dataset();
+        dataset(init.io, init.gpa) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "analyze")) {
         analyze();
     } else if (std.mem.eql(u8, command, "observe")) {

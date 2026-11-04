@@ -1,0 +1,7 @@
+# CMS Run2011A dimuon datasets, CERN Open Data record 545 (CC0-1.0).
+# https://opendata.cern.ch/record/545
+# name                  size_bytes  adler32   url
+Zmumu.csv               970550      0d4cfe9f  https://opendata.cern.ch/record/545/files/Zmumu.csv
+Jpsimumu.csv            2639302     214e4077  https://opendata.cern.ch/record/545/files/Jpsimumu.csv
+Ymumu.csv               2599212     5eef7b87  https://opendata.cern.ch/record/545/files/Ymumu.csv
+Dimuon_DoubleMu.csv     13935840    5b87a72a  https://opendata.cern.ch/record/545/files/Dimuon_DoubleMu.csv
