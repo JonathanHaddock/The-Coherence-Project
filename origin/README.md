@@ -32,6 +32,7 @@ zig-out/bin/origin analyze
 | `display [dataset] [event]` | Transverse event display with muon tracks bent by the CMS magnetic field. Writes SVG to `results/` |
 | `project [a b c]` | Splits a 3-vector between the identity projector J/3 and the differentiation projector I - J/3. With no arguments: masses, plus PMNS and CKM mixing (no mass) |
 | `chart [a b c]` | Draws the triangle and D-axis charts (mass-free) to `results/` and opens them; optional vector is highlighted. `--no-open` to skip opening |
+| `weak` | Tests the weak mixing angle: solves for the angle where charged leptons carry exactly 1/3 projection, compares with measured definitions, draws and opens the chart |
 | `app` | Opens ORIGIN Explorer in the browser: sliders and presets for your own vector, live triangle and D axis, hover details, data table |
 | `science` | Unit system demo |
 

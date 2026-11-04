@@ -7,6 +7,8 @@ const particles = @import("science/particles.zig");
 const observations = @import("science/observations.zig");
 const koide = @import("analysis/koide.zig");
 const projector = @import("analysis/projector.zig");
+const weak = @import("analysis/weak.zig");
+const weak_svg = @import("visualization/weak_svg.zig");
 const kinematics = @import("analysis/kinematics.zig");
 const manifest = @import("dataset/manifest.zig");
 const events = @import("dataset/events.zig");
@@ -18,6 +20,8 @@ const projector_svg = @import("visualization/projector_svg.zig");
 test {
     _ = koide;
     _ = projector;
+    _ = weak;
+    _ = weak_svg;
     _ = kinematics;
     _ = manifest;
     _ = events;
@@ -54,6 +58,7 @@ fn help() void {
         \\  origin project [a b c]
         \\  origin chart [a b c] [--no-open]
         \\  origin app [--no-open]
+        \\  origin weak [--no-open]
         \\  origin display [dataset] [event]
         \\  origin help
         \\
@@ -635,6 +640,47 @@ fn app(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !vo
     try writeAndOpen(io, gpa, "app.html", html, open_it);
 }
 
+fn weakReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
+    var open_it = true;
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--no-open")) open_it = false;
+    }
+    const sol = weak.solve(1.0 / 3.0);
+    std.debug.print(
+        \\
+        \\========================================
+        \\          WEAK MIXING ANGLE TEST
+        \\========================================
+        \\
+        \\Charged-lepton interaction vector (EM, weak) depends on one free
+        \\Standard Model parameter, s = sin^2(theta_W):
+        \\  weak / EM = (1/4 - s + 2 s^2) / (s (1 - s))
+        \\
+        \\Rule tested: charged leptons carry 2/3 on their dominant axis and
+        \\1/3 projected (mirroring Koide's 2/3).
+        \\
+        \\  Rule fixes sin^2(theta_W) = {d:.6}
+        \\
+        \\  {s:<28} {s:>9} {s:>9} {s:>9}
+        \\
+    , .{ sol, "MEASURED DEFINITION", "VALUE", "ERROR", "PULL" });
+    for (weak.measured) |m| {
+        std.debug.print("  {s:<28} {d:>9.5} {d:>9.5} {d:>8.1}s\n", .{ m.name, m.value, m.err, (sol - m.value) / m.err });
+    }
+    std.debug.print(
+        \\
+        \\  Pull = (rule - measured) / error. Within about 2 sigma is consistent.
+        \\  The rule matches only the MS-bar definition at the Z mass, and the
+        \\  angle changes with energy, so it holds at one scale only. Treat as a
+        \\  candidate, chosen after seeing the data.
+        \\
+        \\
+    , .{});
+    const svg = try weak_svg.render(gpa);
+    defer gpa.free(svg);
+    try writeAndOpen(io, gpa, "weak-angle.svg", svg, open_it);
+}
+
 fn badVector(text: []const u8) void {
     std.debug.print("\nNot a number: {s}. Usage: origin project [a b c]\n", .{text});
 }
@@ -817,6 +863,8 @@ pub fn main(init: std.process.Init) void {
         }
     } else if (std.mem.eql(u8, command, "display")) {
         display(init.io, init.gpa, args.next() orelse "Zmumu", args.next()) catch |err| fail(err);
+    } else if (std.mem.eql(u8, command, "weak")) {
+        weakReport(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "app")) {
         app(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "chart")) {
