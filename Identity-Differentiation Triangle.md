@@ -143,6 +143,11 @@ empty EM corner, which would have required an EM-only fermion).
    variants and several "nice" fractions. If staked as a claim, FCC-ee would
    test it at about ten times current precision. Computed by `origin weak`.
 
+Not predictions: the quark pole becomes less pure at higher energies and the
+structure dissolves near coupling unification (standard running, which sets
+the framework's range rather than testing it); sterile neutrinos feel no
+force and would sit outside the framework.
+
 ## Why 1/3, and why at the Z mass
 
 **Why the Z mass (supported by data).** Running sin^2(theta_W) away from
@@ -193,11 +198,6 @@ is a rotation, like a polarization rotation.
 averaged over three equivalent directions (the three forces, or the three
 generations that carry it identically). That mechanism would turn the 1/3
 from geometry into physics.
-
-Not predictions: the quark pole becomes less pure at higher energies and the
-structure dissolves near coupling unification (standard running, which sets
-the framework's range rather than testing it); sterile neutrinos feel no
-force and would sit outside the framework.
 
 ## How it fails
 
