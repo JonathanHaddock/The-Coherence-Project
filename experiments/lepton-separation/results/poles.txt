@@ -1,0 +1,22 @@
+OFF-AXIS PROJECTION (0 = pure pole, no projection)
+
+m_Z (91 GeV), weak = Z
+  neutrinos        dominant axis weak   off-axis share 0.0000
+  charged leptons  dominant axis EM     off-axis share 0.3334
+  quarks (bound)   dominant axis strong off-axis share 0.0023
+
+m_Z (91 GeV), weak = Z + W
+  neutrinos        dominant axis weak   off-axis share 0.0000
+  charged leptons  dominant axis weak   off-axis share 0.1083
+  quarks (bound)   dominant axis strong off-axis share 0.0231
+
+low energy (~2 GeV), weak = Z
+  neutrinos        dominant axis weak   off-axis share 0.0000
+  charged leptons  dominant axis EM     off-axis share 0.3334
+  quarks (bound)   dominant axis strong off-axis share 0.0003
+
+low energy (~2 GeV), weak = Z + W
+  neutrinos        dominant axis weak   off-axis share 0.0000
+  charged leptons  dominant axis weak   off-axis share 0.1083
+  quarks (bound)   dominant axis strong off-axis share 0.0034
+
