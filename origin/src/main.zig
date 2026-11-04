@@ -6,6 +6,7 @@ const units = @import("science/units.zig");
 const particles = @import("science/particles.zig");
 const observations = @import("science/observations.zig");
 const koide = @import("analysis/koide.zig");
+const projector = @import("analysis/projector.zig");
 const kinematics = @import("analysis/kinematics.zig");
 const manifest = @import("dataset/manifest.zig");
 const events = @import("dataset/events.zig");
@@ -15,6 +16,7 @@ const spectrum_svg = @import("visualization/spectrum_svg.zig");
 
 test {
     _ = koide;
+    _ = projector;
     _ = kinematics;
     _ = manifest;
     _ = events;
@@ -46,6 +48,7 @@ fn help() void {
         \\  origin dataset
         \\  origin analyze [dataset]
         \\  origin koide
+        \\  origin project [a b c]
         \\  origin display [dataset] [event]
         \\  origin help
         \\
@@ -390,6 +393,109 @@ fn display(io: std.Io, gpa: std.mem.Allocator, name: []const u8, index_arg: ?[]c
     , .{ entry.name, index, evs.len, ev.run, ev.event, ev.mu1.charge, ev.mu1.p.pt(), ev.mu2.charge, ev.mu2.p.pt(), ev.mass(), path });
 }
 
+fn projectRow(label: []const u8, v: [3]f64) void {
+    const s = projector.split(v);
+    std.debug.print("  {s:<26} {d:>7.4} {d:>7.4} {d:>7.4}   {d:>6.3} {d:>6.3} {d:>6.3} {d:>6.3}\n", .{
+        label, v[0], v[1], v[2], s.identity, s.q, s.d, s.omega,
+    });
+}
+
+fn projectHeader(title: []const u8) void {
+    std.debug.print("\n{s}\n  {s:<26} {s:>7} {s:>7} {s:>7}   {s:>6} {s:>6} {s:>6} {s:>6}\n", .{ title, "VECTOR", "v1", "v2", "v3", "IDENT", "Q", "D", "OMEGA" });
+}
+
+fn projectReport(args: *std.process.Args.Iterator) void {
+    std.debug.print(
+        \\
+        \\========================================
+        \\          PROJECTOR ANALYSIS
+        \\========================================
+        \\
+        \\Splits a 3-vector v between two projectors:
+        \\  P1 = J/3      identity (the democratic direction 1,1,1)
+        \\  P2 = I - J/3  differentiation (the plane orthogonal to it)
+        \\IDENT = |P1 v|^2/|v|^2.  Q = 1/(3 IDENT).  D = (Q - 1/3)/(2/3).  OMEGA = 4D(1-D).
+        \\D = 0 pure identity, 1 pure differentiation. No assumption that v is a mass.
+        \\
+    , .{});
+
+    // Custom vector: origin project a b c
+    if (args.next()) |first| {
+        var v: [3]f64 = undefined;
+        v[0] = std.fmt.parseFloat(f64, first) catch return badVector(first);
+        for (1..3) |k| {
+            const text = args.next() orelse {
+                std.debug.print("\nUsage: origin project [a b c]\n", .{});
+                return;
+            };
+            v[k] = std.fmt.parseFloat(f64, text) catch return badVector(text);
+        }
+        projectHeader("YOUR VECTOR");
+        projectRow("input", v);
+        return;
+    }
+
+    projectHeader("MASS VECTORS v = sqrt(m)  (reproduces Koide; included for comparison)");
+    const sq = struct {
+        fn of(a: particles.Particle, b: particles.Particle, c: particles.Particle) [3]f64 {
+            // Normalise so the components are readable; the split is scale-free.
+            const n = @sqrt(a.mass_kg) + @sqrt(b.mass_kg) + @sqrt(c.mass_kg);
+            return .{ @sqrt(a.mass_kg) / n, @sqrt(b.mass_kg) / n, @sqrt(c.mass_kg) / n };
+        }
+    }.of;
+    projectRow("charged leptons e,mu,tau", sq(particles.electron, particles.muon, particles.tau));
+    projectRow("down quarks d,s,b", sq(particles.down, particles.strange, particles.bottom));
+    projectRow("up quarks u,c,t", sq(particles.up, particles.charm, particles.top));
+
+    const u = projector.pmns();
+    const v = projector.ckm;
+    projectHeader("MIXING VECTORS, NO MASS: |U| neutrino (PMNS), |V| quark (CKM) amplitudes");
+    const lepton_rows = [_][]const u8{ "PMNS row e", "PMNS row mu", "PMNS row tau" };
+    const nu_cols = [_][]const u8{ "PMNS column nu1", "PMNS column nu2", "PMNS column nu3" };
+    const up_rows = [_][]const u8{ "CKM row u", "CKM row c", "CKM row t" };
+    const down_cols = [_][]const u8{ "CKM column d", "CKM column s", "CKM column b" };
+    var lepton_d: f64 = 0;
+    var quark_d: f64 = 0;
+    for (0..3) |i| {
+        projectRow(lepton_rows[i], projector.row(u, i));
+        lepton_d += projector.split(projector.row(u, i)).d;
+    }
+    for (0..3) |i| {
+        projectRow(nu_cols[i], projector.column(u, i));
+        lepton_d += projector.split(projector.column(u, i)).d;
+    }
+    for (0..3) |i| {
+        projectRow(up_rows[i], projector.row(v, i));
+        quark_d += projector.split(projector.row(v, i)).d;
+    }
+    for (0..3) |i| {
+        projectRow(down_cols[i], projector.column(v, i));
+        quark_d += projector.split(projector.column(v, i)).d;
+    }
+    lepton_d /= 6;
+    quark_d /= 6;
+
+    std.debug.print(
+        \\
+        \\SECTOR SUMMARY (mean D over rows and columns)
+        \\  lepton sector (PMNS)  D = {d:.3}
+        \\  quark sector (CKM)    D = {d:.3}
+        \\
+        \\  Each mixing row belongs to one family (PMNS rows: charged leptons,
+        \\  columns: neutrinos; CKM rows: up quarks, columns: down quarks), but a
+        \\  mixing matrix is shared by its two families, so sector D is the
+        \\  cleanest mass-free comparison.
+        \\
+        \\Sources: CKM PDG 2024 global fit; PMNS from PDG 2024 normal-ordering
+        \\angles (sin^2 t12 = 0.307, sin^2 t23 = 0.558, sin^2 t13 = 0.0219, delta = 1.19 pi).
+        \\
+    , .{ lepton_d, quark_d });
+}
+
+fn badVector(text: []const u8) void {
+    std.debug.print("\nNot a number: {s}. Usage: origin project [a b c]\n", .{text});
+}
+
 fn koideFamily(label: []const u8, a: particles.Particle, b: particles.Particle, c: particles.Particle) void {
     const q = koide.ratio(a.mass_kg, b.mass_kg, c.mass_kg);
     const d = koide.organization(q);
@@ -557,6 +663,8 @@ pub fn main(init: std.process.Init) void {
         }
     } else if (std.mem.eql(u8, command, "display")) {
         display(init.io, init.gpa, args.next() orelse "Zmumu", args.next()) catch |err| fail(err);
+    } else if (std.mem.eql(u8, command, "project")) {
+        projectReport(&args);
     } else if (std.mem.eql(u8, command, "koide")) {
         koideReport();
     } else {
