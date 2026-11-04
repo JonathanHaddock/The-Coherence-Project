@@ -143,6 +143,57 @@ empty EM corner, which would have required an EM-only fermion).
    variants and several "nice" fractions. If staked as a claim, FCC-ee would
    test it at about ten times current precision. Computed by `origin weak`.
 
+## Why 1/3, and why at the Z mass
+
+**Why the Z mass (supported by data).** Running sin^2(theta_W) away from
+m_Z, the charged-lepton share equals 1/3 at **mu = 90.4 +- 0.7 GeV**
+(one-loop running, approximate). Of the meaningful scales nearby, only the
+Z mass is consistent:
+
+| Scale | GeV | Share | Pull from rule |
+|---|---|---|---|
+| W mass | 80.4 | 0.3343 | 14.7 sigma |
+| **Z mass** | **91.2** | **0.3333** | **1.1 sigma** |
+| Higgs mass | 125.2 | 0.3307 | 41 sigma |
+| top mass | 172.6 | 0.3283 | 81 sigma |
+| Higgs field v | 246.2 | 0.3256 | 126 sigma |
+
+So if the rule is real, the data picks out the Z mass on its own. A
+physical reason fits: the weak mixing angle is the rotation that builds the
+photon and the Z from the two underlying fields, and m_Z is where EM and
+the weak force separate. The projection is the charged lepton's split
+between exactly those two forces. (`experiments/weak-angle/which_scale.py`,
+`which-scale.png`.)
+
+**Why 1/3 (open).** No derivation. Candidates:
+
+1. Koide's complement: 2/3 on the dominant axis, mirroring Koide's 2/3.
+2. The cube-diagonal angle: a 1/3 share means the interaction vector is
+   tilted 35.26 deg from its EM axis, the complement of the angle (54.74
+   deg) between (1,1,1) and any axis, where cos^2 = 1/3.
+3. One over the number of forces or of generations (both 3).
+
+Ruled out: grand unification (sin^2 = 3/8 gives a share of 0.3077), and a
+simple closed form (the rule needs
+s = ((sqrt2 + 1) - sqrt(sqrt2 - 1)) / (2 (2 sqrt2 + 1)) = 0.231246).
+
+**Refraction (considered for candidate 2).** Not a literal cause:
+refraction needs light crossing a boundary between media, and the 1/3 is a
+ratio of a particle's couplings, with no light, boundary or medium. The
+geometry matches exactly, though: for a medium of index sqrt2 the Brewster
+angle is arctan(sqrt2) = 54.74 deg and the refracted ray travels at
+35.26 deg, the charged lepton's tilt. The match exists because 54.74 deg is
+the "magic angle", which appears wherever three equal directions are
+averaged (the 3D average of cos^2 is 1/3; NMR magic-angle spinning; Brewster
+refraction at index sqrt2). Refraction shares the source of the 1/3 rather
+than explaining it. The related real physics is that the weak mixing angle
+is a rotation, like a polarization rotation.
+
+**Open question:** why the charged lepton's coupling direction would be
+averaged over three equivalent directions (the three forces, or the three
+generations that carry it identically). That mechanism would turn the 1/3
+from geometry into physics.
+
 Not predictions: the quark pole becomes less pure at higher energies and the
 structure dissolves near coupling unification (standard running, which sets
 the framework's range rather than testing it); sterile neutrinos feel no
