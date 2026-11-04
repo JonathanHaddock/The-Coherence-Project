@@ -1,0 +1,23 @@
+1. MEASURED weak^2 / EM^2 (MS-bar, m_Z)
+  charged leptons  0.4998 +- 0.0001   (1/(N_gen - 1) = 0.5 for N_gen = 3)
+  up quarks        3.29
+  down quarks      87.50
+  pull of charged leptons from 1/2: -1.1 sigma
+
+2. GRAND-UNIFICATION PREDICTION of sin^2(theta_W) at m_Z vs N_gen
+  N_gen = 1   b1 - b2 = 7.267   b2 - b3 = 3.833   sin^2(theta_W) = 0.20756
+  N_gen = 2   b1 - b2 = 7.267   b2 - b3 = 3.833   sin^2(theta_W) = 0.20756
+  N_gen = 3   b1 - b2 = 7.267   b2 - b3 = 3.833   sin^2(theta_W) = 0.20756
+  N_gen = 4   b1 - b2 = 7.267   b2 - b3 = 3.833   sin^2(theta_W) = 0.20756
+  N_gen = 5   b1 - b2 = 7.267   b2 - b3 = 3.833   sin^2(theta_W) = 0.20756
+  The number of generations cancels: complete generations shift every b_i
+  equally, so the predicted angle is the same for any N_gen. (The one-loop
+  non-supersymmetric value, about 0.207, also misses the measured 0.23129.)
+
+3. RANDOM AVERAGING (share of a random direction on one axis)
+  one direction:              mean 0.3328, spread (sd) 0.2980
+  averaged over 3 directions: mean 0.3332, spread (sd) 0.1724
+  measured charged-lepton share: 0.3333, precise to about 0.0001
+  -> random averaging gives 1/3 on average but scatters by about 0.17;
+     a 1/3 this sharp needs an exact symmetry, not averaging.
+
