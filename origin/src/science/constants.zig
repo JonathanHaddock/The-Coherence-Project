@@ -1,0 +1,10 @@
+pub const speed_of_light = 299792458.0;
+pub const gravitational_constant = 6.67430e-11;
+pub const planck_constant = 6.62607015e-34;
+pub const elementary_charge = 1.602176634e-19;
+pub const electron_mass = 9.1093837139e-31;
+pub const proton_mass = 1.67262192595e-27;
+pub const neutron_mass = 1.67492750056e-27;
+pub const avogadro_constant = 6.02214076e23;
+pub const boltzmann_constant = 1.380649e-23;
+pub const vacuum_permittivity = 8.8541878188e-12;
