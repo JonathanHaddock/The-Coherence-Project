@@ -26,7 +26,7 @@ zig-out/bin/origin analyze
 | `catalogue` | The 12 registered particles: leptons, quarks, hadrons, photon |
 | `constants` | CODATA physical constants |
 | `observe <particle>` | Mass, charge, class (name or symbol, any case) |
-| `koide` | Koide ratio Q for charged leptons, up and down quarks, and a neutrino mass scan |
+| `koide` | Koide Q, organizational coordinate D and equilibrium Omega per family; normal and inverted neutrino scans; all 336 signed-root fermion triplets ranked by closeness to 2/3 |
 | `dataset` | Verifies each downloaded dataset against its published size and adler32 checksum, and counts events |
 | `analyze [dataset]` | Dimuon invariant-mass spectrum; finds phi, J/psi, psi(2S), Upsilon, Z and compares with PDG masses. Writes CSV and SVG to `results/` |
 | `display [dataset] [event]` | Transverse event display with muon tracks bent by the CMS magnetic field. Writes SVG to `results/` |

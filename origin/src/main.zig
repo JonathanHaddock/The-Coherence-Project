@@ -392,10 +392,31 @@ fn display(io: std.Io, gpa: std.mem.Allocator, name: []const u8, index_arg: ?[]c
 
 fn koideFamily(label: []const u8, a: particles.Particle, b: particles.Particle, c: particles.Particle) void {
     const q = koide.ratio(a.mass_kg, b.mass_kg, c.mass_kg);
-    std.debug.print("  {s:<18} Q = {d:.6}   angle = {d:>8.4} deg   Q - 2/3 = {e:>10.3}\n", .{
-        label, q, koide.angleDegrees(a.mass_kg, b.mass_kg, c.mass_kg), q - 2.0 / 3.0,
+    const d = koide.organization(q);
+    std.debug.print("  {s:<18} {d:>8.5} {d:>8.3} {d:>8.3} {d:>9.3}\n", .{
+        label, q, d, koide.equilibrium(d), koide.angleDegrees(a.mass_kg, b.mass_kg, c.mass_kg),
     });
 }
+
+fn neutrinoRow(n: [3]f64, lightest: f64) void {
+    const q = koide.ratio(n[0], n[1], n[2]);
+    const d = koide.organization(q);
+    std.debug.print("  {d:<8.3} {d:<9.5} {d:<9.5} {d:<9.5} {d:>8.4} {d:>7.3} {d:>7.3}\n", .{ lightest, n[0], n[1], n[2], q, d, koide.equilibrium(d) });
+}
+
+const Triplet = struct {
+    names: [3][]const u8,
+    sign: [3]f64,
+    q: f64,
+
+    fn distance(self: Triplet) f64 {
+        return @abs(self.q - 2.0 / 3.0);
+    }
+
+    fn closer(_: void, a: Triplet, b: Triplet) bool {
+        return a.distance() < b.distance();
+    }
+};
 
 fn koideReport() void {
     std.debug.print(
@@ -404,41 +425,89 @@ fn koideReport() void {
         \\          KOIDE ANALYSIS
         \\========================================
         \\
-        \\Q = (m1+m2+m3) / (sqrt m1 + sqrt m2 + sqrt m3)^2
-        \\Range: 1/3 (equal masses) to 1 (one mass dominates).
-        \\Q = 2/3 is a 45 degree angle to (1,1,1).
+        \\Q = (m1+m2+m3) / (sqrt m1 + sqrt m2 + sqrt m3)^2, from 1/3 (equal) to 1.
+        \\D = (Q - 1/3) / (2/3)   organizational coordinate, 0 identity .. 1 differentiation
+        \\Omega = 4 D (1 - D)     equilibrium, 1 at D = 1/2 (Q = 2/3, a 45 degree angle)
         \\
-        \\FERMION FAMILIES
+        \\FERMION FAMILIES (PDG 2024)
         \\
-    , .{});
+        \\  {s:<18} {s:>8} {s:>8} {s:>8} {s:>9}
+        \\
+    , .{ "FAMILY", "Q", "D", "OMEGA", "ANGLE" });
 
     koideFamily("Charged leptons", particles.electron, particles.muon, particles.tau);
-    koideFamily("Up-type quarks", particles.up, particles.charm, particles.top);
     koideFamily("Down-type quarks", particles.down, particles.strange, particles.bottom);
+    koideFamily("Up-type quarks", particles.up, particles.charm, particles.top);
 
     std.debug.print(
         \\
-        \\NEUTRINOS (masses unknown; scanning the lightest mass m1)
-        \\Normal ordering, NuFIT 6.0: dm21^2 = {e:.3} eV^2, dm31^2 = {e:.3} eV^2
+        \\NEUTRINOS: absolute masses unknown, so Q depends on the lightest mass.
+        \\NuFIT 6.0 splittings: dm21^2 = {e:.3} eV^2, |dm31^2| = {e:.3} eV^2
         \\
-        \\  m1 (eV)      m2 (eV)      m3 (eV)      Q
+        \\Normal ordering (m1 lightest)
+        \\  {s:<8} {s:<9} {s:<9} {s:<9} {s:>8} {s:>7} {s:>7}
         \\
-    , .{ koide.nu_dm21_sq, koide.nu_dm31_sq });
-
+    , .{ koide.nu_dm21_sq, koide.nu_dm31_sq, "m1 eV", "m1", "m2", "m3", "Q", "D", "OMEGA" });
     const scan = [_]f64{ 0.0, 0.001, 0.003, 0.01, 0.03, 0.1 };
-    for (scan) |m1| {
-        const n = koide.neutrinoMasses(m1);
-        std.debug.print("  {d:<12.4} {d:<12.5} {d:<12.5} {d:.6}\n", .{ n[0], n[1], n[2], koide.ratio(n[0], n[1], n[2]) });
+    for (scan) |m| neutrinoRow(koide.neutrinoMasses(m), m);
+    std.debug.print("\nInverted ordering (m3 lightest)\n  {s:<8} {s:<9} {s:<9} {s:<9} {s:>8} {s:>7} {s:>7}\n", .{ "m3 eV", "m1", "m2", "m3", "Q", "D", "OMEGA" });
+    for (scan) |m| neutrinoRow(koide.neutrinoMassesInverted(m), m);
+    std.debug.print(
+        \\
+        \\  Neutrino Q is at most 0.585 (normal) or 0.500 (inverted) and falls toward
+        \\  1/3 as the lightest mass grows. Its place on the D axis is not yet measured.
+        \\
+    , .{});
+
+    // Every triplet of the nine charged fermions, with all-positive roots or
+    // one negative root (the signed-root extension).
+    const fermions = [_]particles.Particle{
+        particles.electron, particles.muon,    particles.tau,
+        particles.up,       particles.charm,   particles.top,
+        particles.down,     particles.strange, particles.bottom,
+    };
+    var triplets: [84 * 4]Triplet = undefined;
+    var n: usize = 0;
+    for (0..fermions.len) |i| for (i + 1..fermions.len) |j| for (j + 1..fermions.len) |k| {
+        const m = [3]f64{ fermions[i].mass_kg, fermions[j].mass_kg, fermions[k].mass_kg };
+        const signs = [_][3]f64{ .{ 1, 1, 1 }, .{ -1, 1, 1 }, .{ 1, -1, 1 }, .{ 1, 1, -1 } };
+        for (signs) |sign| {
+            triplets[n] = .{ .names = .{ fermions[i].symbol, fermions[j].symbol, fermions[k].symbol }, .sign = sign, .q = koide.signedRatio(m, sign) };
+            n += 1;
+        }
+    };
+    std.mem.sort(Triplet, &triplets, {}, Triplet.closer);
+
+    var near: usize = 0;
+    for (triplets) |t| {
+        if (t.distance() < 0.01) near += 1;
     }
 
     std.debug.print(
         \\
-        \\  Q falls from {d:.4} toward 1/3 as m1 grows. Q = 2/3 is not reachable
-        \\  in normal ordering, so a Koide-like neutrino relation needs another form.
+        \\TRIPLETS CLOSEST TO Q = 2/3 ({d} triplets of 9 charged fermions, a minus sign marks a negative root)
+        \\
+        \\  {s:<20} {s:>9} {s:>10} {s:>7}
+        \\
+    , .{ triplets.len, "TRIPLET", "Q", "Q - 2/3", "D" });
+    for (triplets[0..12]) |t| {
+        var label_buf: [40]u8 = undefined;
+        const label = std.fmt.bufPrint(&label_buf, "{s}{s} {s}{s} {s}{s}", .{
+            if (t.sign[0] < 0) "-" else "", t.names[0],
+            if (t.sign[1] < 0) "-" else "", t.names[1],
+            if (t.sign[2] < 0) "-" else "", t.names[2],
+        }) catch "?";
+        std.debug.print("  {s:<20} {d:>9.5} {e:>10.2} {d:>7.3}\n", .{ label, t.q, t.q - 2.0 / 3.0, koide.organization(t.q) });
+    }
+
+    std.debug.print(
+        \\
+        \\  {d} of {d} triplets fall within 0.01 of 2/3, so near-2/3 values occur by chance.
+        \\  The charged leptons stand out by precision ({e:.1} from 2/3), not by being near it.
         \\
         \\NOTE: quark masses are scheme-dependent (MS-bar vs pole); treat quark Q as indicative.
         \\
-    , .{koide.ratio(koide.neutrinoMasses(0.0)[0], koide.neutrinoMasses(0.0)[1], koide.neutrinoMasses(0.0)[2])});
+    , .{ near, triplets.len, @abs(koide.ratio(particles.electron.mass_kg, particles.muon.mass_kg, particles.tau.mass_kg) - 2.0 / 3.0) });
 }
 
 fn fail(err: anyerror) void {

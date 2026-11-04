@@ -17,9 +17,35 @@ pub fn angleDegrees(m1: f64, m2: f64, m3: f64) f64 {
     return std.math.acos(cos_theta) * 180.0 / std.math.pi;
 }
 
+/// Signed Koide ratio: sign[k] = -1 flips the square root of mass k, as in
+/// the signed-root extensions of Koide (Rivero; Rodejohann and Zhang).
+pub fn signedRatio(m: [3]f64, sign: [3]f64) f64 {
+    const s = sign[0] * @sqrt(m[0]) + sign[1] * @sqrt(m[1]) + sign[2] * @sqrt(m[2]);
+    return (m[0] + m[1] + m[2]) / (s * s);
+}
+
+/// Organizational coordinate from "Lepton coherence": D = (Q - 1/3) / (2/3).
+/// D = 0 for equal masses, 1 when one mass dominates. Q = 2/3 gives D = 1/2.
+pub fn organization(q: f64) f64 {
+    return 1.5 * (q - 1.0 / 3.0);
+}
+
+/// Equilibrium function Omega = 4 D (1 - D): 1 at D = 1/2, 0 at either end.
+/// Note it is a function of Q alone, so it adds no information beyond Q.
+pub fn equilibrium(d: f64) f64 {
+    return 4.0 * d * (1.0 - d);
+}
+
 /// Neutrino mass-squared splittings, normal ordering (NuFIT 6.0, 2024), eV^2.
 pub const nu_dm21_sq = 7.49e-5;
 pub const nu_dm31_sq = 2.513e-3;
+
+/// Neutrino masses in eV for a given lightest mass m3, inverted ordering
+/// (m3 < m1 < m2). dm32^2 = dm31^2 - dm21^2 in magnitude.
+pub fn neutrinoMassesInverted(m3: f64) [3]f64 {
+    const dm32 = nu_dm31_sq - nu_dm21_sq;
+    return .{ @sqrt(m3 * m3 + dm32 - nu_dm21_sq), @sqrt(m3 * m3 + dm32), m3 };
+}
 
 /// Neutrino masses in eV for a given lightest mass m1, normal ordering.
 pub fn neutrinoMasses(m1: f64) [3]f64 {
@@ -54,4 +80,23 @@ test "normal-ordering neutrinos stay below 2/3" {
         try std.testing.expect(q < previous);
         previous = q;
     }
+}
+
+test "organization coordinate and equilibrium" {
+    try std.testing.expectApproxEqAbs(0.0, organization(1.0 / 3.0), 1e-12);
+    try std.testing.expectApproxEqAbs(0.5, organization(2.0 / 3.0), 1e-12);
+    try std.testing.expectApproxEqAbs(1.0, organization(1.0), 1e-12);
+    try std.testing.expectApproxEqAbs(1.0, equilibrium(0.5), 1e-12);
+    try std.testing.expectApproxEqAbs(0.0, equilibrium(1.0), 1e-12);
+}
+
+test "signed ratio with all positive signs equals ratio" {
+    const m = [3]f64{ 0.511, 105.66, 1776.9 };
+    try std.testing.expectApproxEqAbs(ratio(m[0], m[1], m[2]), signedRatio(m, .{ 1, 1, 1 }), 1e-12);
+}
+
+test "inverted ordering with massless m3 gives Q = 1/2" {
+    // m1 ~ m2 >> m3 = 0: Q -> 2m / (2 sqrt m)^2 = 1/2.
+    const n = neutrinoMassesInverted(0.0);
+    try std.testing.expectApproxEqAbs(0.5, ratio(n[0], n[1], n[2]), 0.001);
 }
