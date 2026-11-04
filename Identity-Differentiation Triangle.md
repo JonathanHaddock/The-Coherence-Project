@@ -150,8 +150,8 @@ by mass.
    result, so continued nulls support the framework without distinguishing
    it.
 
-2. **Charged-lepton off-dominant share of exactly 1/3 (probably
-   coincidence).** In the main variant the share is 0.3333. Exactly 1/3
+2. **Charged-lepton off-dominant share of exactly 1/3 (tested: consistent
+   with coincidence).** In the main variant the share is 0.3333. Exactly 1/3
    requires sin^2(theta_W) = 0.231246 in the MS-bar scheme at m_Z; measured
    0.23129 +- 0.00004 (PDG 2024, 1.1 sigma). It fails other definitions of
    the angle (effective leptonic 0.23161: 9.1 sigma; on-shell 0.22348:
@@ -162,6 +162,9 @@ by mass.
    test it at about ten times current precision. Computed by `origin weak`.
    Under the selection framing this is a secondary property: how evenly the
    one non-selective node divides itself between the two forces it selects.
+   A look-elsewhere test (see "Is the 1/3 a signal?" below) finds a match
+   like this arises by chance in about 7% of cases and holds only in the
+   MS-bar convention, so it is recorded as a likely coincidence.
 
 Not predictions: quarks become less selective at higher energies and the
 weighting structure dissolves near coupling unification (standard running,
@@ -256,10 +259,37 @@ scatters by 0.17, far too broad for a 1/3 measured to 0.0001. So averaging
 reproduces the number but not the mechanism.
 (`experiments/generation-averaging/`.)
 
-**Open question:** a symmetry that ties the 1 + 2 split of generation space
-to how the non-selective node divides itself between EM and the weak force,
-holding at the Z mass. The Standard Model contains no such link; it would be
-new physics.
+**Is the 1/3 a signal? (tested: likely coincidence).** Sixteen reasonable
+measures of the charged lepton's EM/weak division at m_Z were compared with
+simple numbers (fractions with denominator up to 6, and common roots):
+
+- Only three land within 2 sigma, and they are one fact written three ways:
+  weak/EM strength = 0.70699 (1/sqrt2), its square 0.49984 (1/2), and the
+  squared share 0.33326 (1/3). The underlying statement is that at the Z
+  mass a charged lepton couples to the Z with 1/sqrt2 of the strength it
+  couples to the photon.
+- The other 13 measures (linear shares, including the W, vector/axial
+  ratio, left-right asymmetry, lepton/neutrino ratio) miss by 19 to 2000
+  sigma.
+- For random weak angles in [0.20, 0.26] at the same precision, at least
+  one of the 16 measures hits a simple number in **about 7%** of cases. That
+  is not rare enough to count as evidence, and it understates the chance
+  because more measures and targets could have been tried.
+- The match holds only in the MS-bar convention. In the effective couplings
+  closest to what LEP measured, the electron gives 0.3353, about 9 sigma
+  from 1/3. A law of nature should hold for physical quantities.
+- No algebraic structure: the required angle 0.231246 has no clean closed
+  form, unlike symmetry-based values (3/8, 1/4). The nearest structural
+  relation, a charged-lepton Z coupling of exactly half the neutrino's (true
+  at sin^2 = 1/4), misses by 234 sigma (measured 0.5028).
+
+Conclusion: the 1/3 is most likely a coincidence of the MS-bar convention at
+the Z mass. (`experiments/weak-angle/why_one_third.py`, `why-one-third.png`.)
+
+**Open question, if it were real:** a symmetry tying the 1 + 2 split of
+generation space to how the non-selective node divides itself between EM and
+the weak force, at the Z mass. The Standard Model contains no such link. The
+test above makes this unlikely to be needed.
 
 ## How it fails
 
@@ -276,8 +306,10 @@ new physics.
 
 The selection pattern is exact Standard-Model structure; the weighting rests
 on measured couplings with modelling choices. The framework is a structural
-description more than a risky prediction; prediction 2 is its only sharp
-numerical claim.
+description more than a risky prediction. Its one sharp numerical claim
+(prediction 2, the 1/3) tested as a likely coincidence, so the framework's
+solid ground is the exact part: the selection pattern and the
+charge-balancing constraint.
 
 ## Earlier framings
 
