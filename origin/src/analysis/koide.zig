@@ -17,6 +17,15 @@ pub fn angleDegrees(m1: f64, m2: f64, m3: f64) f64 {
     return std.math.acos(cos_theta) * 180.0 / std.math.pi;
 }
 
+/// Neutrino mass-squared splittings, normal ordering (NuFIT 6.0, 2024), eV^2.
+pub const nu_dm21_sq = 7.49e-5;
+pub const nu_dm31_sq = 2.513e-3;
+
+/// Neutrino masses in eV for a given lightest mass m1, normal ordering.
+pub fn neutrinoMasses(m1: f64) [3]f64 {
+    return .{ m1, @sqrt(m1 * m1 + nu_dm21_sq), @sqrt(m1 * m1 + nu_dm31_sq) };
+}
+
 test "ratio bounds" {
     // Equal masses give the minimum Q = 1/3 and angle 0.
     try std.testing.expectApproxEqAbs(1.0 / 3.0, ratio(1, 1, 1), 1e-12);
@@ -33,4 +42,16 @@ test "Q = 2/3 is exactly 45 degrees" {
     const c = 1.0 + @sqrt(2.0) * @cos(0.222 + 4.0 * std.math.pi / 3.0);
     try std.testing.expectApproxEqAbs(2.0 / 3.0, ratio(a * a, b * b, c * c), 1e-12);
     try std.testing.expectApproxEqAbs(45.0, angleDegrees(a * a, b * b, c * c), 1e-9);
+}
+
+test "normal-ordering neutrinos stay below 2/3" {
+    // Q is largest at m1 = 0 and decreases toward 1/3 as m1 grows.
+    var previous: f64 = 1.0;
+    for ([_]f64{ 0.0, 0.001, 0.01, 0.1, 1.0 }) |m1| {
+        const n = neutrinoMasses(m1);
+        const q = ratio(n[0], n[1], n[2]);
+        try std.testing.expect(q < 2.0 / 3.0);
+        try std.testing.expect(q < previous);
+        previous = q;
+    }
 }

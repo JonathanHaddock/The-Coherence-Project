@@ -61,21 +61,16 @@ fn catalogue() void {
         \\          PARTICLE CATALOGUE
         \\========================================
         \\
-        \\LEPTONS
-        \\  Electron  e-
-        \\  Muon      mu-
-        \\  Tau       tau-
-        \\
-        \\HADRONS
-        \\  Proton    p
-        \\  Neutron   n
-        \\
-        \\BOSONS
-        \\  Photon    gamma
-        \\
-        \\Total registered particles: 6
-        \\
     , .{});
+
+    for (std.enums.values(particles.Family)) |family| {
+        std.debug.print("\n{s}\n", .{family.label()});
+        for (particles.catalogue) |p| {
+            if (p.family == family) std.debug.print("  {s:<9} {s}\n", .{ p.name, p.symbol });
+        }
+    }
+
+    std.debug.print("\nTotal registered particles: {d}\n", .{particles.catalogue.len});
 }
 
 fn printConstants() void {
@@ -232,25 +227,55 @@ fn analyze() void {
     });
 }
 
-fn koideReport() void {
-    const me = particles.electron.mass_kg;
-    const mm = particles.muon.mass_kg;
-    const mt = particles.tau.mass_kg;
-    const q = koide.ratio(me, mm, mt);
+fn koideFamily(label: []const u8, a: particles.Particle, b: particles.Particle, c: particles.Particle) void {
+    const q = koide.ratio(a.mass_kg, b.mass_kg, c.mass_kg);
+    std.debug.print("  {s:<18} Q = {d:.6}   angle = {d:>8.4} deg   Q - 2/3 = {e:>10.3}\n", .{
+        label, q, koide.angleDegrees(a.mass_kg, b.mass_kg, c.mass_kg), q - 2.0 / 3.0,
+    });
+}
 
+fn koideReport() void {
     std.debug.print(
         \\
         \\========================================
         \\          KOIDE ANALYSIS
         \\========================================
         \\
-        \\Charged leptons: e, mu, tau
-        \\Q measured:      {d:.8}
-        \\Q predicted:     {d:.8}  (2/3)
-        \\Deviation:       {e:.3}
-        \\Angle to (1,1,1): {d:.6} degrees  (45 if Q = 2/3)
+        \\Q = (m1+m2+m3) / (sqrt m1 + sqrt m2 + sqrt m3)^2
+        \\Range: 1/3 (equal masses) to 1 (one mass dominates).
+        \\Q = 2/3 is a 45 degree angle to (1,1,1).
         \\
-    , .{ q, 2.0 / 3.0, q - 2.0 / 3.0, koide.angleDegrees(me, mm, mt) });
+        \\FERMION FAMILIES
+        \\
+    , .{});
+
+    koideFamily("Charged leptons", particles.electron, particles.muon, particles.tau);
+    koideFamily("Up-type quarks", particles.up, particles.charm, particles.top);
+    koideFamily("Down-type quarks", particles.down, particles.strange, particles.bottom);
+
+    std.debug.print(
+        \\
+        \\NEUTRINOS (masses unknown; scanning the lightest mass m1)
+        \\Normal ordering, NuFIT 6.0: dm21^2 = {e:.3} eV^2, dm31^2 = {e:.3} eV^2
+        \\
+        \\  m1 (eV)      m2 (eV)      m3 (eV)      Q
+        \\
+    , .{ koide.nu_dm21_sq, koide.nu_dm31_sq });
+
+    const scan = [_]f64{ 0.0, 0.001, 0.003, 0.01, 0.03, 0.1 };
+    for (scan) |m1| {
+        const n = koide.neutrinoMasses(m1);
+        std.debug.print("  {d:<12.4} {d:<12.5} {d:<12.5} {d:.6}\n", .{ n[0], n[1], n[2], koide.ratio(n[0], n[1], n[2]) });
+    }
+
+    std.debug.print(
+        \\
+        \\  Q falls from {d:.4} toward 1/3 as m1 grows. Q = 2/3 is not reachable
+        \\  in normal ordering, so a Koide-like neutrino relation needs another form.
+        \\
+        \\NOTE: quark masses are scheme-dependent (MS-bar vs pole); treat quark Q as indicative.
+        \\
+    , .{koide.ratio(koide.neutrinoMasses(0.0)[0], koide.neutrinoMasses(0.0)[1], koide.neutrinoMasses(0.0)[2])});
 }
 
 pub fn main(init: std.process.Init) void {
