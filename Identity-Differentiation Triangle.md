@@ -1,92 +1,104 @@
 # The Identity-Differentiation Triangle
 
 Jonathan Haddock, 2026-11-03. Supersedes the equilibrium framing in
-`Lepton coherence`.
+`Lepton coherence`. Stated and tested without mass.
 
-## Hypothesis
+## Framework
 
-- **Neutrinos are identity.**
-- **Quarks are differentiation.** They are confined, so they count as one
-  bound entity.
-- **Charged leptons span the frame.** e, mu and tau are the three axes on
-  which the other entities are projected.
+The fermion entities are **nodes in a larger framework**:
 
-The hypothesis is stated and tested **without mass**.
+- **Neutrinos** and **quarks** are the poles. A pole is unprojected: it sits
+  on a single axis with nothing projected onto the others.
+- **Charged leptons** sit between the poles. **All projection happens in
+  them**: they are the only entity spread across more than one axis.
+- Quarks are confined, so they count as one bound entity.
 
 ## Measure
 
-Each entity is a 3-vector over generations, taken from the mixing matrices:
-neutrinos are the columns of the lepton mixing matrix |U| (PMNS), and quarks
-are the rows and columns of the quark mixing matrix |V| (CKM). The identity
-projector P1 = J/3 and the differentiation projector P2 = I - J/3 split each
-vector, giving
+Each entity is a vector of its interaction strengths per particle,
 
-    D = (Q - 1/3) / (2/3),   Q = |v|^2 / (sum v)^2
+    v = (EM, weak, strong)
+      = (Q^2 alpha,  alpha_Z (gL^2 + gR^2),  alpha_s C_F)
 
-D = 0 is pure identity (centre of the triangle), D = 1 pure differentiation
-(a corner). Computed by `origin project`.
+with Z couplings gL = T3 - Q sin^2(theta_W), gR = -Q sin^2(theta_W),
+C_F = 4/3 for quarks and 0 for leptons. Bound quarks average up and down
+types. Couplings are PDG 2024 values at a common energy.
 
-"Identity" is fixed in advance as **D <= 0.1**.
+**Projection** is the off-axis share,
 
-## Results (mass-free, PDG 2024)
+    off = 1 - (largest component)^2 / |v|^2
 
-| Entity | Vectors | D |
-|---|---|---|
-| Neutrinos | PMNS columns nu1, nu2, nu3 | 0.08, 0.00, 0.13, **mean 0.07** |
-| Quarks, bound | CKM rows and columns | **mean 0.63** |
-| Charged leptons | PMNS rows e, mu, tau | 0.15, 0.06, 0.01, mean 0.07 |
+0 means the vector lies on a single force axis (an unprojected pole).
 
-Neutrinos sit inside the identity band and quarks on the differentiation
-side. **The hypothesis holds on current data.**
+## Results
 
-Limit: charged leptons and neutrinos share one mixing matrix, so mixing data
-gives them the same D. That fits their roles (the frame is not a pole), but
-the frame role itself is not measured by this method.
+| Entity | Dominant axis | Off-axis share | Effective forces |
+|---|---|---|---|
+| Neutrinos | weak | **0** (exact) | 1.00 |
+| Quarks, bound | strong | **0.0003 to 0.023** | 1.05 to 1.33 |
+| Charged leptons | EM or weak | **0.11 to 0.33** | 1.62 to 1.94 |
 
-## Predictions
+Ranges span four variants: energy scale m_Z or about 2 GeV, and weak strength
+from the Z alone or Z plus W. In every variant the poles are unprojected (or
+nearly) and the charged leptons carry 5 to 1000 times more projection than
+either pole. Effective forces = (sum v)^2 / sum v^2.
 
-1. As lepton mixing is measured more precisely (JUNO, DUNE, Hyper-K: the
-   theta23 octant and the CP phase), the neutrino mean D stays at or below 0.1.
-2. Quark mixing stays on the differentiation side (D above 0.5).
+Script and charts: `experiments/lepton-separation/` (`strengths.py`,
+`poles.py`; charts 4 to 6).
 
-These follow from data already in hand, so they are weak tests. A strong test
-needs a mass-free observable that separates charged leptons from neutrinos.
+## Choices that could change the numbers
 
-## Mass: noted and abandoned
+- Strengths are per particle, not summed over the three quark colours.
+  Summing over colours pushes quarks further onto the strong axis.
+- The strong strength uses the colour factor C_F = 4/3.
+- All forces are compared at one energy. Couplings run with energy: the
+  strong coupling weakens and the others strengthen, so the quark pole
+  becomes less pure at higher energies and the structure dissolves as the
+  couplings approach unification.
+- The near-1/3 lepton share in the main variant follows from the measured
+  weak mixing angle; it moves to 0.11 when the W is included, so it is not
+  treated as meaningful.
 
-Mass was used first, through Koide's vector v = (sqrt m1, sqrt m2, sqrt m3).
-Those results are recorded here for completeness:
+## How it fails
 
-| Entity | D from mass |
-|---|---|
-| Neutrinos | 0 to 0.38, depending on the unmeasured lightest mass |
-| Charged leptons | 0.500 |
-| Quarks, bound (u+d, c+s, t+b) | 0.763 |
+- A measured fermion property that puts projection in a pole (neutrinos
+  spread across forces, or quarks with comparable non-strong interactions at
+  accessible energies).
+- A new fermion entity that fits neither a pole nor the projecting middle.
 
-Taken at face value, mass would require neutrinos to have normal mass ordering
-and a total mass of 0.069 to 0.072 eV (`prediction-window.png`).
+The result rests on measured couplings, but which axes count and how they are
+weighted are modelling choices, so it is a structural description more than a
+risky prediction.
 
-**Reasons for abandoning mass:**
+## Earlier framings
 
-1. **The hypothesis is about organization, not mass.** The working premise
-   from `Lepton coherence` is that Q measures organizational structure and
-   mass is one manifestation of it. Using mass as the measure makes the test
-   depend on the thing the hypothesis says is secondary.
-2. **Neutrino masses are not measured.** Only their differences are. Placing
-   neutrinos by mass meant choosing the lightest mass, which made their
-   position a free parameter rather than a result.
-3. **Quark masses are not uniquely defined.** They depend on the
-   renormalization scheme and scale, so quark D from mass shifts with that
-   choice.
-4. **Mass moved the claims.** With mass, charged leptons sit at D = 1/2
-   (equilibrium); without it, the picture is two poles and a frame. The
-   mass-based prediction window also came from cosmology limits rather than
-   from the hypothesis itself.
+**Generation-based D (no mass).** Each entity as a vector over its three
+generations from the mixing matrices: neutrinos D = 0.07, bound quarks 0.63.
+This cannot separate charged leptons from neutrinos: they share one mixing
+matrix, and every per-generation mass-free quantity (Z branching, weak
+couplings, charges) is universal, giving D ~ 0 (`lepton-separation/run.py`).
+The structure appears only in force space.
+
+**Mass: noted and abandoned.** With Koide's vector v = (sqrt m1, sqrt m2,
+sqrt m3): neutrinos D 0 to 0.38 (lightest mass unmeasured), charged leptons
+0.500, bound quarks 0.763. Taken at face value it would require normal
+neutrino ordering and a total neutrino mass of 0.069 to 0.072 eV
+(`prediction-window.png`). Abandoned because:
+
+1. The hypothesis is about organization, not mass; mass is treated as one
+   manifestation of it.
+2. Neutrino masses are not measured, only their differences, so their
+   position was a free parameter.
+3. Quark masses depend on the renormalization scheme and scale.
+4. Mass moved the claims (charged leptons became an "equilibrium"), and the
+   prediction window came from cosmology limits rather than the hypothesis.
 
 ## Charts
 
-- `experiments/koide-projector/triangle.png`: mixing vectors in the triangle
-  (mass-free, the basis of the results above).
-- `experiments/koide-projector/three-entities.png`: D by mass and by mixing.
-- `experiments/koide-projector/lepton-frame.png` and `prediction-window.png`:
-  the abandoned mass-based picture, kept for the record.
+- `experiments/lepton-separation/results/6-pole-projection.png`: off-axis
+  share per entity, all variants (the main result).
+- `experiments/lepton-separation/results/4-interaction-triangle.png`:
+  entities in the EM / weak / strong triangle.
+- `experiments/lepton-separation/results/5-effective-forces.png`: effective
+  number of forces.
+- `experiments/koide-projector/`: earlier generation-based and mass charts.
