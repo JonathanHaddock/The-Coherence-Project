@@ -94,7 +94,31 @@ balance. This is measured: atoms are neutral because the electron's charge
 cancels the proton's, confirmed to better than about 1 part in 1e21.
 
 This is standard Standard-Model structure, so it supports the framework
-without being a new prediction. It replaces an earlier open question (an
+without being a new prediction.
+
+**One projection, carried identically by three particles.** Each charged
+lepton carries the full projection on its own; it is not divided among them.
+From each lepton's own Z couplings measured at LEP/SLD (PDG 2024):
+
+| Charged lepton | g_V | g_A | Projection share |
+|---|---|---|---|
+| Electron | -0.03817 | -0.50111 | 0.3353 +- 0.0006 |
+| Muon | -0.0367 | -0.50120 | 0.3353 +- 0.0010 |
+| Tau | -0.0366 | -0.50204 | 0.3368 +- 0.0011 |
+
+The three agree within errors (lepton universality). They sit slightly above
+1/3 because measured couplings include radiative corrections, corresponding
+to the effective weak angle rather than the MS-bar one.
+
+So the third point is a single projection held identically by e, mu and tau:
+
+- **By force** the three are identical; force space treats them as one.
+- **By mass** they are maximally distinct (Koide Q = 2/3, D = 1/2). Mass is
+  the only thing that separates them.
+
+This also explains why the generation-based D cannot separate charged
+leptons from neutrinos without mass: within a family, generations differ only
+by mass. It replaces an earlier open question (an
 empty EM corner, which would have required an EM-only fermion).
 
 ## Predictions
