@@ -1,0 +1,6 @@
+Measurement                     Energy (GeV)   sin^2 theta_W
+Cs atomic parity violation            0.0024   0.23490 +- 0.00180
+Qweak (e-p scattering)                 0.157   0.23820 +- 0.00110
+E158 (e-e scattering)                  0.161   0.24030 +- 0.00130
+Z pole, global fit                    91.188   0.23129 +- 0.00004
+SM prediction, low-energy limit          -> 0   0.23873 +- 0.00005

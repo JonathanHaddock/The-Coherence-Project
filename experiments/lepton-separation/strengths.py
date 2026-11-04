@@ -20,7 +20,7 @@ import chartstyle as cs  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 
 OUT = Path(__file__).parent / "results"
-S2W = 0.23122  # sin^2 theta_W (MS-bar, m_Z), PDG 2024
+S2W = 0.23129  # sin^2 theta_W (MS-bar, m_Z), PDG 2024 Table 10.2
 
 SCALES = {
     "m_Z (91 GeV)": dict(alpha=1 / 127.95, alpha_s=0.1180),

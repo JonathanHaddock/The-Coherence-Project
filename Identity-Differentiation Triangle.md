@@ -109,13 +109,15 @@ empty EM corner, which would have required an EM-only fermion).
    distinguishing it.
 
 2. **Charged-lepton projection of exactly 1/3 (probably coincidence).** In
-   the main variant the share is 0.3334. Exactly 1/3 requires
+   the main variant the share is 0.3333. Exactly 1/3 requires
    sin^2(theta_W) = 0.231246 in the MS-bar scheme at m_Z; measured
-   0.23122 +- 0.00004 (0.7 sigma). It fails other definitions of the angle
-   (effective leptonic: 7 sigma; on-shell: 79 sigma), holds only at one
-   energy because the angle runs, and was found after looking at four
+   0.23129 +- 0.00004 (PDG 2024, 1.1 sigma). It fails other definitions of
+   the angle (effective leptonic 0.23161: 9.1 sigma; on-shell 0.22348:
+   78 sigma), and holds only at one energy because the angle runs: measured
+   values are 0.2349 (2.4 MeV), 0.2382 (157 MeV) and 0.2403 (161 MeV), see
+   `experiments/weak-angle/running.png`. It was found after looking at four
    variants and several "nice" fractions. If staked as a claim, FCC-ee would
-   test it at about ten times current precision.
+   test it at about ten times current precision. Computed by `origin weak`.
 
 Not predictions: the quark pole becomes less pure at higher energies and the
 structure dissolves near coupling unification (standard running, which sets

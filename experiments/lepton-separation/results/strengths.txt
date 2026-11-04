@@ -7,8 +7,8 @@ m_Z (91 GeV), weak = Z
 
 m_Z (91 GeV), weak = Z + W
   neutrinos        v = (0.00000, 0.02789, 0.00000)   D = 1.000   forces effectively = 1.00
-  charged leptons  v = (0.00782, 0.02243, 0.00000)   D = 0.425   forces effectively = 1.62
-  quarks (bound)   v = (0.00217, 0.02412, 0.15733)   D = 0.627   forces effectively = 1.33
+  charged leptons  v = (0.00782, 0.02242, 0.00000)   D = 0.425   forces effectively = 1.62
+  quarks (bound)   v = (0.00217, 0.02411, 0.15733)   D = 0.627   forces effectively = 1.33
 
 low energy (~2 GeV), weak = Z
   neutrinos        v = (0.00000, 0.01053, 0.00000)   D = 1.000   forces effectively = 1.00
@@ -17,6 +17,6 @@ low energy (~2 GeV), weak = Z
 
 low energy (~2 GeV), weak = Z + W
   neutrinos        v = (0.00000, 0.02673, 0.00000)   D = 1.000   forces effectively = 1.00
-  charged leptons  v = (0.00749, 0.02150, 0.00000)   D = 0.425   forces effectively = 1.62
+  charged leptons  v = (0.00749, 0.02149, 0.00000)   D = 0.425   forces effectively = 1.62
   quarks (bound)   v = (0.00208, 0.02311, 0.40000)   D = 0.832   forces effectively = 1.13
 
