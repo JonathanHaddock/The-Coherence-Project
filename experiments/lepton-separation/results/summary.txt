@@ -1,0 +1,26 @@
+PART A: per-generation, mass-free quantities
+
+  Z -> l l branching (%)               charged leptons  D = 3.02e-07   (LEP; e, mu, tau)
+  Weak coupling ratios (tau decays)    charged leptons  D = 7.12e-07   (HFLAV: g_mu/g_e, g_tau/g_e)
+  Anomalous magnetic moment a          charged leptons  not measurable per generation (a_e, a_mu measured; a_tau only bounded)
+  Electric charge                      charged leptons  D = 0.00e+00   (|Q| = 1 for e, mu, tau)
+  Electric charge                      neutrinos        not measurable per generation (0 for all three: no direction to project)
+  Z -> nu nu per flavour               neutrinos        not measurable per generation (only the total is measured (N_nu = 2.996))
+  Weak isospin |T3|                    neutrinos        D = 0.00e+00   (same for every generation)
+  Weak isospin |T3|                    charged leptons  D = 0.00e+00   (same for every generation)
+
+  Every measured per-generation quantity gives D ~ 0 (lepton universality):
+  the generations are identical once mass and mixing are removed. Projected
+  this way, charged leptons are pure identity too, the same as neutrinos.
+
+PART B: entity-level properties
+
+  property                        neutrinos  charged lep.     quarks   separates l from nu?
+  electric charge |Q|                     0             1   2/3, 1/3   YES
+  feels electromagnetism                  0             1          1   YES
+  feels the weak force                    1             1          1   no
+  feels the strong force                  0             0          1   no
+  helicity states observed                1             2          2   YES
+  colour states                           1             1          3   no
+  free / observable directly   free, barely          free   confined   YES
+  forces felt (count)                     1             2          3   YES
