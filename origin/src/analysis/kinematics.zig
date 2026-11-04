@@ -3,6 +3,9 @@ const std = @import("std");
 /// Muon rest mass in GeV/c^2 (PDG 2024).
 pub const muon_mass_gev = 0.1056583755;
 
+/// Electron rest mass in GeV/c^2 (PDG 2024).
+pub const electron_mass_gev = 0.00051099895;
+
 /// Relativistic four-momentum in natural units (GeV, c = 1).
 pub const FourVector = struct {
     e: f64,
@@ -12,10 +15,10 @@ pub const FourVector = struct {
 
     /// Momentum reconstruction from collider coordinates: transverse
     /// momentum, pseudorapidity and azimuth, for a particle of known mass.
-    pub fn fromPtEtaPhi(transverse: f64, eta: f64, azimuth: f64, rest_mass: f64) FourVector {
+    pub fn fromPtEtaPhi(transverse: f64, pseudorapidity: f64, azimuth: f64, rest_mass: f64) FourVector {
         const px = transverse * @cos(azimuth);
         const py = transverse * @sin(azimuth);
-        const pz = transverse * std.math.sinh(eta);
+        const pz = transverse * std.math.sinh(pseudorapidity);
         return .{ .e = @sqrt(px * px + py * py + pz * pz + rest_mass * rest_mass), .px = px, .py = py, .pz = pz };
     }
 
@@ -29,6 +32,16 @@ pub const FourVector = struct {
 
     pub fn phi(v: FourVector) f64 {
         return std.math.atan2(v.py, v.px);
+    }
+
+    /// Pseudorapidity, the detector's polar-angle coordinate.
+    pub fn eta(v: FourVector) f64 {
+        return std.math.asinh(v.pz / v.pt());
+    }
+
+    /// Rapidity along the beam, y = 1/2 ln((E + pz) / (E - pz)).
+    pub fn rapidity(v: FourVector) f64 {
+        return 0.5 * @log((v.e + v.pz) / (v.e - v.pz));
     }
 
     /// Invariant mass sqrt(E^2 - |p|^2). Clamped at zero, since rounding in

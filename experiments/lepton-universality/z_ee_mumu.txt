@@ -1,0 +1,3 @@
+electron  peak 90.799 +- 0.080 GeV  (7591 events)
+muon      peak 90.817 +- 0.037 GeV  (9664 events)
+difference e - mu: -0.019 +- 0.088 GeV  (-0.2 sigma, statistical only)

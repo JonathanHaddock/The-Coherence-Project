@@ -139,6 +139,14 @@ This also explains why the generation-based D cannot separate charged
 leptons from neutrinos without mass: within a family, generations differ only
 by mass.
 
+**Real-data check (CMS 2011, same detector).** Z -> ee and Z -> mumu give
+the same Z peak: electrons 90.799 +- 0.080 GeV (7591 events), muons
+90.817 +- 0.037 GeV (9664 events), difference -0.019 +- 0.088 GeV
+(0.2 sigma, statistical only). The widths differ (6.5 vs 4.75 GeV FWHM)
+because electrons and muons are measured by different detector systems,
+not because of the leptons. (`origin export`;
+`experiments/lepton-universality/z-ee-vs-mumu.png`.)
+
 ## Predictions
 
 1. **Neutrinos stay perfectly selective.** No electromagnetic coupling

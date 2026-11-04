@@ -1,0 +1,18 @@
+# ORIGIN derived datasets. Regenerate with: origin export
+# file                       rows      bytes   adler32
+dilepton-events.csv            160000   17059580  bd93655a
+z-ee-vs-mumu.csv                  120       2061  d5b18582
+z-ee-vs-mumu-summary.csv            2        162  39e12f30
+selection.csv                      12       1114  b982226a
+
+# Sources (CMS Run2011A, CERN Open Data record 545, CC0; verified by adler32):
+  Zmumu.csv (970550 bytes, adler32 0d4cfe9f) https://opendata.cern.ch/record/545/files/Zmumu.csv
+  Jpsimumu.csv (2639302 bytes, adler32 214e4077) https://opendata.cern.ch/record/545/files/Jpsimumu.csv
+  Ymumu.csv (2599212 bytes, adler32 5eef7b87) https://opendata.cern.ch/record/545/files/Ymumu.csv
+  Dimuon_DoubleMu.csv (13935840 bytes, adler32 5b87a72a) https://opendata.cern.ch/record/545/files/Dimuon_DoubleMu.csv
+  Zee.csv (1445651 bytes, adler32 3ad4c332) https://opendata.cern.ch/record/545/files/Zee.csv
+
+# selection.csv: PDG 2024 couplings, sin^2(theta_W) = 0.23129 (MS-bar, m_Z).
+# Z comparison: electrons are measured by the calorimeter, muons by the
+# tracker and muon chambers, with different selections; compare peak
+# positions, not event counts or widths, without efficiency corrections.

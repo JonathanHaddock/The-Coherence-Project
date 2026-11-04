@@ -50,7 +50,7 @@ const MuonColumns = struct {
         };
     }
 
-    fn read(c: MuonColumns, row: []const []const u8) !Muon {
+    fn read(c: MuonColumns, row: []const []const u8, lepton_mass: f64) !Muon {
         const p = if (c.e != null and c.px != null and c.py != null and c.pz != null) FourVector{
             .e = try float(row[c.e.?]),
             .px = try float(row[c.px.?]),
@@ -60,7 +60,7 @@ const MuonColumns = struct {
             try float(row[c.pt]),
             try float(row[c.eta]),
             try float(row[c.phi]),
-            kinematics.muon_mass_gev,
+            lepton_mass,
         );
         return .{ .p = p, .charge = try std.fmt.parseInt(i8, row[c.q], 10) };
     }
@@ -89,6 +89,12 @@ fn splitRow(line: []const u8, out: *[max_columns][]const u8) ![]const []const u8
 
 /// Parse a CMS open-data dimuon CSV into events.
 pub fn parse(gpa: std.mem.Allocator, text: []const u8) ![]DimuonEvent {
+    return parseLeptons(gpa, text, kinematics.muon_mass_gev);
+}
+
+/// Parse a dilepton CSV, rebuilding energies with the given lepton mass
+/// when the file lists only (pt, eta, phi).
+pub fn parseLeptons(gpa: std.mem.Allocator, text: []const u8, lepton_mass: f64) ![]DimuonEvent {
     var lines = std.mem.splitScalar(u8, text, '\n');
 
     var header_buf: [max_columns][]const u8 = undefined;
@@ -109,8 +115,8 @@ pub fn parse(gpa: std.mem.Allocator, text: []const u8) ![]DimuonEvent {
         try events.append(gpa, .{
             .run = try std.fmt.parseInt(u64, row[run_col], 10),
             .event = try std.fmt.parseInt(u64, row[event_col], 10),
-            .mu1 = try c1.read(row),
-            .mu2 = try c2.read(row),
+            .mu1 = try c1.read(row, lepton_mass),
+            .mu2 = try c2.read(row, lepton_mass),
         });
     }
     return events.toOwnedSlice(gpa);

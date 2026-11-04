@@ -1,0 +1,13 @@
+scale,weak_definition,entity,em,weak,strong,selectivity,off_dominant_share,effective_forces
+m_Z (91 GeV),Z,neutrinos,0.00000e0,1.09896e-2,0.00000e0,1.0000,0.0000,1.000
+m_Z (91 GeV),Z,charged leptons,7.81555e-3,5.52556e-3,0.00000e0,0.3825,0.3333,1.943
+m_Z (91 GeV),Z,quarks (bound),2.17099e-3,7.21243e-3,1.57333e-1,0.7751,0.0023,1.120
+m_Z (91 GeV),Z+W,neutrinos,0.00000e0,2.78851e-2,0.00000e0,1.0000,0.0000,1.000
+m_Z (91 GeV),Z+W,charged leptons,7.81555e-3,2.24211e-2,0.00000e0,0.4798,0.1083,1.622
+m_Z (91 GeV),Z+W,quarks (bound),2.17099e-3,2.41080e-2,1.57333e-1,0.5891,0.0231,1.330
+low energy (~2 GeV),Z,neutrinos,0.00000e0,1.05327e-2,0.00000e0,1.0000,0.0000,1.000
+low energy (~2 GeV),Z,charged leptons,7.49064e-3,5.29584e-3,0.00000e0,0.3825,0.3333,1.943
+low energy (~2 GeV),Z,quarks (bound),2.08073e-3,6.91258e-3,4.00000e-1,0.8930,0.0003,1.045
+low energy (~2 GeV),Z+W,neutrinos,0.00000e0,2.67259e-2,0.00000e0,1.0000,0.0000,1.000
+low energy (~2 GeV),Z+W,charged leptons,7.49064e-3,2.14890e-2,0.00000e0,0.4798,0.1083,1.622
+low energy (~2 GeV),Z+W,quarks (bound),2.08073e-3,2.31058e-2,4.00000e-1,0.7799,0.0034,1.126

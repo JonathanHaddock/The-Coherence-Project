@@ -2,6 +2,7 @@ const std = @import("std");
 const Io = std.Io;
 const manifest = @import("manifest.zig");
 const events = @import("events.zig");
+const kinematics = @import("../analysis/kinematics.zig");
 
 pub const manifests_dir = "data/manifests";
 pub const raw_dir = "data/raw";
@@ -98,5 +99,14 @@ pub fn loadEvents(io: Io, gpa: std.mem.Allocator, entry: manifest.Entry) ![]even
     }
     const bytes = try readRaw(io, gpa, entry.name);
     defer gpa.free(bytes);
-    return events.parse(gpa, bytes);
+    return events.parseLeptons(gpa, bytes, leptonMass(entry.name));
+}
+
+/// Electron datasets (Zee) need the electron mass; the rest are dimuon.
+pub fn leptonMass(name: []const u8) f64 {
+    return if (std.mem.startsWith(u8, name, "Zee")) kinematics.electron_mass_gev else kinematics.muon_mass_gev;
+}
+
+pub fn leptonName(name: []const u8) []const u8 {
+    return if (std.mem.startsWith(u8, name, "Zee")) "electron" else "muon";
 }

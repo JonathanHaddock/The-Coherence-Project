@@ -10,6 +10,8 @@ const projector = @import("analysis/projector.zig");
 const weak = @import("analysis/weak.zig");
 const charge = @import("analysis/charge.zig");
 const majorana = @import("analysis/majorana.zig");
+const selection = @import("analysis/selection.zig");
+const export_ = @import("dataset/export.zig");
 const weak_svg = @import("visualization/weak_svg.zig");
 const kinematics = @import("analysis/kinematics.zig");
 const manifest = @import("dataset/manifest.zig");
@@ -25,6 +27,8 @@ test {
     _ = weak;
     _ = charge;
     _ = majorana;
+    _ = selection;
+    _ = export_;
     _ = weak_svg;
     _ = kinematics;
     _ = manifest;
@@ -65,6 +69,7 @@ fn help() void {
         \\  origin weak [--no-open]
         \\  origin charge
         \\  origin majorana
+        \\  origin export
         \\  origin display [dataset] [event]
         \\  origin help
         \\
@@ -960,6 +965,9 @@ pub fn main(init: std.process.Init) void {
         }
     } else if (std.mem.eql(u8, command, "display")) {
         display(init.io, init.gpa, args.next() orelse "Zmumu", args.next()) catch |err| fail(err);
+    } else if (std.mem.eql(u8, command, "export")) {
+        std.debug.print("\n========================================\n          DATASET EXPORT\n========================================\n\n", .{});
+        export_.run(init.io, init.gpa) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "majorana")) {
         majoranaReport();
     } else if (std.mem.eql(u8, command, "charge")) {

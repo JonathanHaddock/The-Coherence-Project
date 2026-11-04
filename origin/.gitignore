@@ -2,3 +2,4 @@
 zig-out/
 data/raw/*
 !data/raw/.gitkeep
+datasets/dilepton-events.csv
