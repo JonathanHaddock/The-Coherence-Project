@@ -85,7 +85,7 @@ fn help() void {
         \\  origin display [dataset] [event]
         \\  origin engine [ticks] [seed]
         \\  origin clocks [seed]
-        \\  origin lattice3 [display] [update] [core] [ticks]
+        \\  origin lattice3 [display] [update] [core] [ticks] [gravity]
         \\  origin help
         \\
     , .{});
@@ -1156,21 +1156,24 @@ fn lattice3Report(args: anytype) void {
     const upd = std.meta.stringToEnum(engine.Update, args.next() orelse "sync") orelse .sync;
     const core = std.fmt.parseInt(u32, args.next() orelse "8", 10) catch 8;
     const ticks = std.fmt.parseInt(i64, args.next() orelse "1500", 10) catch 1500;
+    const gravity = std.mem.eql(u8, args.next() orelse "off", "gravity");
     const from = @divTrunc(ticks * 2, 3);
     std.debug.print(
         \\
         \\--- 3D LATTICE {d}^3, 6 neighbors ---
         \\display {s}, update {s}, core sphere radius {d}, {d} ticks, averages over ticks {d}-{d}
-        \\carrier: released neutrino units, one hop per tick, lost at box edge, no feedback
+        \\carrier: released neutrino units, one hop per tick, lost at box edge, feedback {s}
         \\
-        \\  dist   pixels  flash rate  carrier      carrier*dist
+        \\  dist   pixels  flash rate  agreement  carrier      carrier*dist
         \\
-    , .{ grid3.side, @tagName(disp), @tagName(upd), core, ticks, from, ticks });
+    , .{ grid3.side, @tagName(disp), @tagName(upd), core, ticks, from, ticks, if (gravity) "ON (rule 6: 3 units -> +1 reinforce per cell)" else "off" });
     lattice.init(.{ .display = disp, .update = upd, .start = if (core == 0) .random else .{ .core = core } });
+    lattice.gravity = gravity;
     const bins = grid3.side / 2;
     var rate: [bins]f64 = @splat(0);
     var car: [bins]f64 = @splat(0);
     var cnt: [bins]f64 = @splat(0);
+    var agr: [bins]f64 = @splat(0);
     for (0..grid3.n) |i| {
         const b: usize = @intFromFloat(@floor(grid3.radius(i)));
         if (b < bins) cnt[b] += 1;
@@ -1185,6 +1188,7 @@ fn lattice3Report(args: anytype) void {
             if (b >= bins) continue;
             if (lattice.fired[i]) rate[b] += 1;
             car[b] += lattice.carrier[i];
+            agr[b] += lattice.agreement(i);
         }
     }
     const w: f64 = @floatFromInt(ticks - from);
@@ -1198,7 +1202,7 @@ fn lattice3Report(args: anytype) void {
         const r = rate[b] / (cnt[b] * w);
         const c = car[b] / (cnt[b] * w);
         const d: f64 = @as(f64, @floatFromInt(b)) + 0.5;
-        std.debug.print("  {d:>4}  {d:>7}  {d:>10.3}  {e:>11.3}  {e:>11.3}\n", .{ b, @as(u64, @intFromFloat(cnt[b])), r, c, c * d });
+        std.debug.print("  {d:>4}  {d:>7}  {d:>10.3}  {d:>9.3}  {e:>11.3}  {e:>11.3}\n", .{ b, @as(u64, @intFromFloat(cnt[b])), r, agr[b] / (cnt[b] * w), c, c * d });
         if (b > core + 2 and b < bins - 4 and c > 0) {
             sx += @log(d);
             sy += @log(c);

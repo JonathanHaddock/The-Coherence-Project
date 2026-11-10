@@ -54,9 +54,12 @@ pub const Grid3 = struct {
     carrier: [n]f64,
     next: [n]f64,
     cfg: px.Config,
+    /// RULE CHOICE 6: carrier acts back on pixels (gravity feedback).
+    gravity: bool,
 
     pub fn init(g: *Grid3, cfg: px.Config) void {
         g.cfg = cfg;
+        g.gravity = false;
         g.fired = @splat(false);
         g.carrier = @splat(0);
         var s = cfg.seed;
@@ -106,7 +109,29 @@ pub const Grid3 = struct {
             },
         }
         g.spread();
+        if (g.gravity) g.absorb();
         return count;
+    }
+
+    /// RULE CHOICE 6: each whole pixel's worth of carrier (3 units) at a site
+    /// is taken from the field and reinforces every cell of the pattern the
+    /// pixel shows now (section 6: gravity pushes the display back into the
+    /// scaffold). The only number is the cell count.
+    pub fn absorb(g: *Grid3) void {
+        const unit: f64 = px.cells;
+        for (0..n) |i| {
+            if (g.carrier[i] < unit) continue;
+            const k: u32 = @intFromFloat(@floor(g.carrier[i] / unit));
+            g.carrier[i] -= @as(f64, @floatFromInt(k)) * unit;
+            for (0..px.cells) |c| g.px[i].reinforce[c] += k;
+        }
+    }
+
+    /// Fraction of matching cells between pixel i and its 6 neighbors.
+    pub fn agreement(g: *const Grid3, i: usize) f64 {
+        var m: u32 = 0;
+        for (neighbors(i)) |j| m += px.cells - @popCount(g.px[i].pattern ^ g.px[j].pattern);
+        return @as(f64, @floatFromInt(m)) / (6.0 * px.cells);
     }
 
     /// One hop: each site hands 1/6 of its carrier to each face neighbor.
@@ -164,4 +189,16 @@ test "point source in 3D gives roughly 1/distance" {
     const a = avg[4] * 4;
     const b = avg[8] * 8;
     try std.testing.expect(b / a > 0.7 and b / a < 1.05);
+}
+
+test "absorb turns whole pixels of carrier into reinforcement" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{});
+    g.carrier = @splat(0);
+    g.px[0].reinforce = .{ 0, 0, 0 };
+    g.carrier[0] = 7.5;
+    g.absorb();
+    try std.testing.expectEqual([3]u32{ 2, 2, 2 }, g.px[0].reinforce);
+    try std.testing.expectApproxEqAbs(@as(f64, 1.5), g.carrier[0], 1e-12);
 }
