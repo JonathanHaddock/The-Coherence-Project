@@ -26,7 +26,7 @@ input[type=range]{accent-color:var(--acc)}
 <main>
 <section class="card">
  <div class="ctl">
-  <button id="play">▶ Run</button><button id="step">Step</button><button id="reset">Reset</button>
+  <button id="play">▶ Run</button><button id="step">Step</button><button id="reset">Reset</button><button id="copy">Copy state</button>
   <label>speed <input id="speed" type="range" min="1" max="20" value="3"></label>
  </div>
  <div class="ctl">
@@ -49,6 +49,7 @@ input[type=range]{accent-color:var(--acc)}
  </div>
  <details style="margin-top:6px"><summary style="color:#8a919c;font-size:12px;cursor:pointer">flat slice view</summary>
  <canvas id="slice" width="48" height="48" style="margin-top:8px"></canvas></details>
+ <textarea id="copybox" readonly style="display:none;width:100%;height:140px;margin-top:8px;background:#0e1013;color:#e6e8eb;border:1px solid #2a2f37;border-radius:6px;font:11px ui-monospace,monospace"></textarea>
  <div class="legend" id="legend"></div>
  <div class="stats">
   <div class="stat"><b id="st-t">0</b><i>tick</i></div>
@@ -283,6 +284,21 @@ function loop(){if(!running)return;const n=+$("speed").value;for(let k=0;k<n;k++
 $("play").onclick=()=>{running=!running;$("play").textContent=running?"❚❚ Pause":"▶ Run";$("play").classList.toggle("on",running);if(running)loop();};
 $("step").onclick=()=>{step();draw();};
 $("reset").onclick=reset;
+function stateText(){
+  const c=eng.cfg, lat=c.mode==="lattice";
+  let a=0,mem=0;const fill=[0,0,0];for(let i=0;i<N;i++){a+=eng.agreement(i);mem+=eng.cs[i*3]+eng.cs[i*3+1]+eng.cs[i*3+2];for(let k=0;k<3;k++)fill[k]+=(eng.pat[i]>>k)&1;}
+  const last=hist.length?hist[hist.length-1]:0;
+  const cmd="origin record mode="+c.mode+" core="+c.core+" ticks="+eng.t+(lat?" display="+c.display+" update="+c.update+(c.gravity?" gravity=on":""):"")+" every=10";
+  const s={record:cmd,mode:c.mode,display:lat?c.display:"one_cell",update:lat?c.update:"sync",core:c.core,gravity:lat?c.gravity:false,seed:"20261110",
+    tick:eng.t,total_flashes:eng.total,flashes_this_tick:last,flashing:+(last/N).toFixed(4),agreement:+(a/N).toFixed(4),memory:mem,
+    filled:fill.map(v=>+(v/N).toFixed(4)),view:$("view").value,slice_z:+$("z").value,
+    profile_moving_avg:Array.from({length:BINS-1},(_,k)=>[k+1,+rate[k+1].toFixed(4),+agr[k+1].toFixed(4)])};
+  return JSON.stringify(s).replace(/\],\[/g,"], [");
+}
+$("copy").onclick=async()=>{const txt=stateText(),box=$("copybox");box.value=txt;
+  try{await navigator.clipboard.writeText(txt);$("copy").textContent="Copied ✓";box.style.display="none";}
+  catch(e){box.style.display="block";box.select();$("copy").textContent="Select + copy below";}
+  setTimeout(()=>$("copy").textContent="Copy state",2000);};
 $("gravity").onclick=()=>{const b=$("gravity");b.classList.toggle("on");b.textContent="gravity: "+(b.classList.contains("on")?"ON":"off");reset();};
 for(const id of["mode","display","update","core"])$(id).onchange=reset;
 $("z").oninput=draw;$("view").onchange=()=>{legend();draw();};
