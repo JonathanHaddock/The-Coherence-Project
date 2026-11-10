@@ -88,7 +88,7 @@ fn help() void {
         \\  origin engine [ticks] [seed]
         \\  origin clocks [seed]
         \\  origin lattice3 [display] [update] [core] [ticks] [gravity]
-        \\  origin lepton [core] [ticks] [v1|signed]
+        \\  origin lepton [core] [ticks] [v1|signed|turing]
         \\  origin help
         \\
     , .{});
@@ -1226,7 +1226,9 @@ var lep_grid: lepton.Lepton = undefined;
 fn leptonReport(args: anytype) void {
     const core = std.fmt.parseInt(u32, args.next() orelse "0", 10) catch 0;
     const ticks = std.fmt.parseInt(i64, args.next() orelse "1500", 10) catch 1500;
-    const signed = std.mem.eql(u8, args.next() orelse "v1", "signed");
+    const mode_s = args.next() orelse "v1";
+    const signed = std.mem.eql(u8, mode_s, "signed");
+    const turing = std.mem.eql(u8, mode_s, "turing");
     std.debug.print(
         \\
         \\--- LEPTON MODE {s} 48^3 (rule choices 7-9) ---
@@ -1235,9 +1237,10 @@ fn leptonReport(args: anytype) void {
         \\
         \\  tick  flashing   agree   carrier     memory    e      mu     tau   (fraction filled)
         \\
-    , .{ if (signed) "signed (rule 10)" else "v1 (rule 9)", core, ticks });
+    , .{ if (turing) "turing (rule 11)" else if (signed) "signed (rule 10)" else "v1 (rule 9)", core, ticks });
     lep_grid.init(20261110, core);
     lep_grid.signed = signed;
+    lep_grid.turing = turing;
     const c = grid3.index(grid3.side / 2, grid3.side / 2, grid3.side / 2);
     var t: i64 = 0;
     const bins = grid3.side / 2;

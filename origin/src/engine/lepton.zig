@@ -20,10 +20,13 @@ pub const Lepton = struct {
     nxt: [n][6]f64,
     /// RULE CHOICE 10 when true; rule 9 (always "filled") when false.
     signed: bool,
+    /// RULE CHOICE 11: carrier cancels memory (gravity as inhibitor).
+    turing: bool,
 
     pub fn init(g: *Lepton, seed: u64, core: u32) void {
         g.fired = @splat(false);
         g.signed = false;
+        g.turing = false;
         g.car = @splat(@splat(0));
         var s = seed;
         for (&g.px) |*p| {
@@ -79,6 +82,15 @@ pub const Lepton = struct {
     }
 
     pub fn absorb(g: *Lepton) void {
+        if (g.turing) {
+            for (0..n) |i| for (0..3) |k| {
+                if (g.car[i][k] < 1) continue;
+                const m = @min(@as(u32, @intFromFloat(@floor(g.car[i][k]))), g.px[i].conserved[k]);
+                g.car[i][k] -= @floatFromInt(m);
+                g.px[i].conserved[k] -= m;
+            };
+            return;
+        }
         for (0..n) |i| for (0..6) |ch| {
             if (g.car[i][ch] < 1) continue;
             const m: u32 = @intFromFloat(@floor(g.car[i][ch]));
@@ -138,4 +150,18 @@ test "signed carrier: empty shown on an empty cell reinforces" {
     g.absorb();
     try std.testing.expectEqual([3]u32{ 0, 1, 0 }, g.px[0].reinforce);
     try std.testing.expectEqual([3]u32{ 1, 0, 0 }, g.px[0].conserved);
+}
+
+test "turing: carrier cancels memory one for one" {
+    const g = try std.testing.allocator.create(Lepton);
+    defer std.testing.allocator.destroy(g);
+    g.init(1, 0);
+    g.turing = true;
+    g.px[0] = .{ .pattern = 0b001, .conserved = .{ 1, 0, 2 } };
+    g.car[0] = .{ 2.5, 1.0, 1.7, 0, 0, 0 };
+    g.absorb();
+    try std.testing.expectEqual([3]u32{ 0, 0, 1 }, g.px[0].conserved);
+    try std.testing.expectApproxEqAbs(@as(f64, 1.5), g.car[0][0], 1e-12);
+    try std.testing.expectApproxEqAbs(@as(f64, 1.0), g.car[0][1], 1e-12);
+    try std.testing.expectApproxEqAbs(@as(f64, 0.7), g.car[0][2], 1e-12);
 }
