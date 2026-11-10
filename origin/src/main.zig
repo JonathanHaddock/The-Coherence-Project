@@ -24,6 +24,7 @@ const spectrum_svg = @import("visualization/spectrum_svg.zig");
 const projector_svg = @import("visualization/projector_svg.zig");
 const engine = @import("engine/pixel.zig");
 const clocks = @import("engine/clocks.zig");
+const grid3 = @import("engine/grid3.zig");
 
 test {
     _ = koide;
@@ -45,6 +46,7 @@ test {
     _ = projector_svg;
     _ = engine;
     _ = clocks;
+    _ = grid3;
     _ = @import("visualization/labels.zig");
 }
 
@@ -83,6 +85,7 @@ fn help() void {
         \\  origin display [dataset] [event]
         \\  origin engine [ticks] [seed]
         \\  origin clocks [seed]
+        \\  origin lattice3 [display] [update] [core] [ticks]
         \\  origin help
         \\
     , .{});
@@ -1146,6 +1149,71 @@ fn clocksReport(args: anytype) void {
     std.debug.print("\n  r shown as raw/merged. n/a = no spread (all regions identical or silent).\n", .{});
 }
 
+var lattice: grid3.Grid3 = undefined;
+
+fn lattice3Report(args: anytype) void {
+    const disp = std.meta.stringToEnum(engine.Display, args.next() orelse "hold") orelse .hold;
+    const upd = std.meta.stringToEnum(engine.Update, args.next() orelse "sync") orelse .sync;
+    const core = std.fmt.parseInt(u32, args.next() orelse "8", 10) catch 8;
+    const ticks = std.fmt.parseInt(i64, args.next() orelse "1500", 10) catch 1500;
+    const from = @divTrunc(ticks * 2, 3);
+    std.debug.print(
+        \\
+        \\--- 3D LATTICE {d}^3, 6 neighbors ---
+        \\display {s}, update {s}, core sphere radius {d}, {d} ticks, averages over ticks {d}-{d}
+        \\carrier: released neutrino units, one hop per tick, lost at box edge, no feedback
+        \\
+        \\  dist   pixels  flash rate  carrier      carrier*dist
+        \\
+    , .{ grid3.side, @tagName(disp), @tagName(upd), core, ticks, from, ticks });
+    lattice.init(.{ .display = disp, .update = upd, .start = if (core == 0) .random else .{ .core = core } });
+    const bins = grid3.side / 2;
+    var rate: [bins]f64 = @splat(0);
+    var car: [bins]f64 = @splat(0);
+    var cnt: [bins]f64 = @splat(0);
+    for (0..grid3.n) |i| {
+        const b: usize = @intFromFloat(@floor(grid3.radius(i)));
+        if (b < bins) cnt[b] += 1;
+    }
+    var t: i64 = 0;
+    var total: u64 = 0;
+    while (t < ticks) : (t += 1) {
+        total += lattice.tick(t, if (t == 0) @as(?usize, grid3.index(grid3.side / 2, grid3.side / 2, grid3.side / 2)) else null);
+        if (t < from) continue;
+        for (0..grid3.n) |i| {
+            const b: usize = @intFromFloat(@floor(grid3.radius(i)));
+            if (b >= bins) continue;
+            if (lattice.fired[i]) rate[b] += 1;
+            car[b] += lattice.carrier[i];
+        }
+    }
+    const w: f64 = @floatFromInt(ticks - from);
+    // log-log slope of carrier vs distance, outside the core and away from the edge
+    var sx: f64 = 0;
+    var sy: f64 = 0;
+    var sxx: f64 = 0;
+    var sxy: f64 = 0;
+    var k: f64 = 0;
+    for (1..bins) |b| {
+        const r = rate[b] / (cnt[b] * w);
+        const c = car[b] / (cnt[b] * w);
+        const d: f64 = @as(f64, @floatFromInt(b)) + 0.5;
+        std.debug.print("  {d:>4}  {d:>7}  {d:>10.3}  {e:>11.3}  {e:>11.3}\n", .{ b, @as(u64, @intFromFloat(cnt[b])), r, c, c * d });
+        if (b > core + 2 and b < bins - 4 and c > 0) {
+            sx += @log(d);
+            sy += @log(c);
+            sxx += @log(d) * @log(d);
+            sxy += @log(d) * @log(c);
+            k += 1;
+        }
+    }
+    std.debug.print("  total flashes {d}\n", .{total});
+    if (k > 2) {
+        const slope = (k * sxy - sx * sy) / (k * sxx - sx * sx);
+        std.debug.print("  carrier falloff exponent outside core: {d:.2}  (1/distance = -1.00)\n", .{slope});
+    }
+}
+
 pub fn main(init: std.process.Init) void {
     var args = init.minimal.args.iterate();
     _ = args.skip();
@@ -1203,6 +1271,8 @@ pub fn main(init: std.process.Init) void {
         chart(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "project")) {
         projectReport(&args);
+    } else if (std.mem.eql(u8, command, "lattice3")) {
+        lattice3Report(&args);
     } else if (std.mem.eql(u8, command, "clocks")) {
         clocksReport(&args);
     } else if (std.mem.eql(u8, command, "engine")) {

@@ -1,0 +1,36 @@
+
+========================================
+                 ORIGIN
+       PARTICLE OBSERVATION ENGINE
+========================================
+
+--- 3D LATTICE 48^3, 6 neighbors ---
+display one_cell, update sync, core sphere radius 0, 1500 ticks, averages over ticks 1000-1500
+carrier: released neutrino units, one hop per tick, lost at box edge, no feedback
+
+  dist   pixels  flash rate  carrier      carrier*dist
+     1       26       0.007      1.477e2      2.216e2
+     2       66       0.012      1.475e2      3.687e2
+     3      158       0.032      1.469e2      5.142e2
+     4      234       0.059      1.459e2      6.565e2
+     5      410       0.046      1.442e2      7.928e2
+     6      470       0.047      1.421e2      9.235e2
+     7      738       0.055      1.395e2      1.046e3
+     8      866       0.050      1.363e2      1.158e3
+     9     1170       0.040      1.326e2      1.260e3
+    10     1358       0.050      1.286e2      1.350e3
+    11     1626       0.061      1.243e2      1.430e3
+    12     1970       0.058      1.195e2      1.493e3
+    13     2366       0.048      1.138e2      1.536e3
+    14     2538       0.049      1.080e2      1.566e3
+    15     3074       0.049      1.019e2      1.580e3
+    16     3306       0.045      9.545e1      1.575e3
+    17     3926       0.041      8.868e1      1.552e3
+    18     4242       0.043      8.171e1      1.512e3
+    19     4826       0.044      7.446e1      1.452e3
+    20     5270       0.043      6.707e1      1.375e3
+    21     5754       0.041      5.904e1      1.269e3
+    22     6338       0.043      5.144e1      1.157e3
+    23     7014       0.046      4.321e1      1.015e3
+  total flashes 11490868
+  carrier falloff exponent outside core: -0.37  (1/distance = -1.00)
