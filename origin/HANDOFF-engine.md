@@ -2,8 +2,7 @@
 
 ## Where things are
 
-- Code is on branch `engine-pixel` in The-Coherence-Project, inside `origin/`. Four commits (this file is the fourth). Not pushed yet: the last session had no GitHub write access.
-- If the branch isn't on GitHub, apply the patches in order: `git am 0001-*.patch 0002-*.patch 0003-*.patch 0004-*.patch`.
+- Code is on branch `engine-pixel` in The-Coherence-Project, inside `origin/`, pushed to GitHub November 10, 2026. Patches 0001-0004 are the first four commits.
 - Rules doc: `engine-rules.txt`, kept outside the repo. Its change log records every rule choice and result from November 10. **Rule:** nothing may be changed after seeing output without logging the change and the reason first.
 - Toolchain: Zig 0.17.1. If it isn't installed: `pip install --break-system-packages ziglang==0.17.1`, then use `python3 -m ziglang build`.
 - Build for speed: `zig build -Doptimize=ReleaseFast`. A 3D run takes about 17 seconds.
