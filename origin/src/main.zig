@@ -26,6 +26,7 @@ const engine = @import("engine/pixel.zig");
 const clocks = @import("engine/clocks.zig");
 const grid3 = @import("engine/grid3.zig");
 const lepton = @import("engine/lepton.zig");
+const record = @import("engine/record.zig");
 
 test {
     _ = koide;
@@ -49,6 +50,7 @@ test {
     _ = clocks;
     _ = grid3;
     _ = lepton;
+    _ = record;
     _ = @import("visualization/labels.zig");
 }
 
@@ -89,6 +91,7 @@ fn help() void {
         \\  origin clocks [seed]
         \\  origin lattice3 [display] [update] [core] [ticks] [gravity]
         \\  origin lepton [core] [ticks] [v1|signed|turing]
+        \\  origin record mode=.. core=.. ticks=.. every=.. [display=.. update=.. gravity=on seed=..]
         \\  origin help
         \\
     , .{});
@@ -1280,6 +1283,66 @@ fn leptonReport(args: anytype) void {
     for (1..bins) |b| std.debug.print("                        {d:>4}  {d:.3}  {d:.3}\n", .{ b, rate[b] / cnt[b], agr[b] / cnt[b] });
 }
 
+fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
+    var mode: []const u8 = "lattice";
+    var disp_s: []const u8 = "one_cell";
+    var update: []const u8 = "sync";
+    var core: u32 = 0;
+    var ticks: i64 = 1500;
+    var every: i64 = 10;
+    var gravity = false;
+    var seed: u64 = 20261110;
+    while (args.next()) |a| {
+        const eq = std.mem.indexOfScalar(u8, a, '=') orelse continue;
+        const k = a[0..eq];
+        const v = a[eq + 1 ..];
+        if (std.mem.eql(u8, k, "mode")) mode = v
+        else if (std.mem.eql(u8, k, "display")) disp_s = v
+        else if (std.mem.eql(u8, k, "update")) update = v
+        else if (std.mem.eql(u8, k, "core")) core = try std.fmt.parseInt(u32, v, 10)
+        else if (std.mem.eql(u8, k, "ticks")) ticks = try std.fmt.parseInt(i64, v, 10)
+        else if (std.mem.eql(u8, k, "every")) every = @max(1, try std.fmt.parseInt(i64, v, 10))
+        else if (std.mem.eql(u8, k, "gravity")) gravity = std.mem.eql(u8, v, "on")
+        else if (std.mem.eql(u8, k, "seed")) seed = try std.fmt.parseInt(u64, v, 10);
+    }
+    const is_lattice = std.mem.eql(u8, mode, "lattice");
+    if (!is_lattice) {
+        disp_s = "one_cell";
+        update = "sync";
+        gravity = false;
+    }
+    const name = if (is_lattice)
+        try std.fmt.allocPrint(gpa, "lattice_{s}_{s}_core{d}_{s}_t{d}_s{d}", .{ disp_s, update, core, if (gravity) "grav" else "nograv", ticks, seed })
+    else
+        try std.fmt.allocPrint(gpa, "{s}_core{d}_t{d}_s{d}", .{ mode, core, ticks, seed });
+    defer gpa.free(name);
+    const rules = if (is_lattice)
+        (if (gravity) "1-5 + 6 (gravity: 3 carrier units -> +1 reinforce per cell); carrier lost at box edge" else "1-5; carrier lost at box edge, no feedback")
+    else if (std.mem.eql(u8, mode, "v1")) "1-4, 7, 8, 9 (carrier always 'electron')"
+    else if (std.mem.eql(u8, mode, "signed")) "1-4, 7, 8, 10 (signed carrier)"
+    else if (std.mem.eql(u8, mode, "turing")) "1-4, 7, 8, 11 (carrier cancels memory)"
+    else return error.UnknownMode;
+    const meta: record.Meta = .{ .name = name, .mode = mode, .display = disp_s, .update = update, .core = core, .gravity = gravity, .seed = seed, .ticks = ticks, .every = every, .rules = rules };
+    const start: engine.Start = if (core == 0) .random else .{ .core = core };
+    const dir = if (is_lattice) blk: {
+        lattice.init(.{
+            .display = std.meta.stringToEnum(engine.Display, disp_s) orelse return error.UnknownDisplay,
+            .update = std.meta.stringToEnum(engine.Update, update) orelse return error.UnknownUpdate,
+            .start = start,
+            .seed = seed,
+        });
+        lattice.gravity = gravity;
+        break :blk try record.run(io, gpa, &lattice, meta, "results/runs");
+    } else blk: {
+        lep_grid.init(seed, core);
+        lep_grid.signed = std.mem.eql(u8, mode, "signed");
+        lep_grid.turing = std.mem.eql(u8, mode, "turing");
+        break :blk try record.run(io, gpa, &lep_grid, meta, "results/runs");
+    };
+    defer gpa.free(dir);
+    std.debug.print("wrote {s}/ (meta.json series.csv shells.csv gaps.csv slice.csv)\n", .{dir});
+}
+
 pub fn main(init: std.process.Init) void {
     var args = init.minimal.args.iterate();
     _ = args.skip();
@@ -1337,6 +1400,8 @@ pub fn main(init: std.process.Init) void {
         chart(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "project")) {
         projectReport(&args);
+    } else if (std.mem.eql(u8, command, "record")) {
+        recordRun(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "lepton")) {
         leptonReport(&args);
     } else if (std.mem.eql(u8, command, "lattice3")) {
