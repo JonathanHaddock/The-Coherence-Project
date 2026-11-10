@@ -23,6 +23,7 @@ const spectrum = @import("analysis/spectrum.zig");
 const spectrum_svg = @import("visualization/spectrum_svg.zig");
 const projector_svg = @import("visualization/projector_svg.zig");
 const engine = @import("engine/pixel.zig");
+const clocks = @import("engine/clocks.zig");
 
 test {
     _ = koide;
@@ -43,6 +44,7 @@ test {
     _ = detector;
     _ = projector_svg;
     _ = engine;
+    _ = clocks;
     _ = @import("visualization/labels.zig");
 }
 
@@ -80,6 +82,7 @@ fn help() void {
         \\  origin generations
         \\  origin display [dataset] [event]
         \\  origin engine [ticks] [seed]
+        \\  origin clocks [seed]
         \\  origin help
         \\
     , .{});
@@ -1101,6 +1104,48 @@ fn engineReport(args: anytype) void {
     }
 }
 
+fn fmtR(r: ?f64, buf: []u8) []const u8 {
+    if (r) |v| return std.fmt.bufPrint(buf, "{d:>6.2}", .{v}) catch "?";
+    return "   n/a";
+}
+
+fn clocksReport(args: anytype) void {
+    const seed = std.fmt.parseInt(u64, args.next() orelse "20261110", 10) catch 20261110;
+    std.debug.print(
+        \\
+        \\--- REGION CLOCKS (section 11) ---
+        \\{d} regions of {d}x{d}. Per window: mean coherence, mean flashes per region per tick
+        \\(raw, and merged = coherent co-flashing group counts as one tick), and the
+        \\correlation r across regions between coherence and clock rate.
+        \\Section 11 predicts r < 0 (coherent regions run slow). seed {d}
+        \\
+        \\
+    , .{ clocks.regions, clocks.block, clocks.block, seed });
+    const windows = [_][2]i64{ .{ 0, 25 }, .{ 25, 100 }, .{ 100, 400 } };
+    for ([_]engine.Start{ .random, .{ .core = 20 } }) |start| {
+        for ([_]engine.Update{ .sync, .sweep }) |upd| {
+            for ([_]engine.Display{ .fill_empty, .hold, .one_cell, .flip_all }) |disp| {
+                engine_grid = engine.Grid.initWith(.{ .display = disp, .update = upd, .start = start, .seed = seed });
+                std.debug.print("{s:<6} {s:<5} {s:<10}", .{ if (start == .random) "random" else "core20", @tagName(upd), @tagName(disp) });
+                var t: i64 = 0;
+                for (windows) |win| {
+                    var w: clocks.Window = .{};
+                    while (t < win[1]) : (t += 1) {
+                        _ = engine_grid.tick(t, if (t == 0) @as(?usize, engine.n / 2) else null);
+                        w.record(&engine_grid);
+                    }
+                    const s = clocks.summarize(&w);
+                    var b1: [16]u8 = undefined;
+                    var b2: [16]u8 = undefined;
+                    std.debug.print(" | t{d}-{d}: coh {d:.2} raw {d:>5.1} mrg {d:>5.1} r {s}/{s}", .{ win[0], win[1], s.mean_coherence, s.mean_raw, s.mean_merged, fmtR(s.r_raw, &b1), fmtR(s.r_merged, &b2) });
+                }
+                std.debug.print("\n", .{});
+            }
+        }
+    }
+    std.debug.print("\n  r shown as raw/merged. n/a = no spread (all regions identical or silent).\n", .{});
+}
+
 pub fn main(init: std.process.Init) void {
     var args = init.minimal.args.iterate();
     _ = args.skip();
@@ -1158,6 +1203,8 @@ pub fn main(init: std.process.Init) void {
         chart(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "project")) {
         projectReport(&args);
+    } else if (std.mem.eql(u8, command, "clocks")) {
+        clocksReport(&args);
     } else if (std.mem.eql(u8, command, "engine")) {
         engineReport(&args);
     } else if (std.mem.eql(u8, command, "koide")) {

@@ -22,6 +22,24 @@ const std = @import("std");
 pub const cells = 3;
 pub const threshold: u32 = 3; // RULE CHOICE 2
 
+/// RULE CHOICE 1 and its alternatives.
+///   fill_empty: first run (Nov 10). Mistranslation: matched -> fill, mismatched -> empty,
+///               ignoring which value matched. Kept only to reproduce that run.
+///   hold:       B keeps its pattern; the difference goes to memory (user reading 1).
+///   one_cell:   B flips the one cell with the largest mismatch surplus (user reading 2;
+///               section 12, "a flash is one cell flipping").
+///   flip_all:   B flips every cell where mismatches beat matches.
+pub const Display = enum { fill_empty, hold, one_cell, flip_all };
+pub const Update = enum { sync, sweep };
+pub const Start = union(enum) { random, core: u32 };
+
+pub const Config = struct {
+    display: Display = .fill_empty,
+    update: Update = .sync,
+    start: Start = .random,
+    seed: u64 = 20261110,
+};
+
 /// Charge in thirds of e, by filled-cell count (section 2, matter only).
 pub fn chargeThirds(pattern: u3) i32 {
     return switch (@popCount(pattern)) {
@@ -62,14 +80,35 @@ pub const Pixel = struct {
 
     /// The pixel's own flash. Returns the neutrino flash: the conserved share released.
     pub fn flash(p: *Pixel, tick: i64) u32 {
+        return p.flashWith(tick, .fill_empty);
+    }
+
+    pub fn flashWith(p: *Pixel, tick: i64, display: Display) u32 {
         var next = p.pattern;
-        for (0..cells) |i| {
-            const bit: u3 = @as(u3, 1) << @intCast(i);
-            if (p.reinforce[i] > p.conserved[i]) {
-                next |= bit;
-            } else if (p.reinforce[i] < p.conserved[i]) {
-                next &= ~bit;
-            }
+        switch (display) {
+            .fill_empty => for (0..cells) |i| {
+                const bit: u3 = @as(u3, 1) << @intCast(i);
+                if (p.reinforce[i] > p.conserved[i]) {
+                    next |= bit;
+                } else if (p.reinforce[i] < p.conserved[i]) {
+                    next &= ~bit;
+                }
+            },
+            .hold => {},
+            .one_cell => {
+                var best: ?usize = null;
+                var surplus: u32 = 0;
+                for (0..cells) |i| {
+                    if (p.conserved[i] > p.reinforce[i] and p.conserved[i] - p.reinforce[i] > surplus) {
+                        surplus = p.conserved[i] - p.reinforce[i];
+                        best = i;
+                    }
+                }
+                if (best) |i| next ^= @as(u3, 1) << @intCast(i);
+            },
+            .flip_all => for (0..cells) |i| {
+                if (p.conserved[i] > p.reinforce[i]) next ^= @as(u3, 1) << @intCast(i);
+            },
         }
         p.pattern = next;
         const released = p.memoryTotal();
@@ -130,12 +169,21 @@ pub const Grid = struct {
     px: [n]Pixel,
     /// Ticks between successive flashes of the same pixel (last bin = overflow).
     intervals: [hist_len]u64 = @splat(0),
+    fired: [n]bool = @splat(false),
+    cfg: Config = .{},
 
     /// Deterministic seed (xorshift64). Patterns and starting conserved
     /// shares (0..2, below threshold) are drawn from it, so the run is exact
     /// and repeatable. A starting share is needed or nothing ever flashes.
     pub fn init(seed: u64) Grid {
-        var g: Grid = .{ .px = undefined };
+        return initWith(.{ .seed = seed });
+    }
+
+    /// A core start plants a disc of radius r at the centre: every pixel 111
+    /// with one unit of memory per cell (a dense, coherent region).
+    pub fn initWith(cfg: Config) Grid {
+        const seed = cfg.seed;
+        var g: Grid = .{ .px = undefined, .cfg = cfg };
         var s = seed;
         for (&g.px) |*p| {
             s ^= s << 13;
@@ -144,10 +192,21 @@ pub const Grid = struct {
             p.* = .{ .pattern = @truncate(s) };
             for (0..cells) |i| p.conserved[i] = @intCast((s >> @intCast(8 + 2 * i)) % 2);
         }
+        switch (cfg.start) {
+            .random => {},
+            .core => |r| for (&g.px, 0..) |*p, i| {
+                const dx = @as(i64, @intCast(i % side)) - side / 2;
+                const dy = @as(i64, @intCast(i / side)) - side / 2;
+                if (dx * dx + dy * dy <= @as(i64, r) * r) {
+                    p.pattern = 0b111;
+                    p.conserved = .{ 1, 1, 1 };
+                }
+            },
+        }
         return g;
     }
 
-    fn neighbors(i: usize) [4]usize {
+    pub fn neighbors(i: usize) [4]usize {
         const x = i % side;
         const y = i / side;
         return .{
@@ -164,26 +223,36 @@ pub const Grid = struct {
         agreement: f64, // mean fraction of matching cells across neighbor bonds
     };
 
-    pub fn tick(g: *Grid, t: i64, kick: ?usize) TickStats {
-        var firing: [n]bool = undefined;
-        for (g.px, 0..) |p, i| firing[i] = p.ready();
-        if (kick) |k| firing[k] = true;
-
-        var shown: [n]u3 = undefined;
-        var st: TickStats = .{ .flashes = 0, .neutrino = 0, .agreement = 0 };
-        for (&g.px, 0..) |*p, i| {
-            if (!firing[i]) continue;
-            if (p.last_flash >= 0) {
-                const gap: usize = @intCast(t - p.last_flash);
-                g.intervals[@min(gap, hist_len - 1)] += 1;
-            }
-            st.neutrino += p.flash(t);
-            shown[i] = p.pattern;
-            st.flashes += 1;
+    fn fire(g: *Grid, i: usize, t: i64, st: *TickStats) void {
+        const p = &g.px[i];
+        if (p.last_flash >= 0) {
+            const gap: usize = @intCast(t - p.last_flash);
+            g.intervals[@min(gap, hist_len - 1)] += 1;
         }
-        for (0..n) |i| {
-            if (!firing[i]) continue;
-            for (neighbors(i)) |j| g.px[j].receive(shown[i]);
+        st.neutrino += p.flashWith(t, g.cfg.display);
+        st.flashes += 1;
+        g.fired[i] = true;
+    }
+
+    pub fn tick(g: *Grid, t: i64, kick: ?usize) TickStats {
+        var st: TickStats = .{ .flashes = 0, .neutrino = 0, .agreement = 0 };
+        g.fired = @splat(false);
+        switch (g.cfg.update) {
+            .sync => {
+                var firing: [n]bool = undefined;
+                for (g.px, 0..) |p, i| firing[i] = p.ready();
+                if (kick) |k| firing[k] = true;
+                for (0..n) |i| if (firing[i]) g.fire(i, t, &st);
+                for (0..n) |i| {
+                    if (!firing[i]) continue;
+                    for (neighbors(i)) |j| g.px[j].receive(g.px[i].pattern);
+                }
+            },
+            .sweep => for (0..n) |i| {
+                if (!(g.px[i].ready() or kick == i)) continue;
+                g.fire(i, t, &st);
+                for (neighbors(i)) |j| g.px[j].receive(g.px[i].pattern);
+            },
         }
 
         var match: u64 = 0;

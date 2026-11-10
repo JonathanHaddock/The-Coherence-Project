@@ -1,0 +1,30 @@
+
+========================================
+                 ORIGIN
+       PARTICLE OBSERVATION ENGINE
+========================================
+
+--- REGION CLOCKS (section 11) ---
+64 regions of 8x8. Per window: mean coherence, mean flashes per region per tick
+(raw, and merged = coherent co-flashing group counts as one tick), and the
+correlation r across regions between coherence and clock rate.
+Section 11 predicts r < 0 (coherent regions run slow). seed 20261110
+
+random sync  fill_empty | t0-25: coh 0.54 raw  41.6 mrg  34.0 r   0.51/  0.22 | t25-100: coh 0.57 raw  58.6 mrg  44.3 r   0.22/ -0.04 | t100-400: coh 0.57 raw  63.2 mrg  47.4 r  -0.54/ -0.50
+random sync  hold       | t0-25: coh 0.50 raw  42.1 mrg  37.7 r  -0.39/ -0.49 | t25-100: coh 0.50 raw  46.9 mrg  41.5 r  -0.34/ -0.44 | t100-400: coh 0.50 raw  46.9 mrg  41.5 r  -0.34/ -0.44
+random sync  one_cell   | t0-25: coh 0.78 raw  11.6 mrg  10.4 r  -0.61/ -0.66 | t25-100: coh 0.83 raw   0.3 mrg   0.3 r  -0.25/ -0.26 | t100-400: coh 0.84 raw   0.1 mrg   0.1 r  -0.11/ -0.11
+random sync  flip_all   | t0-25: coh 0.80 raw   8.8 mrg   8.0 r  -0.67/ -0.71 | t25-100: coh 0.86 raw   0.2 mrg   0.1 r   0.22/  0.22 | t100-400: coh 0.86 raw   0.1 mrg   0.1 r   0.24/  0.24
+random sweep fill_empty | t0-25: coh 0.49 raw  62.2 mrg  50.7 r  -0.24/ -0.67 | t25-100: coh 0.48 raw  63.3 mrg  51.8 r  -0.26/ -0.69 | t100-400: coh 0.48 raw  63.3 mrg  51.7 r  -0.22/ -0.66
+random sweep hold       | t0-25: coh 0.50 raw  62.8 mrg  50.3 r  -0.46/ -0.58 | t25-100: coh 0.50 raw  63.4 mrg  50.6 r  -0.38/ -0.56 | t100-400: coh 0.50 raw  63.4 mrg  50.6 r  -0.38/ -0.56
+random sweep one_cell   | t0-25: coh 0.82 raw   6.5 mrg   4.3 r  -0.56/ -0.57 | t25-100: coh 0.83 raw   0.0 mrg   0.0 r  -0.12/ -0.11 | t100-400: coh 0.83 raw   0.0 mrg   0.0 r    n/a/   n/a
+random sweep flip_all   | t0-25: coh 0.92 raw   2.8 mrg   0.9 r  -0.49/ -0.59 | t25-100: coh 0.92 raw   0.1 mrg   0.1 r  -0.09/ -0.09 | t100-400: coh 0.92 raw   0.1 mrg   0.1 r  -0.09/ -0.09
+core20 sync  fill_empty | t0-25: coh 0.65 raw  32.4 mrg  25.9 r  -0.96/ -0.98 | t25-100: coh 0.59 raw  54.5 mrg  40.9 r  -0.58/ -0.63 | t100-400: coh 0.57 raw  63.1 mrg  46.8 r  -0.49/ -0.34
+core20 sync  hold       | t0-25: coh 0.65 raw  30.7 mrg  26.9 r  -0.98/ -0.98 | t25-100: coh 0.65 raw  33.3 mrg  29.6 r  -0.97/ -0.98 | t100-400: coh 0.65 raw  33.3 mrg  29.6 r  -0.97/ -0.98
+core20 sync  one_cell   | t0-25: coh 0.84 raw   8.6 mrg   7.1 r  -0.89/ -0.94 | t25-100: coh 0.88 raw   0.2 mrg   0.2 r  -0.28/ -0.28 | t100-400: coh 0.88 raw   0.1 mrg   0.1 r  -0.14/ -0.14
+core20 sync  flip_all   | t0-25: coh 0.87 raw   6.4 mrg   5.1 r  -0.81/ -0.90 | t25-100: coh 0.90 raw   0.2 mrg   0.1 r  -0.15/ -0.17 | t100-400: coh 0.90 raw   0.2 mrg   0.1 r  -0.13/ -0.15
+core20 sweep fill_empty | t0-25: coh 0.50 raw  61.4 mrg  48.0 r  -0.91/ -0.73 | t25-100: coh 0.48 raw  63.3 mrg  51.3 r  -0.27/  0.20 | t100-400: coh 0.48 raw  63.3 mrg  51.8 r  -0.18/ -0.59
+core20 sweep hold       | t0-25: coh 0.65 raw  45.2 mrg  36.0 r  -1.00/ -0.99 | t25-100: coh 0.65 raw  44.8 mrg  36.2 r  -1.00/ -0.99 | t100-400: coh 0.65 raw  44.9 mrg  36.2 r  -1.00/ -0.99
+core20 sweep one_cell   | t0-25: coh 0.87 raw   5.4 mrg   3.1 r  -0.84/ -0.90 | t25-100: coh 0.88 raw   0.0 mrg   0.0 r  -0.18/ -0.18 | t100-400: coh 0.88 raw   0.0 mrg   0.0 r    n/a/   n/a
+core20 sweep flip_all   | t0-25: coh 0.95 raw   2.6 mrg   0.5 r  -0.29/ -0.75 | t25-100: coh 0.96 raw   0.0 mrg   0.0 r  -0.11/ -0.11 | t100-400: coh 0.96 raw   0.0 mrg   0.0 r  -0.11/ -0.11
+
+  r shown as raw/merged. n/a = no spread (all regions identical or silent).
