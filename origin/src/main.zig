@@ -88,7 +88,7 @@ fn help() void {
         \\  origin engine [ticks] [seed]
         \\  origin clocks [seed]
         \\  origin lattice3 [display] [update] [core] [ticks] [gravity]
-        \\  origin lepton [core] [ticks]
+        \\  origin lepton [core] [ticks] [v1|signed]
         \\  origin help
         \\
     , .{});
@@ -1226,16 +1226,18 @@ var lep_grid: lepton.Lepton = undefined;
 fn leptonReport(args: anytype) void {
     const core = std.fmt.parseInt(u32, args.next() orelse "0", 10) catch 0;
     const ticks = std.fmt.parseInt(i64, args.next() orelse "1500", 10) catch 1500;
+    const signed = std.mem.eql(u8, args.next() orelse "v1", "signed");
     std.debug.print(
         \\
-        \\--- LEPTON MODE 48^3 (rule choices 7-9) ---
+        \\--- LEPTON MODE {s} 48^3 (rule choices 7-9) ---
         \\cells = e, mu, tau. Carrier: 3 channels, wrapped edges, absorbed per whole unit as the flash rule.
         \\core {d}, {d} ticks, display one_cell, sync
         \\
         \\  tick  flashing   agree   carrier     memory    e      mu     tau   (fraction filled)
         \\
-    , .{ core, ticks });
+    , .{ if (signed) "signed (rule 10)" else "v1 (rule 9)", core, ticks });
     lep_grid.init(20261110, core);
+    lep_grid.signed = signed;
     const c = grid3.index(grid3.side / 2, grid3.side / 2, grid3.side / 2);
     var t: i64 = 0;
     const bins = grid3.side / 2;

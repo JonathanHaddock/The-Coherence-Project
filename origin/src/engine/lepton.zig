@@ -15,12 +15,16 @@ pub const n = g3.n;
 pub const Lepton = struct {
     px: [n]px.Pixel,
     fired: [n]bool,
-    car: [n][3]f64,
-    nxt: [n][3]f64,
+    /// channels 0..2 = position k shown filled (electron), 3..5 = shown empty.
+    car: [n][6]f64,
+    nxt: [n][6]f64,
+    /// RULE CHOICE 10 when true; rule 9 (always "filled") when false.
+    signed: bool,
 
     pub fn init(g: *Lepton, seed: u64, core: u32) void {
         g.fired = @splat(false);
-        g.car = @splat(.{ 0, 0, 0 });
+        g.signed = false;
+        g.car = @splat(@splat(0));
         var s = seed;
         for (&g.px) |*p| {
             s ^= s << 13;
@@ -42,8 +46,13 @@ pub const Lepton = struct {
         for (0..n) |i| g.fired[i] = g.px[i].ready() or kick == i;
         for (0..n) |i| if (g.fired[i]) {
             const p = &g.px[i];
-            for (0..3) |k| g.car[i][k] += @floatFromInt(p.conserved[k]);
+            const mem = p.conserved;
             _ = p.flashWith(t, .one_cell);
+            for (0..3) |k| {
+                const filled = p.pattern & (@as(u3, 1) << @intCast(k)) != 0;
+                const ch = if (!g.signed or filled) k else k + 3;
+                g.car[i][ch] += @floatFromInt(mem[k]);
+            }
             count += 1;
         };
         for (0..n) |i| {
@@ -56,11 +65,13 @@ pub const Lepton = struct {
     }
 
     pub fn spread(g: *Lepton) void {
-        g.nxt = @splat(.{ 0, 0, 0 });
+        g.nxt = @splat(@splat(0));
         for (0..n) |i| {
             const c = g.car[i];
-            if (c[0] == 0 and c[1] == 0 and c[2] == 0) continue;
-            for (g3.neighbors(i)) |j| for (0..3) |k| {
+            var any = false;
+            for (c) |v| any = any or v != 0;
+            if (!any) continue;
+            for (g3.neighbors(i)) |j| for (0..6) |k| {
                 g.nxt[j][k] += c[k] / 6.0;
             };
         }
@@ -68,11 +79,14 @@ pub const Lepton = struct {
     }
 
     pub fn absorb(g: *Lepton) void {
-        for (0..n) |i| for (0..3) |k| {
-            if (g.car[i][k] < 1) continue;
-            const m: u32 = @intFromFloat(@floor(g.car[i][k]));
-            g.car[i][k] -= @floatFromInt(m);
-            if (g.px[i].pattern & (@as(u3, 1) << @intCast(k)) != 0) {
+        for (0..n) |i| for (0..6) |ch| {
+            if (g.car[i][ch] < 1) continue;
+            const m: u32 = @intFromFloat(@floor(g.car[i][ch]));
+            g.car[i][ch] -= @floatFromInt(m);
+            const k = ch % 3;
+            const shown_filled = ch < 3;
+            const has = g.px[i].pattern & (@as(u3, 1) << @intCast(k)) != 0;
+            if (has == shown_filled) {
                 g.px[i].reinforce[k] += m;
             } else {
                 g.px[i].conserved[k] += m;
@@ -82,7 +96,9 @@ pub const Lepton = struct {
 
     pub fn carrierTotal(g: *const Lepton) f64 {
         var s: f64 = 0;
-        for (g.car) |c| s += c[0] + c[1] + c[2];
+        for (g.car) |c| for (c) |v| {
+            s += v;
+        };
         return s;
     }
 
@@ -98,7 +114,7 @@ test "absorb follows the flash rule per generation" {
     defer std.testing.allocator.destroy(g);
     g.init(1, 0);
     g.px[0] = .{ .pattern = 0b001 };
-    g.car[0] = .{ 2.5, 1.2, 0.4 };
+    g.car[0] = .{ 2.5, 1.2, 0.4, 0, 0, 0 };
     g.absorb();
     try std.testing.expectEqual([3]u32{ 2, 0, 0 }, g.px[0].reinforce);
     try std.testing.expectEqual([3]u32{ 0, 1, 0 }, g.px[0].conserved);
@@ -107,8 +123,19 @@ test "absorb follows the flash rule per generation" {
 test "spread on wrapped edges conserves carrier" {
     const g = try std.testing.allocator.create(Lepton);
     defer std.testing.allocator.destroy(g);
-    g.car = @splat(.{ 0, 0, 0 });
-    g.car[0] = .{ 6, 3, 0 };
+    g.car = @splat(@splat(0));
+    g.car[0] = .{ 6, 3, 0, 0, 0, 0 };
     g.spread();
     try std.testing.expectApproxEqAbs(@as(f64, 9), g.carrierTotal(), 1e-9);
+}
+
+test "signed carrier: empty shown on an empty cell reinforces" {
+    const g = try std.testing.allocator.create(Lepton);
+    defer std.testing.allocator.destroy(g);
+    g.init(1, 0);
+    g.px[0] = .{ .pattern = 0b001 };
+    g.car[0] = .{ 0, 0, 0, 1, 1, 0 };
+    g.absorb();
+    try std.testing.expectEqual([3]u32{ 0, 1, 0 }, g.px[0].reinforce);
+    try std.testing.expectEqual([3]u32{ 1, 0, 0 }, g.px[0].conserved);
 }
