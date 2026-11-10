@@ -25,6 +25,7 @@ const projector_svg = @import("visualization/projector_svg.zig");
 const engine = @import("engine/pixel.zig");
 const clocks = @import("engine/clocks.zig");
 const grid3 = @import("engine/grid3.zig");
+const lepton = @import("engine/lepton.zig");
 
 test {
     _ = koide;
@@ -47,6 +48,7 @@ test {
     _ = engine;
     _ = clocks;
     _ = grid3;
+    _ = lepton;
     _ = @import("visualization/labels.zig");
 }
 
@@ -86,6 +88,7 @@ fn help() void {
         \\  origin engine [ticks] [seed]
         \\  origin clocks [seed]
         \\  origin lattice3 [display] [update] [core] [ticks] [gravity]
+        \\  origin lepton [core] [ticks]
         \\  origin help
         \\
     , .{});
@@ -1218,6 +1221,60 @@ fn lattice3Report(args: anytype) void {
     }
 }
 
+var lep_grid: lepton.Lepton = undefined;
+
+fn leptonReport(args: anytype) void {
+    const core = std.fmt.parseInt(u32, args.next() orelse "0", 10) catch 0;
+    const ticks = std.fmt.parseInt(i64, args.next() orelse "1500", 10) catch 1500;
+    std.debug.print(
+        \\
+        \\--- LEPTON MODE 48^3 (rule choices 7-9) ---
+        \\cells = e, mu, tau. Carrier: 3 channels, wrapped edges, absorbed per whole unit as the flash rule.
+        \\core {d}, {d} ticks, display one_cell, sync
+        \\
+        \\  tick  flashing   agree   carrier     memory    e      mu     tau   (fraction filled)
+        \\
+    , .{ core, ticks });
+    lep_grid.init(20261110, core);
+    const c = grid3.index(grid3.side / 2, grid3.side / 2, grid3.side / 2);
+    var t: i64 = 0;
+    const bins = grid3.side / 2;
+    var rate: [bins]f64 = @splat(0);
+    var agr: [bins]f64 = @splat(0);
+    var cnt: [bins]f64 = @splat(0);
+    var w: f64 = 0;
+    while (t < ticks) : (t += 1) {
+        const f = lep_grid.tick(t, if (t == 0) c else null);
+        const every = @max(1, @divTrunc(ticks, 15));
+        if (@mod(t, every) == 0 or t == ticks - 1) {
+            var a: f64 = 0;
+            var mem: u64 = 0;
+            var gen: [3]f64 = .{ 0, 0, 0 };
+            for (0..lepton.n) |i| {
+                a += lep_grid.agreement(i);
+                mem += lep_grid.px[i].memoryTotal();
+                for (0..3) |k| {
+                    if (lep_grid.px[i].pattern & (@as(u3, 1) << @intCast(k)) != 0) gen[k] += 1;
+                }
+            }
+            const nf: f64 = lepton.n;
+            std.debug.print("  {d:>5}  {d:>7.4}  {d:>6.4}  {e:>9.3}  {d:>9}  {d:.3}  {d:.3}  {d:.3}\n", .{ t, @as(f64, @floatFromInt(f)) / nf, a / nf, lep_grid.carrierTotal(), mem, gen[0] / nf, gen[1] / nf, gen[2] / nf });
+        }
+        if (t >= @divTrunc(ticks * 2, 3)) {
+            w += 1;
+            for (0..lepton.n) |i| {
+                const b: usize = @intFromFloat(@floor(grid3.radius(i)));
+                if (b >= bins) continue;
+                cnt[b] += 1;
+                if (lep_grid.fired[i]) rate[b] += 1;
+                agr[b] += lep_grid.agreement(i);
+            }
+        }
+    }
+    std.debug.print("\n  profile, last third:  dist  flash  agree\n", .{});
+    for (1..bins) |b| std.debug.print("                        {d:>4}  {d:.3}  {d:.3}\n", .{ b, rate[b] / cnt[b], agr[b] / cnt[b] });
+}
+
 pub fn main(init: std.process.Init) void {
     var args = init.minimal.args.iterate();
     _ = args.skip();
@@ -1275,6 +1332,8 @@ pub fn main(init: std.process.Init) void {
         chart(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "project")) {
         projectReport(&args);
+    } else if (std.mem.eql(u8, command, "lepton")) {
+        leptonReport(&args);
     } else if (std.mem.eql(u8, command, "lattice3")) {
         lattice3Report(&args);
     } else if (std.mem.eql(u8, command, "clocks")) {
