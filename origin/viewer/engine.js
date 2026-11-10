@@ -62,7 +62,20 @@ class Engine {
     const p = this.pat[j], b = j * 3;
     for (let k = 0; k < 3; k++) { if (((p >> k) & 1) === ((shown >> k) & 1)) this.rf[b + k]++; else this.cs[b + k]++; }
   }
-  tick() { return this.cfg.mode === "lattice" ? this.tickLattice() : this.tickLepton(this.cfg.mode === "signed"); }
+  tick() {
+    if (this.cfg.mode === "control") return this.tickControl();
+    return this.cfg.mode === "lattice" ? this.tickLattice() : this.tickLepton(this.cfg.mode === "signed");
+  }
+  // CONTROL (not the engine): each pixel flashes with fixed chance p per tick.
+  tickControl() {
+    if (this.rs === undefined) this.rs = 2463534242 ^ Number(this.cfg.seed & 0xffffffffn);
+    const p = this.cfg.p ?? 0.2; let count = 0;
+    for (let i = 0; i < N; i++) {
+      let x = this.rs; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; this.rs = x >>> 0;
+      const f = (this.rs / 4294967296) < p; this.fired[i] = f ? 1 : 0; if (f) count++;
+    }
+    this.t++; this.total += count; return count;
+  }
   tickLepton(signed) {
     const kick = this.t === 0 ? this.kick : -1, cs = this.cs, car = this.car6;
     let count = 0;

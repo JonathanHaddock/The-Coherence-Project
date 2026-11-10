@@ -30,11 +30,12 @@ input[type=range]{accent-color:var(--acc)}
   <label>speed <input id="speed" type="range" min="1" max="20" value="3"></label>
  </div>
  <div class="ctl">
-  <label>mode <select id="mode"><option value="lattice">lattice (rules 1-6)</option><option value="v1">lepton v1 (rule 9)</option><option value="signed">lepton signed (rule 10)</option><option value="turing">turing: gravity inhibits (rule 11)</option></select></label>
+  <label>mode <select id="mode"><option value="lattice">lattice (rules 1-6)</option><option value="v1">lepton v1 (rule 9)</option><option value="signed">lepton signed (rule 10)</option><option value="turing">turing: gravity inhibits (rule 11)</option><option value="control">CONTROL: fixed chance p (not the engine)</option></select></label>
   <label>display <select id="display"><option>one_cell</option><option>hold</option><option>flip_all</option><option>fill_empty</option></select></label>
   <label>update <select id="update"><option>sync</option><option>sweep</option></select></label>
   <label>core <input id="core" type="number" min="0" max="20" value="8" style="width:56px"></label>
   <button id="gravity">gravity: off</button>
+  <label>control p <input id="p" type="number" min="0.01" max="0.99" step="0.01" value="0.20" style="width:64px"></label>
  </div>
  <div class="ctl">
   <label>view <select id="view"><option value="pattern">pattern</option><option value="flash">flashes (recent)</option><option value="agree">agreement</option><option value="carrier">carrier</option><option value="memory">memory (conserved)</option></select></label>
@@ -62,6 +63,11 @@ input[type=range]{accent-color:var(--acc)}
  <div class="card"><h2>By distance from centre (moving average)</h2>
   <canvas id="prof" width="640" height="300"></canvas>
   <div class="legend"><span><span class="sw" style="background:var(--acc)"></span>flash rate (left axis)</span><span><span class="sw" style="background:var(--ag)"></span>neighbor agreement (right axis)</span><span><span class="sw" style="background:#555"></span>core edge</span></div>
+ </div>
+ <div class="card" style="margin-top:16px"><h2>Decay test: chance to flash at gap k, given no flash before</h2>
+  <canvas id="haz" width="640" height="220"></canvas>
+  <div class="legend"><span><span class="sw" style="background:var(--acc)"></span>this run (since reset, skipping first 50 ticks)</span><span><span class="sw" style="background:#e6e8eb"></span>true decay at the same overall rate (flat)</span></div>
+  <p class="note" style="margin:6px 0 0">Flat = constant chance per tick (radioactive decay). Falling = bursty: just-flashed pixels fire again soon. Zig-zag = rhythm (sync two-tick beat).</p>
  </div>
  <div class="card" style="margin-top:16px"><h2>Flashes per tick</h2>
   <canvas id="ts" width="640" height="140"></canvas>
@@ -135,7 +141,20 @@ class Engine {
     const p = this.pat[j], b = j * 3;
     for (let k = 0; k < 3; k++) { if (((p >> k) & 1) === ((shown >> k) & 1)) this.rf[b + k]++; else this.cs[b + k]++; }
   }
-  tick() { return this.cfg.mode === "lattice" ? this.tickLattice() : this.tickLepton(this.cfg.mode === "signed"); }
+  tick() {
+    if (this.cfg.mode === "control") return this.tickControl();
+    return this.cfg.mode === "lattice" ? this.tickLattice() : this.tickLepton(this.cfg.mode === "signed");
+  }
+  // CONTROL (not the engine): each pixel flashes with fixed chance p per tick.
+  tickControl() {
+    if (this.rs === undefined) this.rs = 2463534242 ^ Number(this.cfg.seed & 0xffffffffn);
+    const p = this.cfg.p ?? 0.2; let count = 0;
+    for (let i = 0; i < N; i++) {
+      let x = this.rs; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; this.rs = x >>> 0;
+      const f = (this.rs / 4294967296) < p; this.fired[i] = f ? 1 : 0; if (f) count++;
+    }
+    this.t++; this.total += count; return count;
+  }
   tickLepton(signed) {
     const kick = this.t === 0 ? this.kick : -1, cs = this.cs, car = this.car6;
     let count = 0;
@@ -231,8 +250,9 @@ let eng, running=false, recent=new Float32Array(N), hist=[];
 const BINS=H; let rate=new Float64Array(BINS), agr=new Float64Array(BINS), seen=false;
 const binOf=new Int16Array(N), cnt=new Float64Array(BINS);
 for(let i=0;i<N;i++){const b=Math.floor(RAD[i]);binOf[i]=b<BINS?b:-1;if(b<BINS)cnt[b]++;}
-function cfg(){return{mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on")};}
-function reset(){eng=new Engine(cfg());recent.fill(0);hist=[];rate.fill(0);agr.fill(0);seen=false;measure(0);draw();}
+function cfg(){return{p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on")};}
+const KG=24;let lastF=new Int32Array(N),gapH=new Float64Array(KG+1),flashSum=0,tickSum=0;
+function reset(){lastF.fill(-1);gapH.fill(0);flashSum=0;tickSum=0;eng=new Engine(cfg());recent.fill(0);hist=[];rate.fill(0);agr.fill(0);seen=false;measure(0);draw();}
 function measure(alpha){
   const r=new Float64Array(BINS),a=new Float64Array(BINS);
   for(let i=0;i<N;i++){const b=binOf[i];if(b<0)continue;if(eng.fired[i])r[b]++;a[b]+=eng.agreement(i);}
@@ -240,7 +260,9 @@ function measure(alpha){
     if(!seen||alpha===0){rate[b]=r[b];agr[b]=a[b];}else{rate[b]+=alpha*(r[b]-rate[b]);agr[b]+=alpha*(a[b]-agr[b]);}}
   seen=true;
 }
-function step(){const c=eng.tick();for(let i=0;i<N;i++)recent[i]=eng.fired[i]?1:recent[i]*0.8;hist.push(c);if(hist.length>400)hist.shift();measure(0.04);}
+function step(){const c=eng.tick();const tt=eng.t-1;
+  if(tt>=50){flashSum+=c;tickSum++;}
+  for(let i=0;i<N;i++){if(!eng.fired[i])continue;const l=lastF[i];if(l>=0&&tt>=50)gapH[Math.min(KG,tt-l)]++;lastF[i]=tt;}for(let i=0;i<N;i++)recent[i]=eng.fired[i]?1:recent[i]*0.8;hist.push(c);if(hist.length>400)hist.shift();measure(0.04);}
 const sctx=$("slice").getContext("2d"),img=sctx.createImageData(S,S);
 function hex(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
 const PCR=PC.map(hex);
@@ -259,7 +281,7 @@ let draw=function(){
   const cr=eng.cfg.core;if(cr>0&&Math.abs(z-H)<=cr){const rr=Math.sqrt(cr*cr-(z-H)**2);sctx.strokeStyle="rgba(255,255,255,.35)";sctx.lineWidth=.15;sctx.beginPath();sctx.arc(H+.5,H+.5,rr,0,7);sctx.stroke();}
   const last=hist.length?hist[hist.length-1]:0;
   $("st-t").textContent=eng.t;$("st-f").textContent=last.toLocaleString();$("st-p").textContent=(100*last/N).toFixed(1)+"%";$("st-tot").textContent=eng.total.toLocaleString();
-  drawProf();drawTs();
+  drawProf();drawTs();drawHaz();
 };
 function drawProf(){
   const c=$("prof"),x=c.getContext("2d"),W=c.width,Hh=c.height,L=44,R=44,T=12,B=28;x.clearRect(0,0,W,Hh);
@@ -273,6 +295,23 @@ function drawProf(){
   for(const[arr,col,Y]of[[rate,"#f5b942",Yr],[agr,"#5cc8ff",Ya]]){x.strokeStyle=col;x.lineWidth=2;x.beginPath();
     for(let b=1;b<BINS;b++){const y=Math.max(T,Math.min(T+ph,Y(arr[b])));b===1?x.moveTo(X(b),y):x.lineTo(X(b),y);}x.stroke();}
   x.fillStyle="#8a919c";x.textAlign="center";x.fillText("distance (cells)",L+pw/2,Hh-0);
+}
+function drawHaz(){
+  const c=$("haz"),x=c.getContext("2d"),W=c.width,Hh=c.height,L=44,R=14,T=12,B=26;x.clearRect(0,0,W,Hh);
+  const pw=W-L-R,ph=Hh-T-B;let rem=0;for(let k=1;k<=KG;k++)rem+=gapH[k];
+  const hz=[];for(let k=1;k<KG;k++){hz.push(rem>0?gapH[k]/rem:NaN);rem-=gapH[k];}
+  const base=tickSum?flashSum/(tickSum*N):NaN;
+  let ymax=0.1;for(const v of hz)if(v>ymax)ymax=v;if(base>ymax)ymax=base;ymax=Math.min(1,Math.ceil(ymax*10)/10);
+  const X=k=>L+(k-1)/(KG-2)*pw,Y=v=>T+ph*(1-v/ymax);
+  x.strokeStyle="#2a2f37";x.fillStyle="#8a919c";x.font="11px ui-monospace,monospace";x.lineWidth=1;
+  for(let q=0;q<=4;q++){const y=T+ph*q/4;x.beginPath();x.moveTo(L,y);x.lineTo(W-R,y);x.stroke();x.textAlign="right";x.fillText((ymax*(1-q/4)).toFixed(2),L-6,y+4);}
+  for(let k=1;k<KG;k+=2){x.textAlign="center";x.fillText(k,X(k),Hh-8);}
+  x.textAlign="right";x.fillText("gap (ticks)",W-R,Hh-8);
+  if(!isNaN(base)){x.strokeStyle="#e6e8eb";x.setLineDash([5,4]);x.beginPath();x.moveTo(X(1),Y(base));x.lineTo(X(KG-1),Y(base));x.stroke();x.setLineDash([]);}
+  x.strokeStyle="#f5b942";x.lineWidth=2;x.beginPath();let st=false;
+  hz.forEach((v,k)=>{if(isNaN(v))return;const px=X(k+1),py=Y(v);st?x.lineTo(px,py):(x.moveTo(px,py),st=true);});x.stroke();
+  x.fillStyle="#f5b942";hz.forEach((v,k)=>{if(!isNaN(v)){x.beginPath();x.arc(X(k+1),Y(v),2.5,0,7);x.fill();}});
+  if(!tickSum){x.fillStyle="#8a919c";x.textAlign="center";x.fillText("press Run: needs 50+ ticks",L+pw/2,T+ph/2);}
 }
 function drawTs(){
   const c=$("ts"),x=c.getContext("2d"),W=c.width,Hh=c.height;x.clearRect(0,0,W,Hh);if(!hist.length)return;
@@ -300,7 +339,7 @@ $("copy").onclick=async()=>{const txt=stateText(),box=$("copybox");box.value=txt
   catch(e){box.style.display="block";box.select();$("copy").textContent="Select + copy below";}
   setTimeout(()=>$("copy").textContent="Copy state",2000);};
 $("gravity").onclick=()=>{const b=$("gravity");b.classList.toggle("on");b.textContent="gravity: "+(b.classList.contains("on")?"ON":"off");reset();};
-for(const id of["mode","display","update","core"])$(id).onchange=reset;
+for(const id of["mode","display","update","core","p"])$(id).onchange=reset;
 $("z").oninput=draw;$("view").onchange=()=>{legend();draw();};
 function legend(){const v=$("view").value,L=$("legend");
   if(v==="pattern")L.innerHTML=PC.map((c,k)=>`<span><span class="sw" style="background:${c}"></span>${k.toString(2).padStart(3,"0")}</span>`).join("")+"<span>bright = flashed this tick · circle = core edge</span>";
