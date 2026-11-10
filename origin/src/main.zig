@@ -91,7 +91,7 @@ fn help() void {
         \\  origin clocks [seed]
         \\  origin lattice3 [display] [update] [core] [ticks] [gravity]
         \\  origin lepton [core] [ticks] [v1|signed|turing]
-        \\  origin record mode=.. core=.. ticks=.. every=.. [display=.. update=.. gravity=on seed=..]
+        \\  origin record mode=lattice|v1|signed|turing|control core=.. p=.. ticks=.. every=.. [display=.. update=.. gravity=on seed=..]
         \\  origin help
         \\
     , .{});
@@ -1283,6 +1283,8 @@ fn leptonReport(args: anytype) void {
     for (1..bins) |b| std.debug.print("                        {d:>4}  {d:.3}  {d:.3}\n", .{ b, rate[b] / cnt[b], agr[b] / cnt[b] });
 }
 
+var control_grid: record.Control = undefined;
+
 fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
     var mode: []const u8 = "lattice";
     var disp_s: []const u8 = "one_cell";
@@ -1292,6 +1294,7 @@ fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
     var every: i64 = 10;
     var gravity = false;
     var seed: u64 = 20261110;
+    var p: f64 = 0.2;
     while (args.next()) |a| {
         const eq = std.mem.indexOfScalar(u8, a, '=') orelse continue;
         const k = a[0..eq];
@@ -1303,13 +1306,24 @@ fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
         else if (std.mem.eql(u8, k, "ticks")) ticks = try std.fmt.parseInt(i64, v, 10)
         else if (std.mem.eql(u8, k, "every")) every = @max(1, try std.fmt.parseInt(i64, v, 10))
         else if (std.mem.eql(u8, k, "gravity")) gravity = std.mem.eql(u8, v, "on")
-        else if (std.mem.eql(u8, k, "seed")) seed = try std.fmt.parseInt(u64, v, 10);
+        else if (std.mem.eql(u8, k, "seed")) seed = try std.fmt.parseInt(u64, v, 10)
+        else if (std.mem.eql(u8, k, "p")) p = try std.fmt.parseFloat(f64, v);
     }
     const is_lattice = std.mem.eql(u8, mode, "lattice");
     if (!is_lattice) {
         disp_s = "one_cell";
         update = "sync";
         gravity = false;
+    }
+    if (std.mem.eql(u8, mode, "control")) {
+        const cname = try std.fmt.allocPrint(gpa, "control_p{d}_t{d}_s{d}", .{ p, ticks, seed });
+        defer gpa.free(cname);
+        const cmeta: record.Meta = .{ .name = cname, .mode = "control", .display = "none", .update = "none", .core = 0, .gravity = false, .seed = seed, .ticks = ticks, .every = every, .rules = "CONTROL: fixed chance p per pixel per tick, not the engine" };
+        control_grid.init(seed, p);
+        const cdir = try record.run(io, gpa, &control_grid, cmeta, "results/runs");
+        defer gpa.free(cdir);
+        std.debug.print("wrote {s}/\n", .{cdir});
+        return;
     }
     const name = if (is_lattice)
         try std.fmt.allocPrint(gpa, "lattice_{s}_{s}_core{d}_{s}_t{d}_s{d}", .{ disp_s, update, core, if (gravity) "grav" else "nograv", ticks, seed })

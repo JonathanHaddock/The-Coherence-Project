@@ -173,3 +173,46 @@ pub fn run(io: std.Io, gpa: std.mem.Allocator, g: anytype, meta: Meta, out_root:
     }
     return dir;
 }
+
+/// CONTROL, not part of the engine: every pixel flashes with a fixed chance p
+/// per tick (seeded, deterministic). Reference for a true constant hazard.
+pub const Control = struct {
+    px: [n]px.Pixel,
+    fired: [n]bool,
+    carrier: [n]f64,
+    s: u64,
+    p: f64,
+
+    pub fn init(c: *Control, seed: u64, p: f64) void {
+        c.s = seed;
+        c.p = p;
+        c.carrier = @splat(0);
+        c.fired = @splat(false);
+        for (&c.px) |*q| q.* = .{ .pattern = @truncate(c.next()) };
+    }
+
+    fn next(c: *Control) u64 {
+        c.s ^= c.s << 13;
+        c.s ^= c.s >> 7;
+        c.s ^= c.s << 17;
+        return c.s;
+    }
+
+    pub fn tick(c: *Control, t: i64, kick: ?usize) u32 {
+        _ = t;
+        _ = kick;
+        var count: u32 = 0;
+        for (0..n) |i| {
+            const u = @as(f64, @floatFromInt(c.next() >> 11)) / 9007199254740992.0;
+            c.fired[i] = u < c.p;
+            if (c.fired[i]) count += 1;
+        }
+        return count;
+    }
+
+    pub fn agreement(c: *const Control, i: usize) f64 {
+        var m: u32 = 0;
+        for (g3.neighbors(i)) |j| m += px.cells - @popCount(c.px[i].pattern ^ c.px[j].pattern);
+        return @as(f64, @floatFromInt(m)) / (6.0 * px.cells);
+    }
+};

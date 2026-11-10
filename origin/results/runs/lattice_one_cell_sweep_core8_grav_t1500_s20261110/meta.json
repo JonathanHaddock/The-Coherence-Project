@@ -1,0 +1,14 @@
+{
+  "name": "lattice_one_cell_sweep_core8_grav_t1500_s20261110",
+  "mode": "lattice",
+  "display": "one_cell",
+  "update": "sweep",
+  "core": 8,
+  "gravity": true,
+  "seed": 20261110,
+  "ticks": 1500,
+  "every": 50,
+  "lattice": "48^3, 6 neighbors",
+  "rules": "1-5 + 6 (gravity: 3 carrier units -> +1 reinforce per cell); carrier lost at box edge",
+  "files": ["series.csv", "shells.csv", "gaps.csv", "slice.csv"]
+}

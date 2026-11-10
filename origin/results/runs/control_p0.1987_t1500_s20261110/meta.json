@@ -1,0 +1,14 @@
+{
+  "name": "control_p0.1987_t1500_s20261110",
+  "mode": "control",
+  "display": "none",
+  "update": "none",
+  "core": 0,
+  "gravity": false,
+  "seed": 20261110,
+  "ticks": 1500,
+  "every": 50,
+  "lattice": "48^3, 6 neighbors",
+  "rules": "CONTROL: fixed chance p per pixel per tick, not the engine",
+  "files": ["series.csv", "shells.csv", "gaps.csv", "slice.csv"]
+}
