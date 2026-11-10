@@ -22,6 +22,7 @@ const store = @import("dataset/store.zig");
 const spectrum = @import("analysis/spectrum.zig");
 const spectrum_svg = @import("visualization/spectrum_svg.zig");
 const projector_svg = @import("visualization/projector_svg.zig");
+const engine = @import("engine/pixel.zig");
 
 test {
     _ = koide;
@@ -41,6 +42,7 @@ test {
     _ = spectrum;
     _ = detector;
     _ = projector_svg;
+    _ = engine;
     _ = @import("visualization/labels.zig");
 }
 
@@ -77,6 +79,7 @@ fn help() void {
         \\  origin universality
         \\  origin generations
         \\  origin display [dataset] [event]
+        \\  origin engine [ticks] [seed]
         \\  origin help
         \\
     , .{});
@@ -1035,6 +1038,69 @@ fn fail(err: anyerror) void {
     }
 }
 
+var engine_grid: engine.Grid = undefined;
+
+fn engineReport(args: anytype) void {
+    const ticks = std.fmt.parseInt(i64, args.next() orelse "2000", 10) catch 2000;
+    const seed = std.fmt.parseInt(u64, args.next() orelse "20261110", 10) catch 20261110;
+
+    std.debug.print("\n--- STEP 1: one pixel, one beta decay ---\n", .{});
+    for ([_]u3{ 0b001, 0b010, 0b100 }) |pat| {
+        var p = engine.Pixel{ .pattern = pat };
+        const e = engine.betaDecay(&p).?;
+        std.debug.print(
+            "  {b:0>3} -> {b:0>3}  quark flash (cell {d})  q: {d}/3 -> {d}/3 + e {d}/3 + nu {d}/3  {s}\n",
+            .{ e.before, e.after, e.flipped_cell, e.quark_q[0], e.quark_q[1], e.electron_q, e.neutrino_q, if (e.balanced()) "BALANCED" else "FAIL" },
+        );
+    }
+
+    std.debug.print("\n--- STEP 2: two pixels, flash rule ---\n", .{});
+    var a = engine.Pixel{ .pattern = 0b101 };
+    var b = engine.Pixel{ .pattern = 0b011 };
+    var t: i64 = 0;
+    while (t < 6) : (t += 1) {
+        const src = if (@mod(t, 2) == 0) &a else &b;
+        const dst = if (@mod(t, 2) == 0) &b else &a;
+        dst.receive(src.pattern);
+        std.debug.print("  t={d} {s} shows {b:0>3} -> {s} reinforce {any} conserved {any}", .{ t, if (src == &a) "A" else "B", src.pattern, if (dst == &a) "A" else "B", dst.reinforce, dst.conserved });
+        if (dst.ready()) {
+            const nu = dst.flash(t);
+            std.debug.print("  FLASH -> {b:0>3}, neutrino carries {d}", .{ dst.pattern, nu });
+        }
+        std.debug.print("\n", .{});
+    }
+
+    std.debug.print("\n--- STEP 3: {d}x{d} torus, {d} ticks, seed {d} ---\n", .{ engine.side, engine.side, ticks, seed });
+    engine_grid = engine.Grid.init(seed);
+    std.debug.print("  tick   flashes  neutrino  agreement\n", .{});
+    var total: u64 = 0;
+    var last_active: i64 = -1;
+    t = 0;
+    while (t < ticks) : (t += 1) {
+        const st = engine_grid.tick(t, if (t == 0) @as(?usize, engine.n / 2) else null);
+        total += st.flashes;
+        if (st.flashes > 0) last_active = t;
+        if (t < 10 or @mod(t, @max(1, @divTrunc(ticks, 20))) == 0)
+            std.debug.print("  {d:>5}  {d:>7}  {d:>8}  {d:.4}\n", .{ @as(u64, @intCast(t)), st.flashes, st.neutrino, st.agreement });
+    }
+    std.debug.print("  total flashes {d}; last active tick {d}\n", .{ total, last_active });
+
+    std.debug.print("\n  Constant-hazard test (section 5): h(k) = P(flash at gap k | no flash before k)\n", .{});
+    var remaining: u64 = 0;
+    for (engine_grid.intervals) |c| remaining += c;
+    if (remaining == 0) {
+        std.debug.print("  no repeat flashes: nothing to test\n", .{});
+        return;
+    }
+    var k: usize = 1;
+    while (k < 16) : (k += 1) {
+        const c = engine_grid.intervals[k];
+        if (remaining == 0) break;
+        std.debug.print("  gap {d:>2}: {d:>8}  h = {d:.3}\n", .{ k, c, @as(f64, @floatFromInt(c)) / @as(f64, @floatFromInt(remaining)) });
+        remaining -= c;
+    }
+}
+
 pub fn main(init: std.process.Init) void {
     var args = init.minimal.args.iterate();
     _ = args.skip();
@@ -1092,6 +1158,8 @@ pub fn main(init: std.process.Init) void {
         chart(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "project")) {
         projectReport(&args);
+    } else if (std.mem.eql(u8, command, "engine")) {
+        engineReport(&args);
     } else if (std.mem.eql(u8, command, "koide")) {
         koideReport();
     } else {

@@ -1,0 +1,65 @@
+
+========================================
+                 ORIGIN
+       PARTICLE OBSERVATION ENGINE
+========================================
+
+--- STEP 1: one pixel, one beta decay ---
+  001 -> 011  quark flash (cell 1)  q: -1/3 -> 2/3 + e -3/3 + nu 0/3  BALANCED
+  010 -> 011  quark flash (cell 0)  q: -1/3 -> 2/3 + e -3/3 + nu 0/3  BALANCED
+  100 -> 101  quark flash (cell 0)  q: -1/3 -> 2/3 + e -3/3 + nu 0/3  BALANCED
+
+--- STEP 2: two pixels, flash rule ---
+  t=0 A shows 101 -> B reinforce { 1, 0, 0 } conserved { 0, 1, 1 }
+  t=1 B shows 011 -> A reinforce { 1, 0, 0 } conserved { 0, 1, 1 }
+  t=2 A shows 101 -> B reinforce { 2, 0, 0 } conserved { 0, 2, 2 }  FLASH -> 001, neutrino carries 4
+  t=3 B shows 001 -> A reinforce { 2, 1, 0 } conserved { 0, 1, 2 }  FLASH -> 001, neutrino carries 3
+  t=4 A shows 001 -> B reinforce { 1, 1, 1 } conserved { 0, 0, 0 }
+  t=5 B shows 001 -> A reinforce { 1, 1, 1 } conserved { 0, 0, 0 }
+
+--- STEP 3: 64x64 torus, 2000 ticks, seed 20261110 ---
+  tick   flashes  neutrino  agreement
+      0      554      1660  0.5185
+      1      993      3931  0.5920
+      2     1168      4848  0.5938
+      3     1566      7165  0.5558
+      4     2010     10288  0.5175
+      5     2356     13017  0.5061
+      6     2552     14475  0.5067
+      7     2708     15335  0.5111
+      8     2804     15765  0.5127
+      9     2894     16382  0.5197
+    100     4006     20636  0.5748
+    200     4046     20797  0.5719
+    300     4054     20828  0.5725
+    400     4056     20872  0.5719
+    500     4055     20871  0.5716
+    600     4056     20883  0.5721
+    700     4054     20866  0.5719
+    800     4054     20850  0.5714
+    900     4059     20892  0.5721
+   1000     4059     20878  0.5718
+   1100     4056     20867  0.5718
+   1200     4056     20875  0.5715
+   1300     4057     20880  0.5717
+   1400     4056     20858  0.5714
+   1500     4060     20902  0.5722
+   1600     4057     20870  0.5718
+   1700     4057     20871  0.5718
+   1800     4059     20901  0.5716
+   1900     4060     20888  0.5722
+  total flashes 8049400; last active tick 1999
+
+  Constant-hazard test (section 5): h(k) = P(flash at gap k | no flash before k)
+  gap  1:  7931149  h = 0.986
+  gap  2:   101953  h = 0.893
+  gap  3:     8742  h = 0.716
+  gap  4:     1980  h = 0.572
+  gap  5:      610  h = 0.412
+  gap  6:      454  h = 0.522
+  gap  7:      249  h = 0.599
+  gap  8:        5  h = 0.030
+  gap  9:        2  h = 0.012
+  gap 10:        1  h = 0.006
+  gap 11:        1  h = 0.006
+  gap 12:      158  h = 1.000
