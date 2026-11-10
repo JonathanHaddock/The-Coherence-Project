@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pixel Engine 3D</title>
+<style>
+:root{--bg:#0e1013;--panel:#171a1f;--ink:#e6e8eb;--dim:#8a919c;--line:#2a2f37;--acc:#f5b942;--ag:#5cc8ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+h1{font-size:15px;margin:0;letter-spacing:.04em}header span{color:var(--dim);font-size:12px}
+main{display:grid;grid-template-columns:minmax(300px,520px) minmax(300px,1fr);gap:16px;padding:16px}
+@media(max-width:820px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px}
+.card h2{font-size:12px;font-weight:600;color:var(--dim);margin:0 0 8px;text-transform:uppercase;letter-spacing:.06em}
+canvas{display:block;width:100%;image-rendering:pixelated;border-radius:4px}
+.ctl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:10px}
+label{color:var(--dim);font-size:12px;display:flex;gap:6px;align-items:center}
+select,button,input[type=number]{background:#0e1013;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 8px;font:inherit;font-size:12px}
+button{cursor:pointer}button.on{border-color:var(--acc);color:var(--acc)}
+input[type=range]{accent-color:var(--acc)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.stat{background:#0e1013;border-radius:6px;padding:8px}.stat b{display:block;font-size:16px}.stat i{font-style:normal;color:var(--dim);font-size:11px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:8px;font-size:11px;color:var(--dim)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.note{color:var(--dim);font-size:12px;margin-top:8px}
+</style></head><body>
+<header><h1>PIXEL ENGINE · 3D LATTICE 48³</h1><span>JS port of grid3.zig. Matches Zig exactly in all modes (seed 20261110).</span></header>
+<main>
+<section class="card">
+ <div class="ctl">
+  <button id="play">▶ Run</button><button id="step">Step</button><button id="reset">Reset</button>
+  <label>speed <input id="speed" type="range" min="1" max="20" value="3"></label>
+ </div>
+ <div class="ctl">
+  <label>mode <select id="mode"><option value="lattice">lattice (rules 1-6)</option><option value="v1">lepton v1 (rule 9)</option><option value="signed">lepton signed (rule 10)</option><option value="turing">turing: gravity inhibits (rule 11)</option></select></label>
+  <label>display <select id="display"><option>one_cell</option><option>hold</option><option>flip_all</option><option>fill_empty</option></select></label>
+  <label>update <select id="update"><option>sync</option><option>sweep</option></select></label>
+  <label>core <input id="core" type="number" min="0" max="20" value="8" style="width:56px"></label>
+  <button id="gravity">gravity: off</button>
+ </div>
+ <div class="ctl">
+  <label>view <select id="view"><option value="pattern">pattern</option><option value="flash">flashes (recent)</option><option value="agree">agreement</option><option value="carrier">carrier</option><option value="memory">memory (conserved)</option></select></label>
+  <label>slice z <input id="z" type="range" min="0" max="47" value="24"> <b id="zv">24</b></label>
+ </div>
+ <div style="position:relative"><canvas id="globe" width="900" height="900" style="cursor:grab;background:#07080a"></canvas>
+ <div style="position:absolute;top:8px;left:10px;font-size:11px;color:#8a919c">drag to rotate · scroll to zoom</div></div>
+ <div class="ctl" style="margin-top:8px">
+  <label><input type="checkbox" id="cut" checked> cutaway (open the front half)</label>
+  <label><input type="checkbox" id="spin" checked> auto-rotate</label>
+  <label>show <select id="show"><option value="all">all pixels</option><option value="active">only active (flashed recently / bright)</option></select></label>
+ </div>
+ <details style="margin-top:6px"><summary style="color:#8a919c;font-size:12px;cursor:pointer">flat slice view</summary>
+ <canvas id="slice" width="48" height="48" style="margin-top:8px"></canvas></details>
+ <div class="legend" id="legend"></div>
+ <div class="stats">
+  <div class="stat"><b id="st-t">0</b><i>tick</i></div>
+  <div class="stat"><b id="st-f">0</b><i>flashes this tick</i></div>
+  <div class="stat"><b id="st-p">0%</b><i>pixels flashing</i></div>
+  <div class="stat"><b id="st-tot">0</b><i>total flashes</i></div>
+ </div>
+</section>
+<section>
+ <div class="card"><h2>By distance from centre (moving average)</h2>
+  <canvas id="prof" width="640" height="300"></canvas>
+  <div class="legend"><span><span class="sw" style="background:var(--acc)"></span>flash rate (left axis)</span><span><span class="sw" style="background:var(--ag)"></span>neighbor agreement (right axis)</span><span><span class="sw" style="background:#555"></span>core edge</span></div>
+ </div>
+ <div class="card" style="margin-top:16px"><h2>Flashes per tick</h2>
+  <canvas id="ts" width="640" height="140"></canvas>
+ </div>
+ <p class="note">Lepton modes: cells are 3 positions, filled = electron shown. Neutrino memory travels as carrier on wrapped edges and acts like a neighbor's flash where a whole unit lands (v1: always "electron"; signed: electron or empty). Display is one_cell, sync; display/update/gravity controls apply to lattice mode only. Gravity = rule choice 6: every 3 units of carrier at a site become +1 reinforcement on each cell of the pattern shown. Agreement 0.5 = random neighbors, 1.0 = identical. The profile averages over roughly the last 50 ticks.</p>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// JS port of origin/src/engine/grid3.zig + pixel.zig (3D lattice, carrier, rule 6 gravity).
+const S = 48, N = S * S * S, H = 24;
+const DISPLAYS = ["fill_empty", "hold", "one_cell", "flip_all"];
+
+function radius(i) {
+  const x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
+  return Math.sqrt((x - H) ** 2 + (y - H) ** 2 + (z - H) ** 2);
+}
+const NB = new Int32Array(N * 6);
+const RAD = new Float64Array(N);
+for (let i = 0; i < N; i++) {
+  const x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
+  const idx = (a, b, c) => (c * S + b) * S + a;
+  NB.set([idx((x + 1) % S, y, z), idx((x + S - 1) % S, y, z), idx(x, (y + 1) % S, z),
+          idx(x, (y + S - 1) % S, z), idx(x, y, (z + 1) % S), idx(x, y, (z + S - 1) % S)], i * 6);
+  RAD[i] = radius(i);
+}
+
+class Engine {
+  constructor(cfg) {
+    this.cfg = Object.assign({ mode: "lattice", display: "one_cell", update: "sync", core: 8, gravity: false, seed: 20261110n }, cfg);
+    this.pat = new Uint8Array(N);
+    this.rf = new Uint32Array(N * 3);
+    this.cs = new Uint32Array(N * 3);
+    this.fired = new Uint8Array(N);
+    this.carrier = new Float64Array(N);
+    this.next = new Float64Array(N);
+    this.car6 = new Float64Array(N * 6); this.nxt6 = new Float64Array(N * 6);
+    this.t = 0; this.total = 0;
+    const M = (1n << 64n) - 1n;
+    let s = BigInt(this.cfg.seed);
+    for (let i = 0; i < N; i++) {
+      s ^= (s << 13n) & M; s ^= s >> 7n; s ^= (s << 17n) & M;
+      this.pat[i] = Number(s & 7n);
+      for (let k = 0; k < 3; k++) this.cs[i * 3 + k] = Number((s >> BigInt(8 + 2 * k)) % 2n);
+    }
+    if (this.cfg.core > 0) for (let i = 0; i < N; i++) if (RAD[i] <= this.cfg.core) {
+      this.pat[i] = 7; this.cs[i * 3] = this.cs[i * 3 + 1] = this.cs[i * 3 + 2] = 1;
+    }
+    this.kick = (H * S + H) * S + H;
+  }
+  ready(i) { return this.cs[i * 3] + this.cs[i * 3 + 1] + this.cs[i * 3 + 2] >= 3; }
+  flash(i) {
+    const d = this.cfg.display, r = this.rf, c = this.cs, b = i * 3;
+    let p = this.pat[i];
+    if (d === "fill_empty") {
+      for (let k = 0; k < 3; k++) { if (r[b + k] > c[b + k]) p |= 1 << k; else if (r[b + k] < c[b + k]) p &= ~(1 << k); }
+    } else if (d === "one_cell") {
+      let best = -1, sur = 0;
+      for (let k = 0; k < 3; k++) if (c[b + k] > r[b + k] && c[b + k] - r[b + k] > sur) { sur = c[b + k] - r[b + k]; best = k; }
+      if (best >= 0) p ^= 1 << best;
+    } else if (d === "flip_all") {
+      for (let k = 0; k < 3; k++) if (c[b + k] > r[b + k]) p ^= 1 << k;
+    }
+    this.pat[i] = p & 7;
+    const rel = c[b] + c[b + 1] + c[b + 2];
+    r[b] = r[b + 1] = r[b + 2] = c[b] = c[b + 1] = c[b + 2] = 0;
+    this.carrier[i] += rel;
+    this.fired[i] = 1;
+  }
+  receive(j, shown) {
+    const p = this.pat[j], b = j * 3;
+    for (let k = 0; k < 3; k++) { if (((p >> k) & 1) === ((shown >> k) & 1)) this.rf[b + k]++; else this.cs[b + k]++; }
+  }
+  tick() { return this.cfg.mode === "lattice" ? this.tickLattice() : this.tickLepton(this.cfg.mode === "signed"); }
+  tickLepton(signed) {
+    const kick = this.t === 0 ? this.kick : -1, cs = this.cs, car = this.car6;
+    let count = 0;
+    for (let i = 0; i < N; i++) this.fired[i] = (this.ready(i) || i === kick) ? 1 : 0;
+    const save = this.cfg.display; this.cfg.display = "one_cell";
+    for (let i = 0; i < N; i++) if (this.fired[i]) {
+      const m0 = cs[i * 3], m1 = cs[i * 3 + 1], m2 = cs[i * 3 + 2];
+      const c0 = this.carrier[i];
+      this.flash(i); this.carrier[i] = c0; count++;
+      const p = this.pat[i], m = [m0, m1, m2];
+      for (let k = 0; k < 3; k++) { const ch = (!signed || ((p >> k) & 1)) ? k : k + 3; car[i * 6 + ch] += m[k]; }
+    }
+    this.cfg.display = save;
+    for (let i = 0; i < N; i++) if (this.fired[i]) { const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh); }
+    // spread on wrapped edges
+    const nx = this.nxt6; nx.fill(0);
+    for (let i = 0; i < N; i++) {
+      const b = i * 6; let any = false;
+      for (let c = 0; c < 6; c++) if (car[b + c] !== 0) { any = true; break; }
+      if (!any) continue;
+      for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q] * 6; for (let c = 0; c < 6; c++) nx[j + c] += car[b + c] / 6; }
+    }
+    this.car6 = nx; this.nxt6 = car;
+    const C = this.car6, rf = this.rf;
+    if (this.cfg.mode === "turing") {
+      for (let i = 0; i < N; i++) for (let k = 0; k < 3; k++) {
+        const v = C[i * 6 + k]; if (v < 1) continue;
+        const m = Math.min(Math.floor(v), cs[i * 3 + k]);
+        C[i * 6 + k] = v - m; cs[i * 3 + k] -= m;
+      }
+    } else for (let i = 0; i < N; i++) for (let ch = 0; ch < 6; ch++) {
+      const v = C[i * 6 + ch]; if (v < 1) continue;
+      const m = Math.floor(v); C[i * 6 + ch] = v - m;
+      const k = ch % 3, has = (this.pat[i] >> k) & 1, shown = ch < 3 ? 1 : 0;
+      if (has === shown) rf[i * 3 + k] += m; else cs[i * 3 + k] += m;
+    }
+    let tot = 0; for (let i = 0; i < N; i++) { let s = 0; for (let c = 0; c < 6; c++) s += C[i * 6 + c]; this.carrier[i] = s; }
+    this.t++; this.total += count;
+    return count;
+  }
+  tickLattice() {
+    const kick = this.t === 0 ? this.kick : -1;
+    this.fired.fill(0);
+    let count = 0;
+    if (this.cfg.update === "sync") {
+      for (let i = 0; i < N; i++) this.fired[i] = (this.ready(i) || i === kick) ? 1 : 0;
+      for (let i = 0; i < N; i++) if (this.fired[i]) { this.flash(i); count++; }
+      for (let i = 0; i < N; i++) if (this.fired[i]) { const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh); }
+    } else {
+      for (let i = 0; i < N; i++) {
+        if (!(this.ready(i) || i === kick)) continue;
+        this.flash(i); count++;
+        const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh);
+      }
+    }
+    this.spread();
+    if (this.cfg.gravity) this.absorb();
+    this.t++; this.total += count;
+    return count;
+  }
+  spread() {
+    const c = this.carrier, nx = this.next; nx.fill(0);
+    for (let i = 0; i < N; i++) {
+      const q = c[i]; if (q === 0) continue;
+      const sh = q / 6, x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
+      if (x + 1 < S) nx[i + 1] += sh;
+      if (x > 0) nx[i - 1] += sh;
+      if (y + 1 < S) nx[i + S] += sh;
+      if (y > 0) nx[i - S] += sh;
+      if (z + 1 < S) nx[i + S * S] += sh;
+      if (z > 0) nx[i - S * S] += sh;
+    }
+    this.carrier = nx; this.next = c;
+  }
+  absorb() {
+    const c = this.carrier;
+    for (let i = 0; i < N; i++) {
+      if (c[i] < 3) continue;
+      const k = Math.floor(c[i] / 3);
+      c[i] -= k * 3;
+      this.rf[i * 3] += k; this.rf[i * 3 + 1] += k; this.rf[i * 3 + 2] += k;
+    }
+  }
+  agreement(i) {
+    let m = 0; const p = this.pat[i];
+    for (let q = 0; q < 6; q++) { const x = p ^ this.pat[NB[i * 6 + q]]; m += 3 - ((x & 1) + ((x >> 1) & 1) + ((x >> 2) & 1)); }
+    return m / 18;
+  }
+}
+const $=id=>document.getElementById(id);
+const PC=["#2b2f36","#d9534f","#5cb85c","#e8a33d","#4a90e2","#b05cc8","#3fbfbf","#f2f2f2"];
+let eng, running=false, recent=new Float32Array(N), hist=[];
+const BINS=H; let rate=new Float64Array(BINS), agr=new Float64Array(BINS), seen=false;
+const binOf=new Int16Array(N), cnt=new Float64Array(BINS);
+for(let i=0;i<N;i++){const b=Math.floor(RAD[i]);binOf[i]=b<BINS?b:-1;if(b<BINS)cnt[b]++;}
+function cfg(){return{mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on")};}
+function reset(){eng=new Engine(cfg());recent.fill(0);hist=[];rate.fill(0);agr.fill(0);seen=false;measure(0);draw();}
+function measure(alpha){
+  const r=new Float64Array(BINS),a=new Float64Array(BINS);
+  for(let i=0;i<N;i++){const b=binOf[i];if(b<0)continue;if(eng.fired[i])r[b]++;a[b]+=eng.agreement(i);}
+  for(let b=0;b<BINS;b++){r[b]/=cnt[b];a[b]/=cnt[b];
+    if(!seen||alpha===0){rate[b]=r[b];agr[b]=a[b];}else{rate[b]+=alpha*(r[b]-rate[b]);agr[b]+=alpha*(a[b]-agr[b]);}}
+  seen=true;
+}
+function step(){const c=eng.tick();for(let i=0;i<N;i++)recent[i]=eng.fired[i]?1:recent[i]*0.8;hist.push(c);if(hist.length>400)hist.shift();measure(0.04);}
+const sctx=$("slice").getContext("2d"),img=sctx.createImageData(S,S);
+function hex(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
+const PCR=PC.map(hex);
+let draw=function(){
+  const z=+$("z").value,v=$("view").value,d=img.data;$("zv").textContent=z;
+  let cmax=1e-9;if(v==="carrier")for(let y=0;y<S;y++)for(let x=0;x<S;x++)cmax=Math.max(cmax,eng.carrier[(z*S+y)*S+x]);
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+    const i=(z*S+y)*S+x,o=(y*S+x)*4;let c;
+    if(v==="pattern"){c=PCR[eng.pat[i]].slice();if(eng.fired[i])c=c.map(q=>Math.min(255,q+90));}
+    else if(v==="flash"){const f=recent[i];c=[20+235*f,20+165*f,25+40*f];}
+    else if(v==="agree"){const a=eng.agreement(i),u=Math.max(0,(a-0.5)*2);c=[20+72*u,25+175*u,35+220*u];}
+    else if(v==="carrier"){const u=Math.sqrt(eng.carrier[i]/cmax);c=[30+200*u,30+120*u,60+60*u];}
+    else{const m=eng.cs[i*3]+eng.cs[i*3+1]+eng.cs[i*3+2],u=Math.min(1,m/3);c=[25+220*u,25+80*u,40+40*u];}
+    d[o]=c[0];d[o+1]=c[1];d[o+2]=c[2];d[o+3]=255;}
+  sctx.putImageData(img,0,0);
+  const cr=eng.cfg.core;if(cr>0&&Math.abs(z-H)<=cr){const rr=Math.sqrt(cr*cr-(z-H)**2);sctx.strokeStyle="rgba(255,255,255,.35)";sctx.lineWidth=.15;sctx.beginPath();sctx.arc(H+.5,H+.5,rr,0,7);sctx.stroke();}
+  const last=hist.length?hist[hist.length-1]:0;
+  $("st-t").textContent=eng.t;$("st-f").textContent=last.toLocaleString();$("st-p").textContent=(100*last/N).toFixed(1)+"%";$("st-tot").textContent=eng.total.toLocaleString();
+  drawProf();drawTs();
+};
+function drawProf(){
+  const c=$("prof"),x=c.getContext("2d"),W=c.width,Hh=c.height,L=44,R=44,T=12,B=28;x.clearRect(0,0,W,Hh);
+  const pw=W-L-R,ph=Hh-T-B;let rmax=0.05;for(let b=1;b<BINS;b++)rmax=Math.max(rmax,rate[b]);rmax=Math.ceil(rmax*20)/20;
+  const X=b=>L+(b-1)/(BINS-2)*pw,Yr=v=>T+ph*(1-v/rmax),Ya=v=>T+ph*(1-(v-0.5)/0.5);
+  x.strokeStyle="#2a2f37";x.fillStyle="#8a919c";x.font="11px ui-monospace,monospace";x.lineWidth=1;
+  for(let k=0;k<=4;k++){const y=T+ph*k/4;x.beginPath();x.moveTo(L,y);x.lineTo(W-R,y);x.stroke();
+    x.textAlign="right";x.fillText((rmax*(1-k/4)).toFixed(2),L-6,y+4);x.textAlign="left";x.fillText((1-k*0.125).toFixed(2),W-R+6,y+4);}
+  for(let b=1;b<BINS;b+=2){x.textAlign="center";x.fillText(b,X(b),Hh-10);}
+  const cr=eng.cfg.core;if(cr>0){x.strokeStyle="#555";x.setLineDash([4,4]);x.beginPath();x.moveTo(X(cr),T);x.lineTo(X(cr),T+ph);x.stroke();x.setLineDash([]);}
+  for(const[arr,col,Y]of[[rate,"#f5b942",Yr],[agr,"#5cc8ff",Ya]]){x.strokeStyle=col;x.lineWidth=2;x.beginPath();
+    for(let b=1;b<BINS;b++){const y=Math.max(T,Math.min(T+ph,Y(arr[b])));b===1?x.moveTo(X(b),y):x.lineTo(X(b),y);}x.stroke();}
+  x.fillStyle="#8a919c";x.textAlign="center";x.fillText("distance (cells)",L+pw/2,Hh-0);
+}
+function drawTs(){
+  const c=$("ts"),x=c.getContext("2d"),W=c.width,Hh=c.height;x.clearRect(0,0,W,Hh);if(!hist.length)return;
+  const mx=Math.max(1,...hist);x.strokeStyle="#f5b942";x.lineWidth=1.5;x.beginPath();
+  hist.forEach((v,k)=>{const px=k/399*(W-50)+44,py=Hh-16-(v/mx)*(Hh-28);k?x.lineTo(px,py):x.moveTo(px,py);});x.stroke();
+  x.fillStyle="#8a919c";x.font="11px ui-monospace,monospace";x.textAlign="right";x.fillText(mx.toLocaleString(),40,14);x.fillText("0",40,Hh-14);
+}
+function loop(){if(!running)return;const n=+$("speed").value;for(let k=0;k<n;k++)step();draw();requestAnimationFrame(loop);}
+$("play").onclick=()=>{running=!running;$("play").textContent=running?"❚❚ Pause":"▶ Run";$("play").classList.toggle("on",running);if(running)loop();};
+$("step").onclick=()=>{step();draw();};
+$("reset").onclick=reset;
+$("gravity").onclick=()=>{const b=$("gravity");b.classList.toggle("on");b.textContent="gravity: "+(b.classList.contains("on")?"ON":"off");reset();};
+for(const id of["mode","display","update","core"])$(id).onchange=reset;
+$("z").oninput=draw;$("view").onchange=()=>{legend();draw();};
+function legend(){const v=$("view").value,L=$("legend");
+  if(v==="pattern")L.innerHTML=PC.map((c,k)=>`<span><span class="sw" style="background:${c}"></span>${k.toString(2).padStart(3,"0")}</span>`).join("")+"<span>bright = flashed this tick · circle = core edge</span>";
+  else L.innerHTML={flash:"bright = flashed recently, fades over a few ticks",agree:"dark = 0.5 (random) → bright = 1.0 (all 6 neighbors match)",carrier:"brightness = carrier at site (sqrt scale, max in slice)",memory:"brightness = conserved share (3 = about to flash)"}[v];}
+// ---------- 3D globe ----------
+const R3=23, gIdx=[];for(let i=0;i<N;i++)if(RAD[i]<=R3)gIdx.push(i);
+const GN=gIdx.length;
+const renderer=new THREE.WebGLRenderer({canvas:$("globe"),antialias:true});
+renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
+const scene=new THREE.Scene(), cam=new THREE.PerspectiveCamera(40,1,1,500);
+let dist=95; cam.position.set(0,0,dist);
+const geo=new THREE.BufferGeometry(), pos=new Float32Array(GN*3), col=new Float32Array(GN*3);
+gIdx.forEach((i,k)=>{pos[k*3]=i%S-H;pos[k*3+1]=((i/S)|0)%S-H;pos[k*3+2]=((i/(S*S))|0)-H;});
+geo.setAttribute("position",new THREE.BufferAttribute(pos,3));geo.setAttribute("color",new THREE.BufferAttribute(col,3));
+const mat=new THREE.PointsMaterial({size:0.9,vertexColors:true,transparent:true,opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false});
+const globe=new THREE.Points(geo,mat);scene.add(globe);
+const ring=new THREE.Mesh(new THREE.SphereGeometry(R3+0.6,32,16),new THREE.MeshBasicMaterial({color:0x2a2f37,wireframe:true,transparent:true,opacity:0.18}));globe.add(ring);
+let rx=0.35,ry=0,drag=null;
+const gc=$("globe");
+gc.addEventListener("pointerdown",e=>{drag=[e.clientX,e.clientY];gc.setPointerCapture(e.pointerId);gc.style.cursor="grabbing";});
+gc.addEventListener("pointermove",e=>{if(!drag)return;ry+=(e.clientX-drag[0])*0.008;rx+=(e.clientY-drag[1])*0.008;rx=Math.max(-1.5,Math.min(1.5,rx));drag=[e.clientX,e.clientY];if(!running)drawGlobe();});
+gc.addEventListener("pointerup",()=>{drag=null;gc.style.cursor="grab";});
+gc.addEventListener("wheel",e=>{e.preventDefault();dist=Math.max(35,Math.min(200,dist*(1+e.deltaY*0.001)));if(!running)drawGlobe();},{passive:false});
+function sizeGlobe(){const w=gc.clientWidth||600;renderer.setSize(w,w,false);cam.aspect=1;cam.updateProjectionMatrix();}
+window.addEventListener("resize",sizeGlobe);
+function drawGlobe(){
+  const v=$("view").value,cut=$("cut").checked,act=$("show").value==="active";
+  // cutaway in view space: hide points whose rotated z > 0 (facing camera)
+  const cy=Math.cos(ry),sy=Math.sin(ry),cx=Math.cos(rx),sx=Math.sin(rx);
+  let cmax=1e-9;if(v==="carrier")for(const i of gIdx)cmax=Math.max(cmax,eng.carrier[i]);
+  for(let k=0;k<GN;k++){const i=gIdx[k];
+    let r=0,g=0,b=0,on=1;
+    if(cut){const x=pos[k*3],y=pos[k*3+1],z=pos[k*3+2];const z1=-x*sy+z*cy;const z2=y*sx+z1*cx;if(z2>0)on=0;}
+    if(on){
+      if(v==="pattern"){const c=PCR[eng.pat[i]];const f=eng.fired[i]?1:0.45;r=c[0]/255*f;g=c[1]/255*f;b=c[2]/255*f;if(act&&!eng.fired[i]&&recent[i]<0.3){r=g=b=0;}}
+      else if(v==="flash"){const f=recent[i];r=f;g=0.7*f;b=0.2*f;if(!act){r+=0.04;g+=0.05;b+=0.07;}}
+      else if(v==="agree"){const u=Math.max(0,(eng.agreement(i)-0.5)*2);r=0.1+0.3*u;g=0.15+0.65*u;b=0.2+0.8*u;if(act&&u<0.6)r=g=b=0;}
+      else if(v==="carrier"){const u=Math.sqrt(eng.carrier[i]/cmax);r=0.8*u;g=0.5*u;b=0.3*u;}
+      else{const m=eng.cs[i*3]+eng.cs[i*3+1]+eng.cs[i*3+2],u=Math.min(1,m/3);r=0.9*u;g=0.35*u;b=0.15*u;if(!act){r+=0.03;g+=0.04;b+=0.06;}}
+    }
+    col[k*3]=r;col[k*3+1]=g;col[k*3+2]=b;}
+  geo.attributes.color.needsUpdate=true;
+  globe.rotation.set(rx,ry,0);cam.position.set(0,0,dist);cam.lookAt(0,0,0);
+  renderer.render(scene,cam);
+}
+const _draw=draw;draw=function(){_draw();drawGlobe();};
+function spinLoop(){if($("spin").checked&&!drag){ry+=0.004;if(!running)drawGlobe();}requestAnimationFrame(spinLoop);}
+for(const id of["cut","show"])$(id).onchange=()=>drawGlobe();
+$("mode").value="turing";$("core").value="0";$("speed").value="1";
+sizeGlobe();legend();reset();
+spinLoop();
+</script></body></html>
