@@ -115,20 +115,36 @@ class Engine {
   // RULE CHOICES 15-16: neutrinos delivered by pattern, not by space; arrive as memory.
   deliverNu(mode) {
     if (!this.acc) { this.acc = new Float64Array(N * 3); this.recv = new Float64Array(N * 3); }
-    const emit = []; for (let p = 0; p < 8; p++) emit.push([0, 0, 0]);
-    for (let i = 0; i < N; i++) if (this.fired[i]) { const p = this.pat[i], m = Engine.makeup(p, "all7"); for (let k = 0; k < 3; k++) emit[p][k] += m[k]; }
-    const nOf = new Array(8).fill(0); for (let i = 0; i < N; i++) nOf[this.pat[i]]++;
-    const toClass = []; for (let q = 0; q < 8; q++) toClass.push([0, 0, 0]);
-    for (let p = 0; p < 8; p++) {
-      if (!emit[p][0] && !emit[p][1] && !emit[p][2]) continue;
-      if (mode === "same") { for (let k = 0; k < 3; k++) toClass[p][k] += emit[p][k]; }
-      else { let tot = 0; for (let q = 0; q < 8; q++) if (q !== p) tot += nOf[q]; if (!tot) continue;
-        for (let q = 0; q < 8; q++) if (q !== p && nOf[q]) for (let k = 0; k < 3; k++) toClass[q][k] += emit[p][k] * nOf[q] / tot; }
+    const weak = this.cfg.weak, hand = this.cfg.hand, ph = this.ph;
+    const pc = x => (x & 1) + ((x >> 1) & 1) + ((x >> 2) & 1);
+    // emit[h][p]: h = 0 antineutrino (beta) or unsigned, 1 neutrino (capture)
+    const emit = [[], []]; for (let h = 0; h < 2; h++) for (let p = 0; p < 8; p++) emit[h].push([0, 0, 0]);
+    for (let i = 0; i < N; i++) if (this.fired[i]) {
+      const p = this.pat[i]; let h = 0;
+      if (weak) { // RULE 17: only a flipped cell is a weak event
+        const b = this.before[i]; if (p === b) continue;
+        if (pc(p) > pc(b)) { ph.beta = (ph.beta || 0) + 1; h = 0; } else { ph.capture = (ph.capture || 0) + 1; h = 1; }
+      }
+      if (!hand) h = 0;
+      const m = Engine.makeup(p, "all7"); for (let k = 0; k < 3; k++) emit[h][p][k] += m[k];
     }
-    for (let i = 0; i < N; i++) { const q = this.pat[i], n = nOf[q]; if (!n) continue;
-      for (let k = 0; k < 3; k++) { const v = toClass[q][k] / n; if (!v) continue; this.recv[i*3+k] += v;
-        const a = this.acc[i*3+k] + v, w = Math.floor(a); this.acc[i*3+k] = a - w; if (w) this.cs[i*3+k] += w; } }
+    const nOf = new Array(8).fill(0); for (let i = 0; i < N; i++) nOf[this.pat[i]]++;
+    for (let h = 0; h < (hand ? 2 : 1); h++) {
+      const toClass = []; for (let q = 0; q < 8; q++) toClass.push([0, 0, 0]);
+      for (let p = 0; p < 8; p++) {
+        const em = emit[h][p]; if (!em[0] && !em[1] && !em[2]) continue;
+        if (mode === "same") { for (let k = 0; k < 3; k++) toClass[p][k] += em[k]; }
+        else { let tot = 0; for (let q = 0; q < 8; q++) if (q !== p) tot += nOf[q]; if (!tot) continue;
+          for (let q = 0; q < 8; q++) if (q !== p && nOf[q]) for (let k = 0; k < 3; k++) toClass[q][k] += em[k] * nOf[q] / tot; }
+      }
+      for (let i = 0; i < N; i++) { const q = this.pat[i], n = nOf[q]; if (!n) continue;
+        for (let k = 0; k < 3; k++) {
+          if (hand) { const filled = (q >> k) & 1; if (h === 0 && !filled) continue; if (h === 1 && filled) continue; }
+          const v = toClass[q][k] / n; if (!v) continue; this.recv[i*3+k] += v;
+          const a = this.acc[i*3+k] + v, w = Math.floor(a); this.acc[i*3+k] = a - w; if (w) this.cs[i*3+k] += w; } }
+    }
   }
+
   fieldD(i) { const f = this.f3; return f ? Engine.Dv([f[i*3], f[i*3+1], f[i*3+2]]) : 0; }
   // CONTROL (not the engine): each pixel flashes with fixed chance p per tick.
   tickControl() {
