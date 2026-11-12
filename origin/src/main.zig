@@ -95,7 +95,7 @@ fn help() void {
         \\  origin lepton [core] [ticks] [v1|signed|turing]
         \\  origin structure [--no-open]
         \\  origin possibility [--no-open]
-        \\  origin photo [all7|next] [ticks]
+        \\  origin photo [all7|next] [ticks] [none|same|unreal]
         \\  origin record mode=lattice|v1|signed|turing|control core=.. p=.. ticks=.. every=.. [display=.. update=.. gravity=on seed=..]
         \\  origin help
         \\
@@ -1420,7 +1420,9 @@ var photo_sim: photo.Photo = undefined;
 fn photoReport(args: anytype) void {
     const w = std.meta.stringToEnum(photo.Weight, args.next() orelse "all7") orelse .all7;
     const ticks = std.fmt.parseInt(i64, args.next() orelse "1500", 10) catch 1500;
+    const deliver = std.meta.stringToEnum(photo.Deliver, args.next() orelse "none") orelse .none;
     photo_sim.init(w, 20261110);
+    photo_sim.deliver = deliver;
     var t: i64 = 0;
     var flashes: u64 = 0;
     while (t < ticks) : (t += 1) flashes += photo_sim.tick(t);
@@ -1428,12 +1430,12 @@ fn photoReport(args: anytype) void {
     std.debug.print(
         \\
         \\--- PHOTOGRAPH MODE (rules 12-14) ---
-        \\48^3, one_cell, sweep, random start, no core, no gravity; {d} ticks; neutrino weighting {s}
+        \\48^3, one_cell, sweep, random start, no core, no gravity; {d} ticks; neutrino weighting {s}; delivery {s} (rules 15-16)
         \\total flash events {d}
         \\
         \\QUARK FLASH (change)
         \\
-    , .{ ticks, @tagName(w), flashes });
+    , .{ ticks, @tagName(w), @tagName(deliver), flashes });
     const ev: f64 = @floatFromInt(@max(P.emitted, 1));
     for (0..3) |k| std.debug.print("  position {d}: empty->filled {d:>10}   filled->empty {d:>10}\n", .{ k + 1, P.flips[k][0], P.flips[k][1] });
     std.debug.print("  no flip {d} ({d:.1}%)\n  filled-count change per event: -1 {d:.1}%   0 {d:.1}%   +1 {d:.1}%\n", .{
@@ -1457,6 +1459,19 @@ fn photoReport(args: anytype) void {
         hist[@min(5, @as(usize, @intFromFloat(d / 0.02)))] += 1;
     }
     std.debug.print("  field D at sites: mean {d:.5}  max {d:.5}\n  sites by D: <0.02 {d}  0.02-0.04 {d}  0.04-0.06 {d}  0.06-0.08 {d}  0.08-0.10 {d}  >=0.10 {d}\n", .{ dsum / @as(f64, photo.n), dmax, hist[0], hist[1], hist[2], hist[3], hist[4], hist[5] });
+    if (deliver != .none) {
+        var rs: f64 = 0;
+        var rm: f64 = 0;
+        var rn: f64 = 0;
+        for (P.recv) |v| {
+            if (v[0] + v[1] + v[2] == 0) continue;
+            const d = photo.dOf(v);
+            rs += d;
+            rm = @max(rm, d);
+            rn += 1;
+        }
+        std.debug.print("  received neutrino D per pixel: mean {d:.4}  max {d:.4}\n", .{ rs / @max(rn, 1), rm });
+    }
     std.debug.print("\nBOOKKEEPING: events where display + unrealized != whole: {d}\n", .{P.whole_fail});
     std.debug.print("MEASURED (PMNS columns, D): nu1 0.083  nu2 0.001  nu3 0.129\n", .{});
 }

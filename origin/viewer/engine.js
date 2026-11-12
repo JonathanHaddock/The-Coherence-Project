@@ -109,7 +109,25 @@ class Engine {
       for (let q = 0; q < 6; q++) { const j = NB[i*6+q] * 3; nx[j] += a/6; nx[j+1] += b/6; nx[j+2] += cc/6; }
     }
     this.f3 = nx; this.n3 = f;
+    if (c.deliver === "same" || c.deliver === "unreal") this.deliverNu(c.deliver);
     return count;
+  }
+  // RULE CHOICES 15-16: neutrinos delivered by pattern, not by space; arrive as memory.
+  deliverNu(mode) {
+    if (!this.acc) { this.acc = new Float64Array(N * 3); this.recv = new Float64Array(N * 3); }
+    const emit = []; for (let p = 0; p < 8; p++) emit.push([0, 0, 0]);
+    for (let i = 0; i < N; i++) if (this.fired[i]) { const p = this.pat[i], m = Engine.makeup(p, "all7"); for (let k = 0; k < 3; k++) emit[p][k] += m[k]; }
+    const nOf = new Array(8).fill(0); for (let i = 0; i < N; i++) nOf[this.pat[i]]++;
+    const toClass = []; for (let q = 0; q < 8; q++) toClass.push([0, 0, 0]);
+    for (let p = 0; p < 8; p++) {
+      if (!emit[p][0] && !emit[p][1] && !emit[p][2]) continue;
+      if (mode === "same") { for (let k = 0; k < 3; k++) toClass[p][k] += emit[p][k]; }
+      else { let tot = 0; for (let q = 0; q < 8; q++) if (q !== p) tot += nOf[q]; if (!tot) continue;
+        for (let q = 0; q < 8; q++) if (q !== p && nOf[q]) for (let k = 0; k < 3; k++) toClass[q][k] += emit[p][k] * nOf[q] / tot; }
+    }
+    for (let i = 0; i < N; i++) { const q = this.pat[i], n = nOf[q]; if (!n) continue;
+      for (let k = 0; k < 3; k++) { const v = toClass[q][k] / n; if (!v) continue; this.recv[i*3+k] += v;
+        const a = this.acc[i*3+k] + v, w = Math.floor(a); this.acc[i*3+k] = a - w; if (w) this.cs[i*3+k] += w; } }
   }
   fieldD(i) { const f = this.f3; return f ? Engine.Dv([f[i*3], f[i*3+1], f[i*3+2]]) : 0; }
   // CONTROL (not the engine): each pixel flashes with fixed chance p per tick.

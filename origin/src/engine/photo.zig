@@ -15,6 +15,8 @@ const g3 = @import("grid3.zig");
 
 pub const n = g3.n;
 pub const Weight = enum { all7, next };
+/// RULE CHOICE 15: neutrino delivery by information, not space.
+pub const Deliver = enum { none, same, unreal };
 
 /// Neutrino makeup for a realized pattern.
 pub fn makeup(p: u3, w: Weight) [3]f64 {
@@ -62,6 +64,10 @@ pub const Photo = struct {
     elec_n: u64,
     /// bookkeeping: events where display + 7 x all7-share != 4 in some position
     whole_fail: u64,
+    deliver: Deliver,
+    /// RULE CHOICE 16: fractional memory waiting to become whole units; and total received.
+    acc: [n][3]f64,
+    recv: [n][3]f64,
 
     pub fn init(p: *Photo, w: Weight, seed: u64) void {
         p.g.init(.{ .display = .one_cell, .update = .sweep, .start = .random, .seed = seed });
@@ -79,6 +85,9 @@ pub const Photo = struct {
         p.elec_d_sum = 0;
         p.elec_n = 0;
         p.whole_fail = 0;
+        p.deliver = .none;
+        p.acc = @splat(.{ 0, 0, 0 });
+        p.recv = @splat(.{ 0, 0, 0 });
     }
 
     pub fn tick(p: *Photo, t: i64) u32 {
@@ -126,7 +135,54 @@ pub const Photo = struct {
             }
         }
         p.spread();
+        if (p.deliver != .none) p.deliverNu();
         return c;
+    }
+
+    /// RULES 15-16: each photograph's neutrino goes, in the same tick, to pixels
+    /// linked by pattern (same, or one of the 7 unrealized), split evenly, and
+    /// arrives as memory: each whole unit per position becomes +1 conserved.
+    fn deliverNu(p: *Photo) void {
+        var emit: [8][3]f64 = @splat(.{ 0, 0, 0 });
+        for (0..n) |i| {
+            if (!p.g.fired[i]) continue;
+            const pat = p.g.px[i].pattern;
+            const m = makeup(pat, .all7);
+            for (0..3) |k| emit[pat][k] += m[k];
+        }
+        var n_of: [8]f64 = @splat(0);
+        for (0..n) |i| n_of[p.g.px[i].pattern] += 1;
+        var to: [8][3]f64 = @splat(.{ 0, 0, 0 });
+        for (0..8) |a| {
+            if (emit[a][0] == 0 and emit[a][1] == 0 and emit[a][2] == 0) continue;
+            if (p.deliver == .same) {
+                for (0..3) |k| to[a][k] += emit[a][k];
+            } else {
+                var tot: f64 = 0;
+                for (0..8) |b| {
+                    if (b != a) tot += n_of[b];
+                }
+                if (tot == 0) continue;
+                for (0..8) |b| {
+                    if (b == a or n_of[b] == 0) continue;
+                    for (0..3) |k| to[b][k] += emit[a][k] * n_of[b] / tot;
+                }
+            }
+        }
+        for (0..n) |i| {
+            const q = p.g.px[i].pattern;
+            const cnt = n_of[q];
+            if (cnt == 0) continue;
+            for (0..3) |k| {
+                const v = to[q][k] / cnt;
+                if (v == 0) continue;
+                p.recv[i][k] += v;
+                const a = p.acc[i][k] + v;
+                const whole = @floor(a);
+                p.acc[i][k] = a - whole;
+                if (whole > 0) p.g.px[i].conserved[k] += @intFromFloat(whole);
+            }
+        }
     }
 
     fn spread(p: *Photo) void {
