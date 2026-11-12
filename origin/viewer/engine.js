@@ -64,8 +64,54 @@ class Engine {
   }
   tick() {
     if (this.cfg.mode === "control") return this.tickControl();
+    if (this.cfg.mode === "photo") return this.tickPhoto();
     return this.cfg.mode === "lattice" ? this.tickLattice() : this.tickLepton(this.cfg.mode === "signed");
   }
+  // PHOTOGRAPH MODE (rules 12-14): lattice, one_cell, sweep, no gravity.
+  initPhoto() {
+    this.before = new Uint8Array(N); this.f3 = new Float64Array(N * 3); this.n3 = new Float64Array(N * 3);
+    this.ph = { events: 0, noflip: 0, up: 0, down: 0, flips: [[0,0],[0,0],[0,0]], realized: new Array(8).fill(0),
+      edSum: 0, edMax: 0, elecSum: 0, elecN: 0, totals: [0,0,0], wholeFail: 0 };
+  }
+  static makeup(p, w) {
+    const m = [0,0,0]; let c = 0;
+    for (let q = 0; q < 8; q++) { if (q === p) continue; const x = q ^ p; if (w === "next" && (x & (x - 1)) !== 0) continue;
+      c++; for (let k = 0; k < 3; k++) if ((q >> k) & 1) m[k]++; }
+    return m.map(v => v / c);
+  }
+  static Dv(v) { const s = v[0]+v[1]+v[2]; if (!s) return 0; return 1.5*((v[0]*v[0]+v[1]*v[1]+v[2]*v[2])/(s*s) - 1/3); }
+  tickPhoto() {
+    if (!this.ph) this.initPhoto();
+    this.before.set(this.pat);
+    const c = this.cfg, sv = [c.display, c.update, c.gravity];
+    c.display = "one_cell"; c.update = "sweep"; c.gravity = false;
+    const count = this.tickLattice();
+    [c.display, c.update, c.gravity] = sv;
+    const ph = this.ph, w = c.weight || "all7", f = this.f3;
+    for (let i = 0; i < N; i++) {
+      if (!this.fired[i]) continue;
+      const p = this.pat[i], d = p ^ this.before[i];
+      ph.events++; ph.realized[p]++;
+      if (!d) ph.noflip++;
+      for (let k = 0; k < 3; k++) if ((d >> k) & 1) ph.flips[k][((p >> k) & 1) ? 0 : 1]++;
+      const pc = x => (x & 1) + ((x >> 1) & 1) + ((x >> 2) & 1), dc = pc(p) - pc(this.before[i]);
+      if (dc > 0) ph.up++; else if (dc < 0) ph.down++;
+      if (p) { ph.elecSum += Engine.Dv([p & 1, (p >> 1) & 1, (p >> 2) & 1]); ph.elecN++; }
+      const m = Engine.makeup(p, w), md = Engine.Dv(m);
+      ph.edSum += md; if (md > ph.edMax) ph.edMax = md;
+      for (let k = 0; k < 3; k++) { f[i*3+k] += m[k]; ph.totals[k] += m[k]; }
+      const a7 = Engine.makeup(p, "all7");
+      for (let k = 0; k < 3; k++) if (Math.abs(((p >> k) & 1) + 7 * a7[k] - 4) > 1e-9) { ph.wholeFail++; break; }
+    }
+    const nx = this.n3; nx.fill(0);
+    for (let i = 0; i < N; i++) {
+      const a = f[i*3], b = f[i*3+1], cc = f[i*3+2]; if (!a && !b && !cc) continue;
+      for (let q = 0; q < 6; q++) { const j = NB[i*6+q] * 3; nx[j] += a/6; nx[j+1] += b/6; nx[j+2] += cc/6; }
+    }
+    this.f3 = nx; this.n3 = f;
+    return count;
+  }
+  fieldD(i) { const f = this.f3; return f ? Engine.Dv([f[i*3], f[i*3+1], f[i*3+2]]) : 0; }
   // CONTROL (not the engine): each pixel flashes with fixed chance p per tick.
   tickControl() {
     if (this.rs === undefined) this.rs = 2463534242 ^ Number(this.cfg.seed & 0xffffffffn);

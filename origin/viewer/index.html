@@ -30,15 +30,16 @@ input[type=range]{accent-color:var(--acc)}
   <label>speed <input id="speed" type="range" min="1" max="20" value="3"></label>
  </div>
  <div class="ctl">
-  <label>mode <select id="mode"><option value="lattice">lattice (rules 1-6)</option><option value="v1">lepton v1 (rule 9)</option><option value="signed">lepton signed (rule 10)</option><option value="turing">turing: gravity inhibits (rule 11)</option><option value="control">CONTROL: fixed chance p (not the engine)</option></select></label>
+  <label>mode <select id="mode"><option value="lattice">lattice (rules 1-6)</option><option value="v1">lepton v1 (rule 9)</option><option value="signed">lepton signed (rule 10)</option><option value="turing">turing: gravity inhibits (rule 11)</option><option value="photo">photograph: quark, electron, neutrino flashes (rules 12-14)</option><option value="control">CONTROL: fixed chance p (not the engine)</option></select></label>
   <label>display <select id="display"><option>one_cell</option><option>hold</option><option>flip_all</option><option>fill_empty</option></select></label>
   <label>update <select id="update"><option>sync</option><option>sweep</option></select></label>
   <label>core <input id="core" type="number" min="0" max="20" value="8" style="width:56px"></label>
   <button id="gravity">gravity: off</button>
+  <label>neutrino weighting <select id="weight"><option value="all7">all 7 unrealized</option><option value="next">3 next-step</option></select></label>
   <label>control p <input id="p" type="number" min="0.01" max="0.99" step="0.01" value="0.20" style="width:64px"></label>
  </div>
  <div class="ctl">
-  <label>view <select id="view"><option value="pattern">pattern</option><option value="flash">flashes (recent)</option><option value="agree">agreement</option><option value="carrier">carrier</option><option value="memory">memory (conserved)</option></select></label>
+  <label>view <select id="view"><option value="pattern">pattern</option><option value="flash">flashes (recent)</option><option value="agree">agreement</option><option value="carrier">carrier</option><option value="memory">memory (conserved)</option><option value="nufield">neutrino field (photograph mode)</option></select></label>
   <label>slice z <input id="z" type="range" min="0" max="47" value="24"> <b id="zv">24</b></label>
  </div>
  <div style="position:relative"><canvas id="globe" width="900" height="900" style="cursor:grab;background:#07080a"></canvas>
@@ -63,6 +64,24 @@ input[type=range]{accent-color:var(--acc)}
  <div class="card"><h2>By distance from centre (moving average)</h2>
   <canvas id="prof" width="640" height="300"></canvas>
   <div class="legend"><span><span class="sw" style="background:var(--acc)"></span>flash rate (left axis)</span><span><span class="sw" style="background:var(--ag)"></span>neighbor agreement (right axis)</span><span><span class="sw" style="background:#555"></span>core edge</span></div>
+ </div>
+ <div class="card" id="phcard" style="margin-bottom:16px"><h2>Photograph mode: the three flashes</h2>
+  <div class="stats" style="margin-top:0">
+   <div class="stat"><b id="ph-ev">0</b><i>flash events</i></div>
+   <div class="stat"><b id="ph-nf">0%</b><i>quark: no change</i></div>
+   <div class="stat"><b id="ph-up">0%</b><i>quark: cell filled</i></div>
+   <div class="stat"><b id="ph-dn">0%</b><i>quark: cell emptied</i></div>
+  </div>
+  <p class="note" style="margin:12px 0 4px">Electron flash: share of photographs by pattern (uniform = 12.5% each)</p>
+  <canvas id="ph-pat" width="640" height="120"></canvas>
+  <p class="note" style="margin:12px 0 4px">Neutrino flash: D from 0 (identity) to 0.15. Band = range one neutrino flash can reach; dot = accumulated field; orange = measured ν1, ν2, ν3</p>
+  <canvas id="ph-axis" width="640" height="90"></canvas>
+  <div class="stats">
+   <div class="stat"><b id="ph-em">0</b><i>neutrino flash D, mean / max</i></div>
+   <div class="stat"><b id="ph-fd">0</b><i>field D, mean / max</i></div>
+   <div class="stat"><b id="ph-ch">0</b><i>channel shares (identity 0.333)</i></div>
+   <div class="stat"><b id="ph-wh">0</b><i>display + unrealized ≠ whole</i></div>
+  </div>
  </div>
  <div class="card" style="margin-top:16px"><h2>Decay test: chance to flash at gap k, given no flash before</h2>
   <canvas id="haz" width="640" height="220"></canvas>
@@ -143,8 +162,54 @@ class Engine {
   }
   tick() {
     if (this.cfg.mode === "control") return this.tickControl();
+    if (this.cfg.mode === "photo") return this.tickPhoto();
     return this.cfg.mode === "lattice" ? this.tickLattice() : this.tickLepton(this.cfg.mode === "signed");
   }
+  // PHOTOGRAPH MODE (rules 12-14): lattice, one_cell, sweep, no gravity.
+  initPhoto() {
+    this.before = new Uint8Array(N); this.f3 = new Float64Array(N * 3); this.n3 = new Float64Array(N * 3);
+    this.ph = { events: 0, noflip: 0, up: 0, down: 0, flips: [[0,0],[0,0],[0,0]], realized: new Array(8).fill(0),
+      edSum: 0, edMax: 0, elecSum: 0, elecN: 0, totals: [0,0,0], wholeFail: 0 };
+  }
+  static makeup(p, w) {
+    const m = [0,0,0]; let c = 0;
+    for (let q = 0; q < 8; q++) { if (q === p) continue; const x = q ^ p; if (w === "next" && (x & (x - 1)) !== 0) continue;
+      c++; for (let k = 0; k < 3; k++) if ((q >> k) & 1) m[k]++; }
+    return m.map(v => v / c);
+  }
+  static Dv(v) { const s = v[0]+v[1]+v[2]; if (!s) return 0; return 1.5*((v[0]*v[0]+v[1]*v[1]+v[2]*v[2])/(s*s) - 1/3); }
+  tickPhoto() {
+    if (!this.ph) this.initPhoto();
+    this.before.set(this.pat);
+    const c = this.cfg, sv = [c.display, c.update, c.gravity];
+    c.display = "one_cell"; c.update = "sweep"; c.gravity = false;
+    const count = this.tickLattice();
+    [c.display, c.update, c.gravity] = sv;
+    const ph = this.ph, w = c.weight || "all7", f = this.f3;
+    for (let i = 0; i < N; i++) {
+      if (!this.fired[i]) continue;
+      const p = this.pat[i], d = p ^ this.before[i];
+      ph.events++; ph.realized[p]++;
+      if (!d) ph.noflip++;
+      for (let k = 0; k < 3; k++) if ((d >> k) & 1) ph.flips[k][((p >> k) & 1) ? 0 : 1]++;
+      const pc = x => (x & 1) + ((x >> 1) & 1) + ((x >> 2) & 1), dc = pc(p) - pc(this.before[i]);
+      if (dc > 0) ph.up++; else if (dc < 0) ph.down++;
+      if (p) { ph.elecSum += Engine.Dv([p & 1, (p >> 1) & 1, (p >> 2) & 1]); ph.elecN++; }
+      const m = Engine.makeup(p, w), md = Engine.Dv(m);
+      ph.edSum += md; if (md > ph.edMax) ph.edMax = md;
+      for (let k = 0; k < 3; k++) { f[i*3+k] += m[k]; ph.totals[k] += m[k]; }
+      const a7 = Engine.makeup(p, "all7");
+      for (let k = 0; k < 3; k++) if (Math.abs(((p >> k) & 1) + 7 * a7[k] - 4) > 1e-9) { ph.wholeFail++; break; }
+    }
+    const nx = this.n3; nx.fill(0);
+    for (let i = 0; i < N; i++) {
+      const a = f[i*3], b = f[i*3+1], cc = f[i*3+2]; if (!a && !b && !cc) continue;
+      for (let q = 0; q < 6; q++) { const j = NB[i*6+q] * 3; nx[j] += a/6; nx[j+1] += b/6; nx[j+2] += cc/6; }
+    }
+    this.f3 = nx; this.n3 = f;
+    return count;
+  }
+  fieldD(i) { const f = this.f3; return f ? Engine.Dv([f[i*3], f[i*3+1], f[i*3+2]]) : 0; }
   // CONTROL (not the engine): each pixel flashes with fixed chance p per tick.
   tickControl() {
     if (this.rs === undefined) this.rs = 2463534242 ^ Number(this.cfg.seed & 0xffffffffn);
@@ -250,7 +315,7 @@ let eng, running=false, recent=new Float32Array(N), hist=[];
 const BINS=H; let rate=new Float64Array(BINS), agr=new Float64Array(BINS), seen=false;
 const binOf=new Int16Array(N), cnt=new Float64Array(BINS);
 for(let i=0;i<N;i++){const b=Math.floor(RAD[i]);binOf[i]=b<BINS?b:-1;if(b<BINS)cnt[b]++;}
-function cfg(){return{p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on")};}
+function cfg(){return{weight:$("weight").value,p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on")};}
 const KG=24;let lastF=new Int32Array(N),gapH=new Float64Array(KG+1),flashSum=0,tickSum=0;
 function reset(){lastF.fill(-1);gapH.fill(0);flashSum=0;tickSum=0;eng=new Engine(cfg());recent.fill(0);hist=[];rate.fill(0);agr.fill(0);seen=false;measure(0);draw();}
 function measure(alpha){
@@ -275,13 +340,14 @@ let draw=function(){
     else if(v==="flash"){const f=recent[i];c=[20+235*f,20+165*f,25+40*f];}
     else if(v==="agree"){const a=eng.agreement(i),u=Math.max(0,(a-0.5)*2);c=[20+72*u,25+175*u,35+220*u];}
     else if(v==="carrier"){const u=Math.sqrt(eng.carrier[i]/cmax);c=[30+200*u,30+120*u,60+60*u];}
+    else if(v==="nufield"){const u=Math.min(1,Math.sqrt(eng.fieldD(i)/0.0625));c=[30+190*u,60+150*u,90+40*u];}
     else{const m=eng.cs[i*3]+eng.cs[i*3+1]+eng.cs[i*3+2],u=Math.min(1,m/3);c=[25+220*u,25+80*u,40+40*u];}
     d[o]=c[0];d[o+1]=c[1];d[o+2]=c[2];d[o+3]=255;}
   sctx.putImageData(img,0,0);
   const cr=eng.cfg.core;if(cr>0&&Math.abs(z-H)<=cr){const rr=Math.sqrt(cr*cr-(z-H)**2);sctx.strokeStyle="rgba(255,255,255,.35)";sctx.lineWidth=.15;sctx.beginPath();sctx.arc(H+.5,H+.5,rr,0,7);sctx.stroke();}
   const last=hist.length?hist[hist.length-1]:0;
   $("st-t").textContent=eng.t;$("st-f").textContent=last.toLocaleString();$("st-p").textContent=(100*last/N).toFixed(1)+"%";$("st-tot").textContent=eng.total.toLocaleString();
-  drawProf();drawTs();drawHaz();
+  drawProf();drawTs();drawHaz();drawPhoto();
 };
 function drawProf(){
   const c=$("prof"),x=c.getContext("2d"),W=c.width,Hh=c.height,L=44,R=44,T=12,B=28;x.clearRect(0,0,W,Hh);
@@ -295,6 +361,28 @@ function drawProf(){
   for(const[arr,col,Y]of[[rate,"#f5b942",Yr],[agr,"#5cc8ff",Ya]]){x.strokeStyle=col;x.lineWidth=2;x.beginPath();
     for(let b=1;b<BINS;b++){const y=Math.max(T,Math.min(T+ph,Y(arr[b])));b===1?x.moveTo(X(b),y):x.lineTo(X(b),y);}x.stroke();}
   x.fillStyle="#8a919c";x.textAlign="center";x.fillText("distance (cells)",L+pw/2,Hh-0);
+}
+function drawPhoto(){
+  const card=$("phcard"),on=eng.cfg.mode==="photo";card.style.opacity=on?1:0.45;
+  const ph=eng.ph;const pc=$("ph-pat"),x=pc.getContext("2d"),W=pc.width,Hh=pc.height;x.clearRect(0,0,W,Hh);
+  const ax=$("ph-axis"),y=ax.getContext("2d"),AW=ax.width,AH=ax.height;y.clearRect(0,0,AW,AH);
+  x.font=y.font="11px ui-monospace,monospace";
+  if(!on||!ph||!ph.events){x.fillStyle="#8a919c";x.textAlign="center";x.fillText(on?"press Run":"select mode: photograph",W/2,Hh/2);
+    for(const id of["ph-ev","ph-nf","ph-up","ph-dn","ph-em","ph-fd","ph-ch","ph-wh"])$(id).textContent="–";return;}
+  const E=ph.events,pct=v=>(100*v/E).toFixed(1)+"%";
+  $("ph-ev").textContent=E.toLocaleString();$("ph-nf").textContent=pct(ph.noflip);$("ph-up").textContent=pct(ph.up);$("ph-dn").textContent=pct(ph.down);
+  const bw=(W-60)/8,mx=0.2;
+  ph.realized.forEach((v,q)=>{const s=v/E,bh=(Hh-34)*Math.min(1,s/mx),px=40+q*bw;x.fillStyle=PC[q];x.fillRect(px+6,Hh-20-bh,bw-12,bh);
+    x.fillStyle="#8a919c";x.textAlign="center";x.fillText(q.toString(2).padStart(3,"0"),px+bw/2,Hh-6);x.fillText((100*s).toFixed(1),px+bw/2,Hh-24-bh);});
+  const yU=Hh-20-(Hh-34)*(0.125/mx);x.strokeStyle="#e6e8eb";x.setLineDash([4,4]);x.beginPath();x.moveTo(40,yU);x.lineTo(W-20,yU);x.stroke();x.setLineDash([]);
+  let fs=0,fm=0;for(let i=0;i<N;i++){const d=eng.fieldD(i);fs+=d;if(d>fm)fm=d;}
+  $("ph-em").textContent=(ph.edSum/E).toFixed(4)+" / "+ph.edMax.toFixed(4);$("ph-fd").textContent=(fs/N).toFixed(5)+" / "+fm.toFixed(5);
+  const tt=ph.totals[0]+ph.totals[1]+ph.totals[2];$("ph-ch").textContent=ph.totals.map(v=>(v/tt).toFixed(3)).join(" ");$("ph-wh").textContent=ph.wholeFail;
+  const L=30,R=AW-20,X=d=>L+d/0.15*(R-L);y.fillStyle="rgba(92,200,255,.18)";y.fillRect(X(0),28,X(ph.edMax)-X(0),26);
+  y.strokeStyle="#8a919c";y.beginPath();y.moveTo(L,41);y.lineTo(R,41);y.stroke();
+  y.fillStyle="#8a919c";y.textAlign="center";for(const t of[0,0.05,0.1,0.15]){y.fillText(t,X(t),AH-6);}
+  [["ν1",0.083],["ν2",0.001],["ν3",0.129]].forEach(([n,d])=>{y.strokeStyle="#f08a5d";y.lineWidth=2;y.beginPath();y.moveTo(X(d),22);y.lineTo(X(d),60);y.stroke();y.lineWidth=1;y.fillStyle="#f08a5d";y.fillText(n,X(d),16);});
+  y.fillStyle="#5cc8ff";y.beginPath();y.arc(X(fs/N),41,5,0,7);y.fill();
 }
 function drawHaz(){
   const c=$("haz"),x=c.getContext("2d"),W=c.width,Hh=c.height,L=44,R=14,T=12,B=26;x.clearRect(0,0,W,Hh);
@@ -339,11 +427,11 @@ $("copy").onclick=async()=>{const txt=stateText(),box=$("copybox");box.value=txt
   catch(e){box.style.display="block";box.select();$("copy").textContent="Select + copy below";}
   setTimeout(()=>$("copy").textContent="Copy state",2000);};
 $("gravity").onclick=()=>{const b=$("gravity");b.classList.toggle("on");b.textContent="gravity: "+(b.classList.contains("on")?"ON":"off");reset();};
-for(const id of["mode","display","update","core","p"])$(id).onchange=reset;
+for(const id of["mode","display","update","core","p","weight"])$(id).onchange=reset;
 $("z").oninput=draw;$("view").onchange=()=>{legend();draw();};
 function legend(){const v=$("view").value,L=$("legend");
   if(v==="pattern")L.innerHTML=PC.map((c,k)=>`<span><span class="sw" style="background:${c}"></span>${k.toString(2).padStart(3,"0")}</span>`).join("")+"<span>bright = flashed this tick · circle = core edge</span>";
-  else L.innerHTML={flash:"bright = flashed recently, fades over a few ticks",agree:"dark = 0.5 (random) → bright = 1.0 (all 6 neighbors match)",carrier:"brightness = carrier at site (sqrt scale, max in slice)",memory:"brightness = conserved share (3 = about to flash)"}[v];}
+  else L.innerHTML={nufield:"brightness = D of the accumulated neutrino field (photograph mode); dark = identity",flash:"bright = flashed recently, fades over a few ticks",agree:"dark = 0.5 (random) → bright = 1.0 (all 6 neighbors match)",carrier:"brightness = carrier at site (sqrt scale, max in slice)",memory:"brightness = conserved share (3 = about to flash)"}[v];}
 // ---------- 3D globe ----------
 const R3=23, gIdx=[];for(let i=0;i<N;i++)if(RAD[i]<=R3)gIdx.push(i);
 const GN=gIdx.length;
@@ -378,6 +466,7 @@ function drawGlobe(){
       else if(v==="flash"){const f=recent[i];r=f;g=0.7*f;b=0.2*f;if(!act){r+=0.04;g+=0.05;b+=0.07;}}
       else if(v==="agree"){const u=Math.max(0,(eng.agreement(i)-0.5)*2);r=0.1+0.3*u;g=0.15+0.65*u;b=0.2+0.8*u;if(act&&u<0.6)r=g=b=0;}
       else if(v==="carrier"){const u=Math.sqrt(eng.carrier[i]/cmax);r=0.8*u;g=0.5*u;b=0.3*u;}
+      else if(v==="nufield"){const u=Math.min(1,Math.sqrt(eng.fieldD(i)/0.0625));r=0.15+0.7*u;g=0.3+0.6*u;b=0.45+0.3*u;if(act&&u<0.2)r=g=b=0;}
       else{const m=eng.cs[i*3]+eng.cs[i*3+1]+eng.cs[i*3+2],u=Math.min(1,m/3);r=0.9*u;g=0.35*u;b=0.15*u;if(!act){r+=0.03;g+=0.04;b+=0.06;}}
     }
     col[k*3]=r;col[k*3+1]=g;col[k*3+2]=b;}
