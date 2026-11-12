@@ -41,12 +41,14 @@ pub const Measurement = struct {
     err: f64,
 };
 
-/// sin^2(theta_W) in its three standard definitions, PDG 2024 Review
-/// "Electroweak Model and Constraints on New Physics", Table 10.2.
+/// sin^2(theta_W) in its standard definitions, PDG 2025 update (Dec 2025) of the
+/// Review "Electroweak Model and Constraints on New Physics", Table 10.2.
+/// (PDG 2024 had MS-bar 0.23129(4), effective 0.23161(4), on-shell 0.22348(10).)
 pub const measured = [_]Measurement{
-    .{ .name = "MS-bar at m_Z", .value = 0.23129, .err = 0.00004 },
-    .{ .name = "effective leptonic", .value = 0.23161, .err = 0.00004 },
-    .{ .name = "on-shell (1 - mW^2/mZ^2)", .value = 0.22348, .err = 0.00010 },
+    .{ .name = "MS-bar at m_Z", .value = 0.23122, .err = 0.00006 },
+    .{ .name = "MS-bar, ND variant", .value = 0.23140, .err = 0.00006 },
+    .{ .name = "effective leptonic", .value = 0.23154, .err = 0.00006 },
+    .{ .name = "on-shell (1 - mW^2/mZ^2)", .value = 0.22342, .err = 0.00009 },
 };
 
 test "one third share at the MS-bar value" {
