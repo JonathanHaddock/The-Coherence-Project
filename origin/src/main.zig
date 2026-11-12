@@ -91,6 +91,7 @@ fn help() void {
         \\  origin clocks [seed]
         \\  origin lattice3 [display] [update] [core] [ticks] [gravity]
         \\  origin lepton [core] [ticks] [v1|signed|turing]
+        \\  origin structure [--no-open]
         \\  origin record mode=lattice|v1|signed|turing|control core=.. p=.. ticks=.. every=.. [display=.. update=.. gravity=on seed=..]
         \\  origin help
         \\
@@ -623,6 +624,36 @@ fn chart(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !
 }
 
 const app_template = @embedFile("app/app.html");
+const structure_template = @embedFile("app/structure.html");
+
+/// Model page: the charged-lepton family in the mass view (Koide) and the
+/// coupling view (1/3 split), plus where each holds in energy.
+fn structurePage(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
+    var open_it = true;
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--no-open")) open_it = false;
+    }
+    const g = generations;
+    const rule = weak.solve(1.0 / 3.0);
+    const mz = weak.measured[0];
+    // E158 Moller scattering, MS-bar at Q^2 = 0.026 GeV^2 (Q = 0.161 GeV):
+    // 0.2381 +- 0.0015 (stat) +- 0.0014 (syst), Mastromarino, Caltech thesis 2004.
+    const e158_v: f64 = 0.2381;
+    const e158_e: f64 = @sqrt(0.0015 * 0.0015 + 0.0014 * 0.0014);
+    const q_e158: f64 = @sqrt(0.026);
+    var j: std.Io.Writer.Allocating = .init(gpa);
+    defer j.deinit();
+    try j.writer.print(
+        \\{{"m_e":{d},"m_mu":{d},"m_tau":{d},"rule_s":{d:.6},"pull_z":{d:.3},"pull_e158":{d:.3},
+        \\"running":[[0.0003,0.2387],[{d:.4},0.2387],[91.1876,{d}],[172.5,0.23462]],
+        \\"points":[{{"q":{d:.4},"v":{d},"err":{d:.5},"label":"E158 (e⁻e⁻), MS-bar","ok":false,"left":true}},
+        \\{{"q":91.1876,"v":{d},"err":{d},"label":"Z mass, PDG 2025","ok":true,"left":true}},
+        \\{{"q":172.5,"v":0.23462,"err":0.00012,"label":"top mass (SM calc.)","ok":false,"left":false}}]}}
+    , .{ g.m_e, g.m_mu, g.tau_measurements[0].value, rule, (rule - mz.value) / mz.err, (rule - e158_v) / e158_e, q_e158, mz.value, q_e158, e158_v, e158_e, mz.value, mz.err });
+    const html = try std.mem.replaceOwned(u8, gpa, structure_template, "/*DATA*/{}", j.written());
+    defer gpa.free(html);
+    try writeAndOpen(io, gpa, "structure.html", html, open_it);
+}
 
 fn writeVectors(w: *std.Io.Writer, name: []const u8, vs: [3][3]f64, last: bool) !void {
     try w.print("\"{s}\":[", .{name});
@@ -1408,6 +1439,8 @@ pub fn main(init: std.process.Init) void {
         chargeReport();
     } else if (std.mem.eql(u8, command, "weak")) {
         weakReport(init.io, init.gpa, &args) catch |err| fail(err);
+    } else if (std.mem.eql(u8, command, "structure")) {
+        structurePage(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "app")) {
         app(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "chart")) {

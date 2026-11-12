@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ORIGIN · Projection within the lepton structure</title>
+<style>
+:root { --surface:#fcfcfb; --panel:#f3f2ee; --ink:#1f1f1e; --ink-2:#6b6a64; --grid:#e6e5e0;
+        --lep:#2a78d6; --nu:#1baf7a; --quark:#eb6834; --rule:#4a3aa7; --bad:#c2410c; --band:rgba(42,120,214,.10); }
+@media (prefers-color-scheme: dark) {
+  :root { --surface:#1a1a19; --panel:#242422; --ink:#f4f3ef; --ink-2:#b4b2a8; --grid:#34332f;
+          --lep:#3987e5; --nu:#199e70; --quark:#d95926; --rule:#9085e9; --bad:#f08a5d; --band:rgba(57,135,229,.16); }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--surface); color:var(--ink); font:14px/1.5 -apple-system,Helvetica,Arial,sans-serif; }
+header { padding:20px 24px 4px; max-width:1240px; margin:0 auto; }
+h1 { margin:0; font-size:21px; }
+header p { margin:6px 0 0; color:var(--ink-2); max-width:880px; }
+main { display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:18px; padding:16px 24px; max-width:1240px; margin:0 auto; }
+section { background:var(--panel); border-radius:12px; padding:14px 16px 16px; }
+section.wide { grid-column:1 / -1; }
+h2 { margin:0 0 2px; font-size:15px; }
+.sub { color:var(--ink-2); font-size:12.5px; margin:0 0 8px; }
+svg { width:100%; height:auto; display:block; }
+.note { font-size:13px; color:var(--ink); margin:10px 0 0; }
+.note b { font-weight:600; }
+.q { max-width:1240px; margin:0 auto; padding:0 24px 28px; }
+.q div { background:var(--panel); border-left:3px solid var(--rule); border-radius:8px; padding:12px 16px; }
+.small { font-size:12px; color:var(--ink-2); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Projection within the lepton structure</h1>
+  <p>The hypothesis: the charged leptons (e, μ, τ) form one structure, and projection happens inside that structure, not at any one energy. If so, the same shape should show up in their masses and in their couplings. These panels put the two views side by side and show where each one holds.</p>
+</header>
+<main>
+  <section>
+    <h2>A · Mass view: Koide triangle</h2>
+    <p class="sub">The three generations are the corners. √mass of e, μ, τ, normalized, is one point.</p>
+    <svg id="koide" viewBox="0 0 440 400"></svg>
+    <p class="note" id="koideNote"></p>
+  </section>
+  <section>
+    <h2>B · Coupling view: the 1/3 split</h2>
+    <p class="sub">A charged lepton's interaction as a vector: electromagnetic vs weak (Z) strength.</p>
+    <svg id="split" viewBox="0 0 440 400"></svg>
+    <p class="note" id="splitNote"></p>
+  </section>
+  <section class="wide">
+    <h2>C · Where each view holds: energy scale</h2>
+    <p class="sub">The weak mixing angle sin²θ<sub>W</sub> (MS-bar) changes with the energy it is read at. The 1/3 rule gives one fixed number.</p>
+    <svg id="scale" viewBox="0 0 1000 380"></svg>
+    <p class="note" id="scaleNote"></p>
+  </section>
+</main>
+<div class="q"><div id="question"></div></div>
+<script>
+const DATA = /*DATA*/{};
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, a, p, text) { const n = document.createElementNS(NS, tag); for (const k in a) n.setAttribute(k, a[k]); if (text !== undefined) n.textContent = text; p.appendChild(n); return n; }
+const deg = r => r * 180 / Math.PI;
+
+// ---------- A: Koide ----------
+(function () {
+  const svg = document.getElementById("koide");
+  const v = [DATA.m_e, DATA.m_mu, DATA.m_tau].map(Math.sqrt);
+  const s = v[0] + v[1] + v[2], n2 = v.reduce((a, x) => a + x * x, 0);
+  const Q = n2 / (s * s), cos2 = s * s / (3 * n2), ang = deg(Math.acos(Math.sqrt(cos2))), D = 1.5 * (Q - 1 / 3);
+  const side = 360, left = 40, base = 360, top = base - side * Math.sqrt(3) / 2;
+  const C = [[left, base], [left + side, base], [left + side / 2, top]];
+  const cx = (C[0][0] + C[1][0] + C[2][0]) / 3, cy = (C[0][1] + C[1][1] + C[2][1]) / 3;
+  const defs = el("defs", {}, svg), clip = el("clipPath", { id: "tc" }, defs);
+  const poly = C.map(p => p.join(",")).join(" ");
+  el("polygon", { points: poly }, clip);
+  el("polygon", { points: poly, fill: css("--surface"), stroke: css("--ink-2"), "stroke-width": 1.2 }, svg);
+  const radius = d => Math.sqrt(2 * d / 3) / Math.sqrt(2) * side;
+  el("circle", { cx, cy, r: radius(0.5), fill: css("--band"), stroke: css("--lep"), "stroke-width": 1.5, "stroke-dasharray": "6 4", "clip-path": "url(#tc)" }, svg);
+  ["e generation", "μ generation", "τ generation"].forEach((t, k) => el("text", { x: C[k][0] + [0, 0, 0][k], y: C[k][1] + (k < 2 ? 22 : -10), "text-anchor": ["start", "end", "middle"][k], "font-size": 12, fill: css("--ink-2") }, svg, t));
+  const xy = w => { const t = w[0] + w[1] + w[2]; return [0, 1].map(j => w.reduce((a, x, k) => a + x / t * C[k][j], 0)); };
+  const [px, py] = xy(v);
+  el("line", { x1: cx, y1: cy, x2: px, y2: py, stroke: css("--lep"), "stroke-width": 2 }, svg);
+  el("circle", { cx, cy, r: 4, fill: css("--ink") }, svg);
+  el("text", { x: cx + 8, y: cy - 8, "font-size": 12, fill: css("--ink") }, svg, "identity (all equal)");
+  el("circle", { cx: px, cy: py, r: 7, fill: css("--lep"), stroke: css("--surface"), "stroke-width": 2 }, svg);
+  el("text", { x: px + 10, y: py + 4, "font-size": 12.5, "font-weight": 600, fill: css("--lep") }, svg, "e, μ, τ (√mass)");
+  el("text", { x: cx - radius(0.5) + 6, y: cy + 4, "font-size": 11.5, fill: css("--lep") }, svg, "D = 0.5 ring");
+  document.getElementById("koideNote").innerHTML =
+    `Koide: Q = ${Q.toFixed(6)} (2/3 = 0.666667). Geometrically the √mass vector sits <b>${ang.toFixed(3)}°</b> from the identity axis, ` +
+    `exactly on the D = 0.5 ring: <b>half</b> its weight on identity, half off it. Holds for the physical (pole) masses, i.e. low energy.`;
+  DATA._koideAngle = ang;
+})();
+
+// ---------- B: split ----------
+(function () {
+  const svg = document.getElementById("split");
+  const ox = 60, oy = 340, R = 290;
+  const g = css("--grid");
+  for (const f of [0.25, 0.5, 0.75, 1]) el("path", { d: `M ${ox + R * f} ${oy} A ${R * f} ${R * f} 0 0 0 ${ox} ${oy - R * f}`, fill: "none", stroke: g }, svg);
+  el("line", { x1: ox, y1: oy, x2: ox + R + 20, y2: oy, stroke: css("--ink-2"), "stroke-width": 1.2 }, svg);
+  el("line", { x1: ox, y1: oy, x2: ox, y2: oy - R - 20, stroke: css("--ink-2"), "stroke-width": 1.2 }, svg);
+  el("text", { x: ox + R + 18, y: oy + 18, "text-anchor": "end", "font-size": 12, fill: css("--ink-2") }, svg, "electromagnetic →");
+  el("text", { x: ox - 10, y: oy - R - 24, "font-size": 12, fill: css("--ink-2") }, svg, "↑ weak (Z)");
+  const a = Math.asin(Math.sqrt(1 / 3)), k = deg(DATA._koideAngle || 45) * 0 + (DATA._koideAngle || 45) * Math.PI / 180;
+  // Koide's angle for comparison
+  el("line", { x1: ox, y1: oy, x2: ox + R * Math.cos(k), y2: oy - R * Math.sin(k), stroke: css("--ink-2"), "stroke-dasharray": "5 4", "stroke-width": 1.2 }, svg);
+  el("text", { x: ox + R * Math.cos(k) + 6, y: oy - R * Math.sin(k) - 4, "font-size": 11.5, fill: css("--ink-2") }, svg, "45°: Koide's angle");
+  // arc for split angle
+  el("path", { d: `M ${ox + 70} ${oy} A 70 70 0 0 0 ${ox + 70 * Math.cos(a)} ${oy - 70 * Math.sin(a)}`, fill: "none", stroke: css("--rule"), "stroke-width": 1.5 }, svg);
+  el("text", { x: ox + 78, y: oy - 18, "font-size": 12, fill: css("--rule") }, svg, `${deg(a).toFixed(2)}°`);
+  const tx = ox + R * Math.cos(a), ty = oy - R * Math.sin(a);
+  el("line", { x1: ox, y1: oy, x2: tx, y2: ty, stroke: css("--rule"), "stroke-width": 3 }, svg);
+  el("line", { x1: tx, y1: ty, x2: tx, y2: oy, stroke: css("--rule"), "stroke-dasharray": "3 3" }, svg);
+  el("line", { x1: tx, y1: ty, x2: ox, y2: ty, stroke: css("--rule"), "stroke-dasharray": "3 3" }, svg);
+  el("circle", { cx: tx, cy: ty, r: 6, fill: css("--rule") }, svg);
+  el("text", { x: tx + 10, y: ty - 6, "font-size": 12.5, "font-weight": 600, fill: css("--rule") }, svg, "charged lepton");
+  el("text", { x: (ox + tx) / 2, y: oy + 18, "text-anchor": "middle", "font-size": 11.5, fill: css("--ink") }, svg, "2/3 of weight (squared)");
+  el("text", { x: ox + 8, y: ty + 4 + (oy - ty) / 2, "font-size": 11.5, fill: css("--ink") }, svg, "1/3 projected");
+  document.getElementById("splitNote").innerHTML =
+    `The rule: 2/3 of the interaction on the dominant (EM) axis, 1/3 projected onto weak. That puts the vector <b>${deg(a).toFixed(2)}°</b> off its axis, ` +
+    `and fixes sin²θ<sub>W</sub> = <b>${DATA.rule_s.toFixed(6)}</b>. Note: Koide is <b>45°</b> (½ / ½), not 35.26° (⅔ / ⅓). Same "2/3", different shape.`;
+})();
+
+// ---------- C: scale ----------
+(function () {
+  const svg = document.getElementById("scale");
+  const L = 70, R = 970, T = 20, B = 320;
+  const lx0 = -3.6, lx1 = 2.6, y0 = 0.229, y1 = 0.242;
+  const X = q => L + (Math.log10(q) - lx0) / (lx1 - lx0) * (R - L), Y = v => B - (v - y0) / (y1 - y0) * (B - T);
+  for (let e = -3; e <= 2; e++) { el("line", { x1: X(10 ** e), x2: X(10 ** e), y1: T, y2: B, stroke: css("--grid") }, svg); el("text", { x: X(10 ** e), y: B + 18, "text-anchor": "middle", "font-size": 11.5, fill: css("--ink-2") }, svg, e >= 0 ? `${10 ** e} GeV` : `10${["⁻³","⁻²","⁻¹"][e + 3]}`); }
+  for (let v = 0.230; v <= 0.2411; v += 0.002) { el("line", { x1: L, x2: R, y1: Y(v), y2: Y(v), stroke: css("--grid") }, svg); el("text", { x: L - 8, y: Y(v) + 4, "text-anchor": "end", "font-size": 11.5, fill: css("--ink-2") }, svg, v.toFixed(3)); }
+  el("text", { x: (L + R) / 2, y: B + 40, "text-anchor": "middle", "font-size": 12, fill: css("--ink-2") }, svg, "energy scale (log)");
+  // lepton band
+  const lep = [["e", DATA.m_e / 1000], ["μ", DATA.m_mu / 1000], ["τ", DATA.m_tau / 1000]];
+  el("rect", { x: X(lep[0][1]), y: T, width: X(lep[2][1]) - X(lep[0][1]), height: B - T, fill: css("--band") }, svg);
+  lep.forEach(([n, m]) => { el("line", { x1: X(m), x2: X(m), y1: T, y2: B, stroke: css("--lep"), "stroke-dasharray": "2 3" }, svg); el("text", { x: X(m), y: T + 14, "text-anchor": "middle", "font-size": 13, "font-weight": 600, fill: css("--lep") }, svg, n); });
+  el("text", { x: X(0.012), y: T + 34, "text-anchor": "middle", "font-size": 11.5, fill: css("--lep") }, svg, "charged-lepton masses");
+  // SM running, schematic through anchors
+  const anchors = DATA.running;
+  let d = ""; anchors.forEach(([q, v], i) => { d += (i ? " L " : "M ") + X(q) + " " + Y(v); });
+  el("path", { d, fill: "none", stroke: css("--ink-2"), "stroke-width": 2 }, svg);
+  el("text", { x: X(3), y: Y(0.2372), "font-size": 11.5, fill: css("--ink-2") }, svg, "Standard Model running (schematic, through anchor values)");
+  // rule line
+  el("line", { x1: L, x2: R, y1: Y(DATA.rule_s), y2: Y(DATA.rule_s), stroke: css("--rule"), "stroke-width": 2, "stroke-dasharray": "8 5" }, svg);
+  el("text", { x: L + 6, y: Y(DATA.rule_s) + 16, "font-size": 12, "font-weight": 600, fill: css("--rule") }, svg, `1/3 rule: ${DATA.rule_s.toFixed(6)} (no scale)`);
+  // data points
+  DATA.points.forEach(p => {
+    const x = X(p.q), y = Y(p.v), e = Math.max(2, Y(p.v - p.err) - y);
+    el("line", { x1: x, x2: x, y1: y - e, y2: y + e, stroke: css(p.ok ? "--nu" : "--bad"), "stroke-width": 2 }, svg);
+    el("circle", { cx: x, cy: y, r: 6, fill: css(p.ok ? "--nu" : "--bad"), stroke: css("--surface"), "stroke-width": 2 }, svg);
+    el("text", { x: x + (p.left ? -10 : 10), y: y - 10, "text-anchor": p.left ? "end" : "start", "font-size": 12, fill: css("--ink") }, svg, p.label);
+  });
+  document.getElementById("scaleNote").innerHTML =
+    `The rule matches only at the Z mass (<span style="color:${css("--nu")}">green</span>, +${DATA.pull_z.toFixed(1)}σ). ` +
+    `Inside the lepton band the measured angle is higher (<span style="color:${css("--bad")}">orange</span>: E158, ${DATA.pull_e158.toFixed(1)}σ). ` +
+    `So the split is <b>not</b> read at the lepton energies. If it comes from the lepton structure, it shows up in the couplings at 91 GeV, while Koide shows up in the masses at rest. ` +
+    `<span class="small">Curve: straight segments through ${anchors.length} anchor values, not a computed running; only the marked points are measurements/calculations.</span>`;
+})();
+
+document.getElementById("question").innerHTML =
+  `<b>What the model asks.</b> Both views describe the charged-lepton family, and both use "2/3". But they are different shapes: Koide is a 45° tilt (half on identity), the split is 35.26° (two-thirds on one axis), ` +
+  `and they hold in different places: Koide in the masses at low energy, the split in the couplings at the Z. For "projection within the structure" to be one idea, ` +
+  `one geometry has to produce both: the 45° mass tilt <i>and</i> the 35.26° coupling tilt, and say why the second appears at 91 GeV. ` +
+  `<span class="small">Sources: lepton masses PDG 2024; sin²θ<sub>W</sub>(M<sub>Z</sub>) PDG 2025 Table 10.2; E158 MS-bar 0.2381 ± 0.0015 ± 0.0014 at Q² = 0.026 GeV² (Mastromarino, Caltech thesis 2004); SM prediction there 0.2387 ± 0.0007; MS-bar at m<sub>t</sub> 0.23462 (Degrassi et al., arXiv:1411.7040).</span>`;
+</script>
+</body>
+</html>
