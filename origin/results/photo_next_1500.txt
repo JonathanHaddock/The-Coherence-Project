@@ -1,0 +1,30 @@
+--- PHOTOGRAPH MODE (rules 12-14) ---
+48^3, one_cell, sweep, random start, no core, no gravity; 1500 ticks; neutrino weighting next
+total flash events 16045208
+
+QUARK FLASH (change)
+  position 1: empty->filled     522146   filled->empty     523669
+  position 2: empty->filled     583046   filled->empty     587191
+  position 3: empty->filled     575564   filled->empty     575760
+  no flip 12677832 (79.0%)
+  filled-count change per event: -1 10.5%   0 79.0%   +1 10.5%
+
+ELECTRON FLASH (display): realized photographs
+  000  12.51%
+  001  12.86%
+  010  12.58%
+  011  12.09%
+  100  12.56%
+  101  13.04%
+  110  12.38%
+  111  11.97%
+  mean D of displayed pattern (000 excluded) 0.5416
+
+NEUTRINO FLASH (conserve): unrealized possibility
+  emitted D: mean 0.0388  max 0.0625
+  channel totals as shares: 0.3341 0.3319 0.3340  (identity = 0.3333 each)
+  field D at sites: mean 0.00001  max 0.00007
+  sites by D: <0.02 110592  0.02-0.04 0  0.04-0.06 0  0.06-0.08 0  0.08-0.10 0  >=0.10 0
+
+BOOKKEEPING: events where display + unrealized != whole: 0
+MEASURED (PMNS columns, D): nu1 0.083  nu2 0.001  nu3 0.129

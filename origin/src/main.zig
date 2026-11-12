@@ -27,6 +27,7 @@ const clocks = @import("engine/clocks.zig");
 const grid3 = @import("engine/grid3.zig");
 const lepton = @import("engine/lepton.zig");
 const record = @import("engine/record.zig");
+const photo = @import("engine/photo.zig");
 
 test {
     _ = koide;
@@ -51,6 +52,7 @@ test {
     _ = grid3;
     _ = lepton;
     _ = record;
+    _ = photo;
     _ = @import("visualization/labels.zig");
 }
 
@@ -93,6 +95,7 @@ fn help() void {
         \\  origin lepton [core] [ticks] [v1|signed|turing]
         \\  origin structure [--no-open]
         \\  origin possibility [--no-open]
+        \\  origin photo [all7|next] [ticks]
         \\  origin record mode=lattice|v1|signed|turing|control core=.. p=.. ticks=.. every=.. [display=.. update=.. gravity=on seed=..]
         \\  origin help
         \\
@@ -1412,6 +1415,52 @@ fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
     std.debug.print("wrote {s}/ (meta.json series.csv shells.csv gaps.csv slice.csv)\n", .{dir});
 }
 
+var photo_sim: photo.Photo = undefined;
+
+fn photoReport(args: anytype) void {
+    const w = std.meta.stringToEnum(photo.Weight, args.next() orelse "all7") orelse .all7;
+    const ticks = std.fmt.parseInt(i64, args.next() orelse "1500", 10) catch 1500;
+    photo_sim.init(w, 20261110);
+    var t: i64 = 0;
+    var flashes: u64 = 0;
+    while (t < ticks) : (t += 1) flashes += photo_sim.tick(t);
+    const P = &photo_sim;
+    std.debug.print(
+        \\
+        \\--- PHOTOGRAPH MODE (rules 12-14) ---
+        \\48^3, one_cell, sweep, random start, no core, no gravity; {d} ticks; neutrino weighting {s}
+        \\total flash events {d}
+        \\
+        \\QUARK FLASH (change)
+        \\
+    , .{ ticks, @tagName(w), flashes });
+    const ev: f64 = @floatFromInt(@max(P.emitted, 1));
+    for (0..3) |k| std.debug.print("  position {d}: empty->filled {d:>10}   filled->empty {d:>10}\n", .{ k + 1, P.flips[k][0], P.flips[k][1] });
+    std.debug.print("  no flip {d} ({d:.1}%)\n  filled-count change per event: -1 {d:.1}%   0 {d:.1}%   +1 {d:.1}%\n", .{
+        P.no_flip, 100 * @as(f64, @floatFromInt(P.no_flip)) / ev,
+        100 * @as(f64, @floatFromInt(P.charge_steps[0])) / ev, 100 * @as(f64, @floatFromInt(P.charge_steps[1])) / ev, 100 * @as(f64, @floatFromInt(P.charge_steps[2])) / ev,
+    });
+    std.debug.print("\nELECTRON FLASH (display): realized photographs\n", .{});
+    for (0..8) |q| std.debug.print("  {b:0>3}  {d:>5.2}%\n", .{ q, 100 * @as(f64, @floatFromInt(P.realized[q])) / ev });
+    std.debug.print("  mean D of displayed pattern (000 excluded) {d:.4}\n", .{P.elec_d_sum / @as(f64, @floatFromInt(@max(P.elec_n, 1)))});
+    std.debug.print("\nNEUTRINO FLASH (conserve): unrealized possibility\n", .{});
+    std.debug.print("  emitted D: mean {d:.4}  max {d:.4}\n", .{ P.emitted_d_sum / ev, P.emitted_d_max });
+    const tt = P.totals[0] + P.totals[1] + P.totals[2];
+    std.debug.print("  channel totals as shares: {d:.4} {d:.4} {d:.4}  (identity = 0.3333 each)\n", .{ P.totals[0] / tt, P.totals[1] / tt, P.totals[2] / tt });
+    var dmax: f64 = 0;
+    var dsum: f64 = 0;
+    var hist: [6]u64 = @splat(0);
+    for (P.field) |v| {
+        const d = photo.dOf(v);
+        dmax = @max(dmax, d);
+        dsum += d;
+        hist[@min(5, @as(usize, @intFromFloat(d / 0.02)))] += 1;
+    }
+    std.debug.print("  field D at sites: mean {d:.5}  max {d:.5}\n  sites by D: <0.02 {d}  0.02-0.04 {d}  0.04-0.06 {d}  0.06-0.08 {d}  0.08-0.10 {d}  >=0.10 {d}\n", .{ dsum / @as(f64, photo.n), dmax, hist[0], hist[1], hist[2], hist[3], hist[4], hist[5] });
+    std.debug.print("\nBOOKKEEPING: events where display + unrealized != whole: {d}\n", .{P.whole_fail});
+    std.debug.print("MEASURED (PMNS columns, D): nu1 0.083  nu2 0.001  nu3 0.129\n", .{});
+}
+
 pub fn main(init: std.process.Init) void {
     var args = init.minimal.args.iterate();
     _ = args.skip();
@@ -1463,6 +1512,8 @@ pub fn main(init: std.process.Init) void {
         chargeReport();
     } else if (std.mem.eql(u8, command, "weak")) {
         weakReport(init.io, init.gpa, &args) catch |err| fail(err);
+    } else if (std.mem.eql(u8, command, "photo")) {
+        photoReport(&args);
     } else if (std.mem.eql(u8, command, "possibility")) {
         possibilityPage(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "structure")) {
