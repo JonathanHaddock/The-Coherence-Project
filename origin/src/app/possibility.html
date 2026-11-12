@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ORIGIN · Unrealized possibility</title>
+<style>
+:root { --surface:#fcfcfb; --panel:#f3f2ee; --ink:#1f1f1e; --ink-2:#6b6a64; --grid:#e6e5e0;
+        --lep:#2a78d6; --nu:#1baf7a; --meas:#c2410c; --band:rgba(42,120,214,.14); }
+@media (prefers-color-scheme: dark) {
+  :root { --surface:#1a1a19; --panel:#242422; --ink:#f4f3ef; --ink-2:#b4b2a8; --grid:#34332f;
+          --lep:#3987e5; --nu:#199e70; --meas:#f08a5d; --band:rgba(57,135,229,.22); }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--surface); color:var(--ink); font:14px/1.5 -apple-system,Helvetica,Arial,sans-serif; }
+header, main { max-width:1000px; margin:0 auto; padding:18px 24px 0; }
+h1 { margin:0; font-size:21px; }
+header p { margin:6px 0 0; color:var(--ink-2); }
+section { background:var(--panel); border-radius:12px; padding:14px 16px; margin:14px 0; }
+h2 { font-size:14px; margin:0 0 10px; color:var(--ink-2); font-weight:600; }
+.row { display:flex; flex-wrap:wrap; gap:10px; }
+.pat { display:inline-flex; gap:4px; padding:8px; border:1px solid var(--grid); border-radius:8px; background:var(--surface); cursor:pointer; }
+.pat.sel { outline:2px solid var(--lep); }
+.pat.ghost { cursor:default; opacity:.85; }
+.cell { width:20px; height:20px; border-radius:4px; border:1px solid var(--ink-2); }
+.cell.on { background:var(--lep); border-color:var(--lep); }
+.bars { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+.bar { height:10px; background:var(--grid); border-radius:5px; margin:6px 0; }
+.bar i { display:block; height:10px; background:var(--nu); border-radius:5px; }
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-top:12px; }
+.stat { background:var(--surface); border-radius:8px; padding:10px 12px; }
+.stat b { display:block; font-size:22px; }
+.stat span { color:var(--ink-2); font-size:12px; }
+svg { width:100%; height:auto; display:block; }
+.note { color:var(--ink-2); font-size:12.5px; }
+label { color:var(--ink-2); font-size:13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Unrealized possibility</h1>
+  <p>A pixel has three cells, so 8 possible patterns. A flash is a photograph: it realizes one. The neutrino is the essence of the 7 that did not happen. Pick the photograph.</p>
+</header>
+<main>
+  <section><h2>The photograph (realized)</h2><div class="row" id="pick"></div></section>
+  <section><h2>Unrealized possibility (the other 7)</h2><div class="row" id="unreal"></div></section>
+  <section>
+    <h2>Neutrino makeup: share of the 7 with each position filled</h2>
+    <div class="bars" id="bars"></div>
+    <p style="margin:12px 0 0"><label><input type="checkbox" id="amp"> read the shares as probabilities (D from amplitudes = square roots)</label></p>
+  </section>
+  <section>
+    <h2>Where it sits on the D axis (0 = identity)</h2>
+    <svg id="axis" viewBox="0 0 900 150"></svg>
+    <div class="stats">
+      <div class="stat"><b id="dval">0</b><span>D for this photograph</span></div>
+      <div class="stat"><b id="drange">0</b><span>D range over all 8 photographs</span></div>
+      <div class="stat"><b id="nusum">1, 1, 1</b><span>flavor sums over ν1+ν2+ν3 (measured; identity = 1 each)</span></div>
+    </div>
+    <p class="note" id="src"></p>
+  </section>
+</main>
+<script>
+const DATA = /*ORIGIN_DATA*/{};
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const pats = [0,1,2,3,4,5,6,7];
+let sel = 5;
+const D = v => { const s = v.reduce((a,b)=>a+b,0), n = v.reduce((a,b)=>a+b*b,0); return 1.5*(n/(s*s)-1/3); };
+const makeup = p => { const u = pats.filter(q=>q!==p); return [0,1,2].map(k=>u.filter(q=>(q>>k)&1).length/7); };
+const dOf = (p, amp) => { const m = makeup(p); return D(amp ? m.map(Math.sqrt) : m); };
+const nuD = DATA.pmns_columns.map(c => D(c));
+function box(p, cls) {
+  const b = document.createElement("div"); b.className = "pat " + (cls||"");
+  for (let k=0;k<3;k++) { const c = document.createElement("div"); c.className = "cell" + ((p>>k)&1 ? " on" : ""); b.appendChild(c); }
+  b.title = p.toString(2).padStart(3,"0"); return b;
+}
+function draw() {
+  const amp = document.getElementById("amp").checked;
+  const pk = document.getElementById("pick"); pk.innerHTML = "";
+  pats.forEach(p => { const b = box(p, p===sel ? "sel" : ""); b.onclick = () => { sel = p; draw(); }; pk.appendChild(b); });
+  const ur = document.getElementById("unreal"); ur.innerHTML = "";
+  pats.filter(q=>q!==sel).forEach(q => ur.appendChild(box(q, "ghost")));
+  const bars = document.getElementById("bars"); bars.innerHTML = "";
+  makeup(sel).forEach((v,k) => {
+    const d = document.createElement("div");
+    d.innerHTML = `<div class="note">Position ${k+1}</div><div class="bar"><i style="width:${(v*100).toFixed(1)}%"></i></div><b>${Math.round(v*7)}/7</b>`;
+    bars.appendChild(d);
+  });
+  const dv = dOf(sel, amp), all = pats.map(p=>dOf(p,amp)), lo = Math.min(...all), hi = Math.max(...all);
+  document.getElementById("dval").textContent = dv.toFixed(4);
+  document.getElementById("drange").textContent = lo.toFixed(3) + " – " + hi.toFixed(3);
+  const svg = document.getElementById("axis"), L = 40, R = 860, max = 0.15, X = v => L + v/max*(R-L);
+  let s = `<rect x="${X(lo)}" y="58" width="${Math.max(3, X(hi)-X(lo))}" height="30" fill="${css("--band")}"/>`;
+  s += `<line x1="${L}" y1="73" x2="${R}" y2="73" stroke="${css("--ink-2")}"/>`;
+  for (const t of [0,0.025,0.05,0.075,0.1,0.125,0.15]) s += `<line x1="${X(t)}" y1="68" x2="${X(t)}" y2="78" stroke="${css("--ink-2")}"/><text x="${X(t)}" y="100" text-anchor="middle" font-size="12" fill="${css("--ink-2")}">${t}</text>`;
+  ["ν1","ν2","ν3"].forEach((n,i) => { const x = X(nuD[i]); s += `<line x1="${x}" y1="40" x2="${x}" y2="92" stroke="${css("--meas")}" stroke-width="2"/><text x="${x}" y="32" text-anchor="middle" font-size="13" fill="${css("--meas")}">${n} measured (${nuD[i].toFixed(3)})</text>`; });
+  s += `<circle cx="${X(dv)}" cy="73" r="7" fill="${css("--lep")}"/>`;
+  s += `<text x="${L}" y="135" font-size="12" fill="${css("--ink-2")}">Shaded band: everywhere unrealized possibility can put a neutrino. Dot: this photograph.</text>`;
+  svg.innerHTML = s;
+  const sums = [0,1,2].map(f => DATA.pmns_rows[f].reduce((a,x)=>a+x*x,0));
+  document.getElementById("nusum").textContent = sums.map(x=>x.toFixed(3)).join(", ");
+}
+document.getElementById("amp").onchange = draw;
+document.getElementById("src").textContent = "Measured neutrino positions: D of each PMNS column. " + DATA.source + " Assumptions of the model: all 7 unrealized patterns weigh equally; logged in the rules doc (Nov 12, 2026).";
+draw();
+</script>
+</body>
+</html>

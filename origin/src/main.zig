@@ -92,6 +92,7 @@ fn help() void {
         \\  origin lattice3 [display] [update] [core] [ticks] [gravity]
         \\  origin lepton [core] [ticks] [v1|signed|turing]
         \\  origin structure [--no-open]
+        \\  origin possibility [--no-open]
         \\  origin record mode=lattice|v1|signed|turing|control core=.. p=.. ticks=.. every=.. [display=.. update=.. gravity=on seed=..]
         \\  origin help
         \\
@@ -625,6 +626,29 @@ fn chart(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !
 
 const app_template = @embedFile("app/app.html");
 const structure_template = @embedFile("app/structure.html");
+const possibility_template = @embedFile("app/possibility.html");
+
+/// Unrealized-possibility model: a flash realizes 1 of the 8 three-cell
+/// patterns; the neutrino is the other 7. Compared with measured PMNS columns.
+fn possibilityPage(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
+    var open_it = true;
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--no-open")) open_it = false;
+    }
+    const u = projector.pmns();
+    var cols_u: [3][3]f64 = undefined;
+    for (0..3) |i| cols_u[i] = projector.column(u, i);
+    var json: std.Io.Writer.Allocating = .init(gpa);
+    defer json.deinit();
+    const w = &json.writer;
+    try w.print("{{", .{});
+    try writeVectors(w, "pmns_rows", u, false);
+    try writeVectors(w, "pmns_columns", cols_u, false);
+    try w.print("\"source\":\"Mixing amplitudes |U| (PMNS), PDG 2024, from ORIGIN.\"}}", .{});
+    const html = try std.mem.replaceOwned(u8, gpa, possibility_template, "/*ORIGIN_DATA*/{}", json.written());
+    defer gpa.free(html);
+    try writeAndOpen(io, gpa, "possibility.html", html, open_it);
+}
 
 /// Model page: the charged-lepton family in the mass view (Koide) and the
 /// coupling view (1/3 split), plus where each holds in energy.
@@ -1439,6 +1463,8 @@ pub fn main(init: std.process.Init) void {
         chargeReport();
     } else if (std.mem.eql(u8, command, "weak")) {
         weakReport(init.io, init.gpa, &args) catch |err| fail(err);
+    } else if (std.mem.eql(u8, command, "possibility")) {
+        possibilityPage(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "structure")) {
         structurePage(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "app")) {
