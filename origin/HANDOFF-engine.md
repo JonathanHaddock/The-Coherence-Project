@@ -45,7 +45,7 @@ The `display` options are fill_empty, hold, one_cell and flip_all; `update` is s
 
 ## Rules
 
-There are 21. See `RULES.md`. The newest is 21, carrier cancels memory (build spec R-A).
+There are 23. See `RULES.md`. 21 = R-A, 22 = R-B, 23 = R-C.
 
 ## Findings
 
@@ -81,8 +81,8 @@ There are 21. See `RULES.md`. The newest is 21, carrier cancels memory (build sp
 | Step | Status |
 |---|---|
 | R-A carrier feedback | **Done** as rule 21 (cancel). Reinforcement already existed as rule 6. Not tested: whether separate regions attract or merge, because there is only a single-core start. |
-| R-B exclusion | **Waiting on Jono:** what counts as "same state"? The pattern, the phase, or handedness (rule 20)? |
-| R-C three carriers | Not started. Open question: do the channels share one conserved total or each conserve separately? |
+| R-B exclusion | **Done** as rule 22 (same state = pattern, a blocked flash waits). It jams one_cell and flip_all within about 20 ticks, and turns hold's runaway into a steady 28–40%. |
+| R-C three carriers | **Done** as rule 23 (each channel conserved separately). Neutrino pixels end up rarest and flash most; quarks don't come out dominantly strong. |
 | R-D colour and confinement (protons, neutrons) | Not started. Needs R-C's strong channel. |
 | R-E antiparticles | Not started. |
 | Nucleus | Only after R-D, and only if it emerges. |
