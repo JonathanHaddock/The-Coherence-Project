@@ -212,7 +212,7 @@ class Engine {
       }
     }
     this.spread();
-    if (this.cfg.gravity) this.absorb();
+    if (this.cfg.gravity) this.absorb(); else if (this.cfg.cancel) this.cancelMemory();
     this.t++; this.total += count;
     return count;
   }
@@ -229,6 +229,16 @@ class Engine {
       if (z > 0) nx[i - S * S] += sh;
     }
     this.carrier = nx; this.next = c;
+  }
+  // RULE 21: each whole pixel's worth of carrier (3 units) cancels one conserved unit
+  // on each cell that holds one; one carrier unit used per memory unit cancelled.
+  cancelMemory() {
+    const c = this.carrier, cs = this.cs;
+    for (let i = 0; i < N; i++) {
+      if (c[i] < 3) continue;
+      const k = Math.floor(c[i] / 3);
+      for (let q = 0; q < 3; q++) { const m = Math.min(k, cs[i * 3 + q]); cs[i * 3 + q] -= m; c[i] -= m; }
+    }
   }
   absorb() {
     const c = this.carrier;

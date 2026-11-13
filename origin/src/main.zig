@@ -93,13 +93,13 @@ fn help() void {
         \\  origin display [dataset] [event]
         \\  origin engine [ticks] [seed]
         \\  origin clocks [seed]
-        \\  origin lattice3 [display] [update] [core] [ticks] [gravity]
+        \\  origin lattice3 [display] [update] [core] [ticks] [gravity|cancel]
         \\  origin lepton [core] [ticks] [v1|signed|turing]
         \\  origin structure [--no-open]
         \\  origin possibility [--no-open]
         \\  origin photo [all7|next] [ticks] [none|same|unreal]
         \\  origin pixel [--no-open]
-        \\  origin record mode=lattice|v1|signed|turing|control core=.. p=.. ticks=.. every=.. [display=.. update=.. gravity=on seed=..]
+        \\  origin record mode=lattice|v1|signed|turing|control core=.. p=.. ticks=.. every=.. [display=.. update=.. gravity=on | feedback=reinforce|cancel seed=..]
         \\  origin onepixel [start] [row|bipyramid] [nC|t ...]   (one pixel engine model, e.g. onepixel 100 row n2 t)
         \\  origin porch [--no-open]                       (experiment menu in the browser)
         \\  origin help
@@ -1323,7 +1323,9 @@ fn lattice3Report(args: anytype) void {
     const upd = std.meta.stringToEnum(engine.Update, args.next() orelse "sync") orelse .sync;
     const core = std.fmt.parseInt(u32, args.next() orelse "8", 10) catch 8;
     const ticks = std.fmt.parseInt(i64, args.next() orelse "1500", 10) catch 1500;
-    const gravity = std.mem.eql(u8, args.next() orelse "off", "gravity");
+    const fb = args.next() orelse "off";
+    const gravity = std.mem.eql(u8, fb, "gravity") or std.mem.eql(u8, fb, "reinforce");
+    const cancel = std.mem.eql(u8, fb, "cancel");
     const from = @divTrunc(ticks * 2, 3);
     std.debug.print(
         \\
@@ -1333,9 +1335,10 @@ fn lattice3Report(args: anytype) void {
         \\
         \\  dist   pixels  flash rate  agreement  carrier      carrier*dist
         \\
-    , .{ grid3.side, @tagName(disp), @tagName(upd), core, ticks, from, ticks, if (gravity) "ON (rule 6: 3 units -> +1 reinforce per cell)" else "off" });
+    , .{ grid3.side, @tagName(disp), @tagName(upd), core, ticks, from, ticks, if (gravity) "ON (rule 6: 3 units -> +1 reinforce per cell)" else if (cancel) "CANCEL (rule 21: 3 units -> -1 memory per cell, 1 for 1)" else "off" });
     lattice.init(.{ .display = disp, .update = upd, .start = if (core == 0) .random else .{ .core = core } });
     lattice.gravity = gravity;
+    lattice.cancel = cancel;
     const bins = grid3.side / 2;
     var rate: [bins]f64 = @splat(0);
     var car: [bins]f64 = @splat(0);
@@ -1488,6 +1491,7 @@ fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
     var ticks: i64 = 1500;
     var every: i64 = 10;
     var gravity = false;
+    var cancel = false;
     var seed: u64 = 20261110;
     var p: f64 = 0.2;
     while (args.next()) |a| {
@@ -1501,6 +1505,10 @@ fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
         else if (std.mem.eql(u8, k, "ticks")) ticks = try std.fmt.parseInt(i64, v, 10)
         else if (std.mem.eql(u8, k, "every")) every = @max(1, try std.fmt.parseInt(i64, v, 10))
         else if (std.mem.eql(u8, k, "gravity")) gravity = std.mem.eql(u8, v, "on")
+        else if (std.mem.eql(u8, k, "feedback")) {
+            gravity = std.mem.eql(u8, v, "reinforce");
+            cancel = std.mem.eql(u8, v, "cancel");
+        }
         else if (std.mem.eql(u8, k, "seed")) seed = try std.fmt.parseInt(u64, v, 10)
         else if (std.mem.eql(u8, k, "p")) p = try std.fmt.parseFloat(f64, v);
     }
@@ -1509,6 +1517,7 @@ fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
         disp_s = "one_cell";
         update = "sync";
         gravity = false;
+        cancel = false;
     }
     if (std.mem.eql(u8, mode, "control")) {
         const cname = try std.fmt.allocPrint(gpa, "control_p{d}_t{d}_s{d}", .{ p, ticks, seed });
@@ -1521,12 +1530,12 @@ fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
         return;
     }
     const name = if (is_lattice)
-        try std.fmt.allocPrint(gpa, "lattice_{s}_{s}_core{d}_{s}_t{d}_s{d}", .{ disp_s, update, core, if (gravity) "grav" else "nograv", ticks, seed })
+        try std.fmt.allocPrint(gpa, "lattice_{s}_{s}_core{d}_{s}_t{d}_s{d}", .{ disp_s, update, core, if (gravity) "grav" else if (cancel) "cancel" else "nograv", ticks, seed })
     else
         try std.fmt.allocPrint(gpa, "{s}_core{d}_t{d}_s{d}", .{ mode, core, ticks, seed });
     defer gpa.free(name);
     const rules = if (is_lattice)
-        (if (gravity) "1-5 + 6 (gravity: 3 carrier units -> +1 reinforce per cell); carrier lost at box edge" else "1-5; carrier lost at box edge, no feedback")
+        (if (gravity) "1-5 + 6 (gravity: 3 carrier units -> +1 reinforce per cell); carrier lost at box edge" else if (cancel) "1-5 + 21 (cancel: 3 carrier units -> -1 memory per cell, one for one); carrier lost at box edge" else "1-5; carrier lost at box edge, no feedback")
     else if (std.mem.eql(u8, mode, "v1")) "1-4, 7, 8, 9 (carrier always 'electron')"
     else if (std.mem.eql(u8, mode, "signed")) "1-4, 7, 8, 10 (signed carrier)"
     else if (std.mem.eql(u8, mode, "turing")) "1-4, 7, 8, 11 (carrier cancels memory)"
@@ -1541,6 +1550,7 @@ fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
             .seed = seed,
         });
         lattice.gravity = gravity;
+        lattice.cancel = cancel;
         break :blk try record.run(io, gpa, &lattice, meta, "results/runs");
     } else blk: {
         lep_grid.init(seed, core);

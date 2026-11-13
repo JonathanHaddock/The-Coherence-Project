@@ -57,10 +57,13 @@ pub const Grid3 = struct {
     cfg: px.Config,
     /// RULE CHOICE 6: carrier acts back on pixels (gravity feedback).
     gravity: bool,
+    /// RULE 21: carrier cancels memory (build spec R-A). Not used together with gravity.
+    cancel: bool,
 
     pub fn init(g: *Grid3, cfg: px.Config) void {
         g.cfg = cfg;
         g.gravity = false;
+        g.cancel = false;
         g.fired = @splat(false);
         g.carrier = @splat(0);
         var s = cfg.seed;
@@ -110,7 +113,7 @@ pub const Grid3 = struct {
             },
         }
         g.spread();
-        if (g.gravity) g.absorb();
+        if (g.gravity) g.absorb() else if (g.cancel) g.cancelMemory();
         return count;
     }
 
@@ -125,6 +128,22 @@ pub const Grid3 = struct {
             const k: u32 = @intFromFloat(@floor(g.carrier[i] / unit));
             g.carrier[i] -= @as(f64, @floatFromInt(k)) * unit;
             for (0..px.cells) |c| g.px[i].reinforce[c] += k;
+        }
+    }
+
+    /// RULE 21: each whole pixel's worth of carrier (3 units) at a site cancels
+    /// one conserved unit on each cell that holds one. One carrier unit is used
+    /// up per memory unit cancelled. The only number is the cell count.
+    pub fn cancelMemory(g: *Grid3) void {
+        const unit: f64 = px.cells;
+        for (0..n) |i| {
+            if (g.carrier[i] < unit) continue;
+            const k: u32 = @intFromFloat(@floor(g.carrier[i] / unit));
+            for (0..px.cells) |c| {
+                const m = @min(k, g.px[i].conserved[c]);
+                g.px[i].conserved[c] -= m;
+                g.carrier[i] -= @floatFromInt(m);
+            }
         }
     }
 
@@ -190,6 +209,18 @@ test "point source in 3D gives roughly 1/distance" {
     const a = avg[4] * 4;
     const b = avg[8] * 8;
     try std.testing.expect(b / a > 0.7 and b / a < 1.05);
+}
+
+test "rule 21: carrier cancels memory one for one" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{});
+    g.carrier = @splat(0);
+    g.px[0].conserved = .{ 2, 0, 1 };
+    g.carrier[0] = 7.5; // two whole pixels' worth
+    g.cancelMemory();
+    try std.testing.expectEqual([3]u32{ 0, 0, 0 }, g.px[0].conserved);
+    try std.testing.expectApproxEqAbs(@as(f64, 4.5), g.carrier[0], 1e-12); // 3 units used
 }
 
 test "absorb turns whole pixels of carrier into reinforcement" {

@@ -25,10 +25,11 @@ The master log is `engine-rules.txt`, kept outside the repo. This list was rebui
 | 17 | **Weak events:** only a flipped cell (a quark flash) emits a neutrino. | engine.js (Zig port pending) | active |
 | 18–19 | From commit 12e07ac only: "beta-type antineutrinos act on filled cells, capture-type neutrinos on empty cells", logged as rules 17–19 together. The exact split between 18 and 19 needs checking against the log. | engine.js | active |
 | 20 | **Handedness:** antineutrinos (beta) and neutrinos (capture) are kept apart. | engine.js | active (switch) |
+| 21 | **Carrier cancels memory (lattice), build spec R-A.** Each whole pixel's worth of carrier (3 units) at a site cancels one conserved unit on each cell that holds one. Every cancelled memory unit uses up one carrier unit, so the two annihilate one for one and nothing is created. The only number is the cell count, as in rule 6. This is the base-lattice counterpart of rule 11. Switch: `feedback=cancel` (rule 6 is `feedback=reinforce`, the same as `gravity=on`). Logged 2026-11-12, before any run. Result 2026-11-12: flashing goes to 0 in all 4 settings, see results/rule21-2026-11-12. | grid3.zig, engine.js | active (switch) |
 
 ## Planned (build spec 2026-11-12, `ORIGIN engine — missing pieces`)
 
-These get numbers only when they are logged and built, in this order: R-A carrier feedback, R-B exclusion, R-C three carriers, R-D colour and confinement, R-E antiparticles.
+R-A is rule 21. The rest get numbers only when they are logged and built, in this order: R-B exclusion, R-C three carriers, R-D colour and confinement, R-E antiparticles.
 
 ## Struck (proven false)
 
