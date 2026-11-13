@@ -36,6 +36,7 @@ input[type=range]{accent-color:var(--acc)}
   <label>core <input id="core" type="number" min="0" max="20" value="8" style="width:56px"></label>
   <button id="gravity">gravity: off</button>
   <button id="cancel">cancel memory (21): off</button>
+  <button id="excl">exclusion (22): off</button>
   <label>neutrino delivery <select id="deliver"><option value="none">none (rule 14)</option><option value="same">same information (15)</option><option value="unreal">unrealized information (15)</option><option value="weak">weak events only (17-19)</option><option value="weakhand">weak events + handedness (20)</option></select></label>
   <label>neutrino weighting <select id="weight"><option value="all7">all 7 unrealized</option><option value="next">3 next-step</option></select></label>
   <label>control p <input id="p" type="number" min="0.01" max="0.99" step="0.01" value="0.20" style="width:64px"></label>
@@ -140,6 +141,28 @@ class Engine {
     this.kick = (H * S + H) * S + H;
   }
   ready(i) { return this.cs[i * 3] + this.cs[i * 3 + 1] + this.cs[i * 3 + 2] >= 3; }
+  // pattern pixel i would display if it flashed now (no state change)
+  nextPat(i) {
+    const d = this.cfg.display, r = this.rf, c = this.cs, b = i * 3;
+    let p = this.pat[i];
+    if (d === "fill_empty") {
+      for (let k = 0; k < 3; k++) { if (r[b + k] > c[b + k]) p |= 1 << k; else if (r[b + k] < c[b + k]) p &= ~(1 << k); }
+    } else if (d === "one_cell") {
+      let best = -1, sur = 0;
+      for (let k = 0; k < 3; k++) if (c[b + k] > r[b + k] && c[b + k] - r[b + k] > sur) { sur = c[b + k] - r[b + k]; best = k; }
+      if (best >= 0) p ^= 1 << best;
+    } else if (d === "flip_all") {
+      for (let k = 0; k < 3; k++) if (c[b + k] > r[b + k]) p ^= 1 << k;
+    }
+    return p & 7;
+  }
+  // RULE 22: a flash may not display a pattern any neighbour is showing; blocked = wait.
+  blocked(i) {
+    if (!this.cfg.exclusion) return false;
+    const nx = this.nextPat(i);
+    for (let q = 0; q < 6; q++) if (this.pat[NB[i * 6 + q]] === nx) return true;
+    return false;
+  }
   flash(i) {
     const d = this.cfg.display, r = this.rf, c = this.cs, b = i * 3;
     let p = this.pat[i];
@@ -301,12 +324,13 @@ class Engine {
     this.fired.fill(0);
     let count = 0;
     if (this.cfg.update === "sync") {
-      for (let i = 0; i < N; i++) this.fired[i] = (this.ready(i) || i === kick) ? 1 : 0;
+      for (let i = 0; i < N; i++) this.fired[i] = ((this.ready(i) || i === kick) && !this.blocked(i)) ? 1 : 0;
       for (let i = 0; i < N; i++) if (this.fired[i]) { this.flash(i); count++; }
       for (let i = 0; i < N; i++) if (this.fired[i]) { const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh); }
     } else {
       for (let i = 0; i < N; i++) {
         if (!(this.ready(i) || i === kick)) continue;
+        if (this.blocked(i)) continue;
         this.flash(i); count++;
         const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh);
       }
@@ -361,7 +385,7 @@ let eng, running=false, recent=new Float32Array(N), hist=[];
 const BINS=H; let rate=new Float64Array(BINS), agr=new Float64Array(BINS), seen=false;
 const binOf=new Int16Array(N), cnt=new Float64Array(BINS);
 for(let i=0;i<N;i++){const b=Math.floor(RAD[i]);binOf[i]=b<BINS?b:-1;if(b<BINS)cnt[b]++;}
-function cfg(){const dv=$("deliver").value;return{deliver:(dv==="weak"||dv==="weakhand")?"unreal":dv,weak:dv==="weak"||dv==="weakhand",hand:dv==="weakhand",weight:$("weight").value,p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on"),cancel:!$("gravity").classList.contains("on")&&$("cancel").classList.contains("on")};}
+function cfg(){const dv=$("deliver").value;return{deliver:(dv==="weak"||dv==="weakhand")?"unreal":dv,weak:dv==="weak"||dv==="weakhand",hand:dv==="weakhand",weight:$("weight").value,p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on"),exclusion:$("excl").classList.contains("on"),cancel:!$("gravity").classList.contains("on")&&$("cancel").classList.contains("on")};}
 const KG=24;let lastF=new Int32Array(N),gapH=new Float64Array(KG+1),flashSum=0,tickSum=0;
 function reset(){lastF.fill(-1);gapH.fill(0);flashSum=0;tickSum=0;eng=new Engine(cfg());recent.fill(0);hist=[];rate.fill(0);agr.fill(0);seen=false;measure(0);draw();}
 function measure(alpha){
@@ -461,7 +485,7 @@ function stateText(){
   const c=eng.cfg, lat=c.mode==="lattice";
   let a=0,mem=0;const fill=[0,0,0];for(let i=0;i<N;i++){a+=eng.agreement(i);mem+=eng.cs[i*3]+eng.cs[i*3+1]+eng.cs[i*3+2];for(let k=0;k<3;k++)fill[k]+=(eng.pat[i]>>k)&1;}
   const last=hist.length?hist[hist.length-1]:0;
-  const cmd="origin record mode="+c.mode+" core="+c.core+" ticks="+eng.t+(lat?" display="+c.display+" update="+c.update+(c.gravity?" gravity=on":c.cancel?" feedback=cancel":""):"")+" every=10";
+  const cmd="origin record mode="+c.mode+" core="+c.core+" ticks="+eng.t+(lat?" display="+c.display+" update="+c.update+(c.gravity?" gravity=on":c.cancel?" feedback=cancel":"")+(c.exclusion?" exclusion=on":""):"")+" every=10";
   const s={record:cmd,mode:c.mode,display:lat?c.display:"one_cell",update:lat?c.update:"sync",core:c.core,gravity:lat?c.gravity:false,seed:"20261110",
     tick:eng.t,total_flashes:eng.total,flashes_this_tick:last,flashing:+(last/N).toFixed(4),agreement:+(a/N).toFixed(4),memory:mem,
     filled:fill.map(v=>+(v/N).toFixed(4)),view:$("view").value,slice_z:+$("z").value,
@@ -473,6 +497,7 @@ $("copy").onclick=async()=>{const txt=stateText(),box=$("copybox");box.value=txt
   catch(e){box.style.display="block";box.select();$("copy").textContent="Select + copy below";}
   setTimeout(()=>$("copy").textContent="Copy state",2000);};
 $("gravity").onclick=()=>{const b=$("gravity");b.classList.toggle("on");b.textContent="gravity: "+(b.classList.contains("on")?"ON":"off");if(b.classList.contains("on")){$("cancel").classList.remove("on");$("cancel").textContent="cancel memory (21): off";}reset();};
+$("excl").onclick=()=>{const b=$("excl");b.classList.toggle("on");b.textContent="exclusion (22): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("cancel").onclick=()=>{const b=$("cancel");b.classList.toggle("on");b.textContent="cancel memory (21): "+(b.classList.contains("on")?"ON":"off");if(b.classList.contains("on")){$("gravity").classList.remove("on");$("gravity").textContent="gravity: off";}reset();};
 for(const id of["mode","display","update","core","p","weight","deliver"])$(id).onchange=reset;
 $("z").oninput=draw;$("view").onchange=()=>{legend();draw();};

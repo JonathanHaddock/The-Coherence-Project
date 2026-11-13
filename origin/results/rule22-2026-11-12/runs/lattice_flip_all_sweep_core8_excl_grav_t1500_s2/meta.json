@@ -1,0 +1,14 @@
+{
+  "name": "lattice_flip_all_sweep_core8_excl_grav_t1500_s2",
+  "mode": "lattice",
+  "display": "flip_all",
+  "update": "sweep",
+  "core": 8,
+  "gravity": true,
+  "seed": 2,
+  "ticks": 1500,
+  "every": 10,
+  "lattice": "48^3, 6 neighbors",
+  "rules": "1-5 + 6 (gravity: 3 carrier units -> +1 reinforce per cell); carrier lost at box edge; + 22 (exclusion on the pattern)",
+  "files": ["series.csv", "shells.csv", "gaps.csv", "slice.csv"]
+}

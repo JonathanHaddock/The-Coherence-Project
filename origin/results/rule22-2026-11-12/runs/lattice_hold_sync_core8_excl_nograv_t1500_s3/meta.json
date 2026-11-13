@@ -1,0 +1,14 @@
+{
+  "name": "lattice_hold_sync_core8_excl_nograv_t1500_s3",
+  "mode": "lattice",
+  "display": "hold",
+  "update": "sync",
+  "core": 8,
+  "gravity": false,
+  "seed": 3,
+  "ticks": 1500,
+  "every": 10,
+  "lattice": "48^3, 6 neighbors",
+  "rules": "1-5; carrier lost at box edge, no feedback; + 22 (exclusion on the pattern)",
+  "files": ["series.csv", "shells.csv", "gaps.csv", "slice.csv"]
+}

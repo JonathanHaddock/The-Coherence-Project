@@ -59,11 +59,14 @@ pub const Grid3 = struct {
     gravity: bool,
     /// RULE 21: carrier cancels memory (build spec R-A). Not used together with gravity.
     cancel: bool,
+    /// RULE 22: exclusion on the pattern (build spec R-B).
+    exclusion: bool,
 
     pub fn init(g: *Grid3, cfg: px.Config) void {
         g.cfg = cfg;
         g.gravity = false;
         g.cancel = false;
+        g.exclusion = false;
         g.fired = @splat(false);
         g.carrier = @splat(0);
         var s = cfg.seed;
@@ -97,7 +100,7 @@ pub const Grid3 = struct {
         g.fired = @splat(false);
         switch (g.cfg.update) {
             .sync => {
-                for (0..n) |i| g.fired[i] = g.px[i].ready() or kick == i;
+                for (0..n) |i| g.fired[i] = (g.px[i].ready() or kick == i) and !g.blocked(i);
                 for (0..n) |i| if (g.fired[i]) {
                     count += g.fire(i, t);
                 };
@@ -108,6 +111,7 @@ pub const Grid3 = struct {
             },
             .sweep => for (0..n) |i| {
                 if (!(g.px[i].ready() or kick == i)) continue;
+                if (g.blocked(i)) continue;
                 count += g.fire(i, t);
                 for (neighbors(i)) |j| g.px[j].receive(g.px[i].pattern);
             },
@@ -129,6 +133,15 @@ pub const Grid3 = struct {
             g.carrier[i] -= @as(f64, @floatFromInt(k)) * unit;
             for (0..px.cells) |c| g.px[i].reinforce[c] += k;
         }
+    }
+
+    /// RULE 22: a flash may not display a pattern any neighbour is showing.
+    /// A blocked pixel waits: no flash, pattern and memory kept.
+    pub fn blocked(g: *const Grid3, i: usize) bool {
+        if (!g.exclusion) return false;
+        const next = g.px[i].nextPattern(g.cfg.display);
+        for (neighbors(i)) |j| if (g.px[j].pattern == next) return true;
+        return false;
     }
 
     /// RULE 21: each whole pixel's worth of carrier (3 units) at a site cancels
@@ -209,6 +222,19 @@ test "point source in 3D gives roughly 1/distance" {
     const a = avg[4] * 4;
     const b = avg[8] * 8;
     try std.testing.expect(b / a > 0.7 and b / a < 1.05);
+}
+
+test "rule 22: a flash into a neighbour's pattern waits" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{ .display = .hold, .update = .sync });
+    g.exclusion = true;
+    const i = index(5, 5, 5);
+    g.px[i].conserved = .{ 1, 1, 1 }; // ready
+    for (neighbors(i)) |j| g.px[j].pattern = g.px[i].pattern ^ 1;
+    try std.testing.expect(!g.blocked(i));
+    g.px[neighbors(i)[3]].pattern = g.px[i].pattern; // hold shows the same pattern
+    try std.testing.expect(g.blocked(i));
 }
 
 test "rule 21: carrier cancels memory one for one" {

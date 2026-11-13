@@ -40,6 +40,28 @@ class Engine {
     this.kick = (H * S + H) * S + H;
   }
   ready(i) { return this.cs[i * 3] + this.cs[i * 3 + 1] + this.cs[i * 3 + 2] >= 3; }
+  // pattern pixel i would display if it flashed now (no state change)
+  nextPat(i) {
+    const d = this.cfg.display, r = this.rf, c = this.cs, b = i * 3;
+    let p = this.pat[i];
+    if (d === "fill_empty") {
+      for (let k = 0; k < 3; k++) { if (r[b + k] > c[b + k]) p |= 1 << k; else if (r[b + k] < c[b + k]) p &= ~(1 << k); }
+    } else if (d === "one_cell") {
+      let best = -1, sur = 0;
+      for (let k = 0; k < 3; k++) if (c[b + k] > r[b + k] && c[b + k] - r[b + k] > sur) { sur = c[b + k] - r[b + k]; best = k; }
+      if (best >= 0) p ^= 1 << best;
+    } else if (d === "flip_all") {
+      for (let k = 0; k < 3; k++) if (c[b + k] > r[b + k]) p ^= 1 << k;
+    }
+    return p & 7;
+  }
+  // RULE 22: a flash may not display a pattern any neighbour is showing; blocked = wait.
+  blocked(i) {
+    if (!this.cfg.exclusion) return false;
+    const nx = this.nextPat(i);
+    for (let q = 0; q < 6; q++) if (this.pat[NB[i * 6 + q]] === nx) return true;
+    return false;
+  }
   flash(i) {
     const d = this.cfg.display, r = this.rf, c = this.cs, b = i * 3;
     let p = this.pat[i];
@@ -201,12 +223,13 @@ class Engine {
     this.fired.fill(0);
     let count = 0;
     if (this.cfg.update === "sync") {
-      for (let i = 0; i < N; i++) this.fired[i] = (this.ready(i) || i === kick) ? 1 : 0;
+      for (let i = 0; i < N; i++) this.fired[i] = ((this.ready(i) || i === kick) && !this.blocked(i)) ? 1 : 0;
       for (let i = 0; i < N; i++) if (this.fired[i]) { this.flash(i); count++; }
       for (let i = 0; i < N; i++) if (this.fired[i]) { const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh); }
     } else {
       for (let i = 0; i < N; i++) {
         if (!(this.ready(i) || i === kick)) continue;
+        if (this.blocked(i)) continue;
         this.flash(i); count++;
         const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh);
       }
