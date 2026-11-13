@@ -1,209 +1,176 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ORIGIN · One pixel</title>
 <style>
-:root { --surface:#fcfcfb; --panel:#f3f2ee; --ink:#1f1f1e; --ink-2:#6b6a64; --grid:#d9d7d0;
-        --q:#eb6834; --lep:#2a78d6; --nu:#1baf7a; --flash:#f5b942; --dim:#e6e5e0; }
-@media (prefers-color-scheme: dark) {
-  :root { --surface:#1a1a19; --panel:#242422; --ink:#f4f3ef; --ink-2:#b4b2a8; --grid:#3c3b37;
-          --q:#d95926; --lep:#3987e5; --nu:#199e70; --flash:#f5b942; --dim:#34332f; }
-}
-* { box-sizing:border-box; }
-body { margin:0; background:var(--surface); color:var(--ink); font:14px/1.5 -apple-system,Helvetica,Arial,sans-serif; }
-header, main { max-width:1180px; margin:0 auto; padding:16px 24px 0; }
-h1 { margin:0; font-size:21px; }
-header p { margin:6px 0 0; color:var(--ink-2); max-width:900px; }
-main { display:grid; grid-template-columns:minmax(320px,460px) 1fr; gap:18px; }
-@media (max-width:900px) { main { grid-template-columns:1fr; } }
-section { background:var(--panel); border-radius:12px; padding:14px 16px; margin-bottom:14px; }
-h2 { font-size:13px; margin:0 0 10px; color:var(--ink-2); font-weight:600; letter-spacing:.02em; }
-button { font:inherit; font-size:13px; padding:6px 10px; border-radius:8px; border:1px solid var(--grid); background:var(--surface); color:var(--ink); cursor:pointer; }
-button:hover { border-color:var(--ink-2); }
-.row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:8px; }
-.pat { display:inline-flex; gap:3px; }
-.pat i { display:inline-block; width:12px; height:12px; border-radius:3px; border:1px solid var(--ink-2); }
-.pat i.on { background:var(--lep); border-color:var(--lep); }
-.lbl { color:var(--ink-2); font-size:12.5px; margin-right:4px; }
-.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; }
-.stat { background:var(--surface); border-radius:8px; padding:8px 10px; }
-.stat b { display:block; font-size:19px; }
-.stat span { color:var(--ink-2); font-size:12px; }
-#log { font:12px/1.55 ui-monospace,Menlo,monospace; max-height:280px; overflow:auto; background:var(--surface); border-radius:8px; padding:8px 10px; }
-#log div { border-bottom:1px solid var(--dim); padding:2px 0; }
-svg { width:100%; height:auto; display:block; }
-.note { color:var(--ink-2); font-size:12.5px; margin:8px 0 0; }
-table { border-collapse:collapse; width:100%; font-size:13px; }
-td, th { padding:4px 6px; text-align:center; border-bottom:1px solid var(--dim); }
-th { color:var(--ink-2); font-weight:500; }
-</style>
-</head>
-<body>
-<header>
-  <h1>One pixel</h1>
-  <p>Quark family at the south pole, charged-lepton family in the middle (e, μ, τ: the three points where a cell operates), neutrino family at the top. A flash runs through five nodes: quark → e → μ → τ → neutrino. Feed it from outside and watch one turn of the engine.</p>
-</header>
+:root{--bg:#0e1013;--panel:#171a1f;--ink:#e6e8eb;--dim:#8a919c;--line:#2a2f37;--acc:#f5b942;--q:#e8743b;--lep:#4a90e2;--nu:#3fbf8f;--light:#c9a6ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+h1{font-size:15px;margin:0;letter-spacing:.04em}header span{color:var(--dim);font-size:12px}
+main{display:grid;grid-template-columns:minmax(320px,500px) minmax(320px,1fr);gap:16px;padding:16px}
+@media(max-width:860px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:16px}
+.card h2{font-size:12px;font-weight:600;color:var(--dim);margin:0 0 8px;text-transform:uppercase;letter-spacing:.06em}
+.ctl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:10px}
+label{color:var(--dim);font-size:12px;display:flex;gap:6px;align-items:center}
+select,button,input[type=number]{background:#0e1013;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 8px;font:inherit;font-size:12px}
+button{cursor:pointer}button.on{border-color:var(--acc);color:var(--acc)}
+input[type=range]{accent-color:var(--acc)}
+canvas{display:block;width:100%}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.stat{background:#0e1013;border-radius:6px;padding:8px}.stat b{display:block;font-size:16px}.stat i{font-style:normal;color:var(--dim);font-size:11px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:8px;font-size:11px;color:var(--dim)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+#log{font-size:11.5px;line-height:1.5;max-height:190px;overflow:auto;background:#0e1013;border-radius:6px;padding:8px;color:var(--dim)}
+#log div{border-bottom:1px solid #1d2128;padding:1px 0}
+#log b{color:var(--ink);font-weight:500}
+.note{color:var(--dim);font-size:12px;margin:8px 0 0}
+</style></head><body>
+<header><h1>ORIGIN · ONE PIXEL</h1><span>quark node → e, μ, τ points → neutrino node. Same rules as the lattice engine; the rest of the universe is the environment you set.</span></header>
 <main>
-  <div>
-    <section>
-      <svg id="px" viewBox="0 0 420 520" role="img" aria-label="One pixel: five nodes"></svg>
-      <p class="note">Filled lepton point = an electron shown at that cell. Bars: green = memory (conserved, toward the neutrino), blue = reinforcement. Flash fires when memory totals 3.</p>
-    </section>
+<section>
+ <div class="card">
+  <div class="ctl">
+   <button id="play">▶ Run</button><button id="step">Step</button><button id="reset">Reset</button>
+   <label>speed <input id="speed" type="range" min="1" max="60" value="8"></label>
   </div>
-  <div>
-    <section>
-      <h2>Feed it from outside</h2>
-      <div class="row"><span class="lbl">a neighbor shows</span><span id="nbtns"></span></div>
-      <div class="row"><span class="lbl">antineutrino arrives at</span>
-        <button data-a="0">e point</button><button data-a="1">μ point</button><button data-a="2">τ point</button>
-        <span class="lbl">(acts only on a filled point)</span></div>
-      <div class="row"><span class="lbl">neutrino arrives at</span>
-        <button data-n="0">e point</button><button data-n="1">μ point</button><button data-n="2">τ point</button>
-        <span class="lbl">(acts only on an empty point)</span></div>
-      <div class="row"><button id="auto">Auto-feed: neighbors cycle 000→111</button><button id="reset">Reset pixel</button>
-        <span class="lbl">start pattern</span><span id="sbtns"></span></div>
-    </section>
-    <section>
-      <h2>State</h2>
-      <div class="stats">
-        <div class="stat"><b id="s-pat">—</b><span>displayed photograph</span></div>
-        <div class="stat"><b id="s-q">down</b><span>quark (up/down entity)</span></div>
-        <div class="stat"><b id="s-mem">0</b><span>memory (trigger at 3)</span></div>
-        <div class="stat"><b id="s-fl">0</b><span>flashes</span></div>
-        <div class="stat"><b id="s-beta">0</b><span>beta-type (ν̄ out)</span></div>
-        <div class="stat"><b id="s-cap">0</b><span>capture-type (ν out)</span></div>
-        <div class="stat"><b id="s-light">0</b><span>display only (light)</span></div>
-      </div>
-      <table style="margin-top:10px">
-        <tr><th></th><th>e point</th><th>μ point</th><th>τ point</th></tr>
-        <tr><td style="text-align:left;color:var(--ink-2)">electron shown</td><td id="c0"></td><td id="c1"></td><td id="c2"></td></tr>
-        <tr><td style="text-align:left;color:var(--ink-2)">reinforcement</td><td id="r0"></td><td id="r1"></td><td id="r2"></td></tr>
-        <tr><td style="text-align:left;color:var(--ink-2)">memory</td><td id="m0"></td><td id="m1"></td><td id="m2"></td></tr>
-      </table>
-    </section>
-    <section>
-      <h2>Event log (newest first)</h2>
-      <div id="log"></div>
-    </section>
+  <div class="ctl">
+   <label>start <select id="start"><option value="0">000</option><option value="1" selected>001</option><option value="2">010</option><option value="3">011</option><option value="4">100</option><option value="5">101</option><option value="6">110</option><option value="7">111</option></select></label>
+   <label>neighbors <select id="env">
+     <option value="cycle">cycle through all 8 patterns</option>
+     <option value="echo">echo: show the pixel's own photograph</option>
+     <option value="fixed">fixed pattern</option>
+     <option value="stride3">stride: pattern 3·n mod 8</option>
+   </select></label>
+   <label>fixed <select id="fixpat"><option value="0">000</option><option value="1">001</option><option value="2">010</option><option value="3">011</option><option value="4">100</option><option value="5">101</option><option value="6">110</option><option value="7" selected>111</option></select></label>
   </div>
+  <div class="ctl">
+   <label>neighbor displays per tick <input id="nrate" type="number" min="0" max="6" value="1" style="width:50px"></label>
+   <label>neutrino flux <select id="flux"><option value="none">none</option><option value="anti">antineutrinos (act on filled)</option><option value="nu">neutrinos (act on empty)</option><option value="both" selected>both, alternating</option></select></label>
+   <label>one every <input id="fluxk" type="number" min="1" max="50" value="3" style="width:50px"> ticks</label>
+  </div>
+  <canvas id="px" width="900" height="900"></canvas>
+  <div class="legend"><span><span class="sw" style="background:var(--q)"></span>quark entity: lit half = active region (d −⅓ or u +⅔)</span><span><span class="sw" style="background:var(--lep)"></span>electron shown at point</span><span><span class="sw" style="background:var(--nu)"></span>neutrino node / memory</span><span><span class="sw" style="background:var(--acc)"></span>flash passing</span></div>
+  <div class="stats">
+   <div class="stat"><b id="st-t">0</b><i>tick</i></div>
+   <div class="stat"><b id="st-p">001</b><i>photograph</i></div>
+   <div class="stat"><b id="st-q">down</b><i>quark: active region</i></div>
+   <div class="stat"><b id="st-m">0</b><i>memory (flash at 3)</i></div>
+  </div>
+ </div>
+</section>
+<section>
+ <div class="card"><h2>Memory and flashes over time (last 300 ticks)</h2>
+  <canvas id="ts" width="760" height="190"></canvas>
+  <div class="legend"><span><span class="sw" style="background:var(--nu)"></span>memory e / μ / τ (stacked)</span><span><span class="sw" style="background:var(--acc)"></span>beta-type (ν̄ out)</span><span><span class="sw" style="background:#5cc8ff"></span>capture-type (ν out)</span><span><span class="sw" style="background:var(--light)"></span>display only (light)</span></div>
+ </div>
+ <div class="card"><h2>The three flashes</h2>
+  <div class="stats" style="margin-top:0">
+   <div class="stat"><b id="c-f">0</b><i>flashes</i></div>
+   <div class="stat"><b id="c-b">0</b><i>beta-type</i></div>
+   <div class="stat"><b id="c-c">0</b><i>capture-type</i></div>
+   <div class="stat"><b id="c-l">0</b><i>display only</i></div>
+  </div>
+  <p class="note" style="margin:12px 0 4px">Photographs taken, by pattern</p>
+  <canvas id="bars" width="760" height="120"></canvas>
+ </div>
+ <div class="card"><h2>Decay test: chance of a weak event at gap k, given none before</h2>
+  <canvas id="haz" width="760" height="170"></canvas>
+  <p class="note">Gaps between successive weak events (beta or capture). Flat = constant chance (decay). Dashed = the flat line at this pixel's overall weak-event rate.</p>
+ </div>
+ <div class="card"><h2>Event log (newest first)</h2><div id="log"></div></div>
+</section>
 </main>
 <script>
-const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const NAMES = ["e", "μ", "τ"];
-const pc = x => (x & 1) + ((x >> 1) & 1) + ((x >> 2) & 1);
-const bits = p => p.toString(2).padStart(3, "0");
-function makeup(p) { const m = [0,0,0]; for (let q = 0; q < 8; q++) { if (q === p) continue; for (let k = 0; k < 3; k++) if ((q >> k) & 1) m[k]++; } return m.map(v => v / 7); }
-function Dv(v) { const s = v[0]+v[1]+v[2]; return 1.5*((v[0]*v[0]+v[1]*v[1]+v[2]*v[2])/(s*s) - 1/3); }
-
-let P, busy = false, autoTimer = null, autoQ = 0, startPat = 0b001;
-function reset() {
-  P = { pat: startPat, rf: [0,0,0], cs: [0,0,0], quark: "down", flashes: 0, beta: 0, cap: 0, light: 0, lit: -1 };
-  document.getElementById("log").innerHTML = "";
-  log(`pixel reset: photograph ${bits(P.pat)}, quark down, memory 0`);
-  draw();
+const $=id=>document.getElementById(id);
+const NAMES=["e","μ","τ"],bits=p=>p.toString(2).padStart(3,"0"),pc=x=>(x&1)+((x>>1)&1)+((x>>2)&1);
+const PC=["#2b2f36","#d9534f","#5cb85c","#e8a33d","#4a90e2","#b05cc8","#3fbfbf","#f2f2f2"];
+function makeup(p){const m=[0,0,0];for(let q=0;q<8;q++){if(q===p)continue;for(let k=0;k<3;k++)if((q>>k)&1)m[k]++;}return m.map(v=>v/7);}
+function Dv(v){const s=v[0]+v[1]+v[2];return 1.5*((v[0]*v[0]+v[1]*v[1]+v[2]*v[2])/(s*s)-1/3);}
+let P,running=false,anim=[];
+function reset(){P={t:0,pat:+$("start").value,rf:[0,0,0],cs:[0,0,0],quark:"down",flashes:0,beta:0,cap:0,light:0,n:0,fluxN:0,
+  hist:[],real:new Array(8).fill(0),lastWeak:-1,gaps:new Array(61).fill(0)};anim=[];$("log").innerHTML="";log(`<b>reset</b>: photograph ${bits(P.pat)}, quark down`);draw();}
+function log(s){const d=document.createElement("div");d.innerHTML=`<b>t${P?P.t:0}</b> ${s}`;const L=$("log");L.prepend(d);while(L.children.length>200)L.lastChild.remove();}
+function neighborPattern(){const env=$("env").value;P.n++;
+  if(env==="cycle")return (P.n-1)%8; if(env==="echo")return P.pat; if(env==="fixed")return +$("fixpat").value; return (3*P.n)%8;}
+function receive(shown){for(let k=0;k<3;k++){if(((P.pat>>k)&1)===((shown>>k)&1))P.rf[k]++;else P.cs[k]++;}}
+function arrive(anti){ // flux targets cycle e -> mu -> tau
+  const k=P.fluxN%3;P.fluxN++;const filled=(P.pat>>k)&1;
+  if(anti!==!!filled)return false; P.cs[k]++; return true;}
+function tick(){
+  const nr=Math.max(0,Math.min(6,+$("nrate").value|0));
+  for(let i=0;i<nr;i++)receive(neighborPattern());
+  const flux=$("flux").value,fk=Math.max(1,+$("fluxk").value|0);
+  if(flux!=="none"&&P.t%fk===0){const anti=flux==="anti"?true:flux==="nu"?false:((P.t/fk)%2===0);if(arrive(anti)&&+$("speed").value<=10)log(`${anti?"antineutrino":"neutrino"} absorbed`);}
+  let ev=null;
+  if(P.cs[0]+P.cs[1]+P.cs[2]>=3){
+    const before=P.pat;let best=-1,sur=0;
+    for(let k=0;k<3;k++)if(P.cs[k]>P.rf[k]&&P.cs[k]-P.rf[k]>sur){sur=P.cs[k]-P.rf[k];best=k;}
+    const after=best>=0?P.pat^(1<<best):P.pat;P.pat=after;P.flashes++;P.real[after]++;
+    if(after===before){P.light++;ev="light";log(`flash: no change — display only, memory ${P.cs.join(",")} leaves as light`);}
+    else{const up=pc(after)>pc(before),m=makeup(after);
+      if(up){P.beta++;P.quark="up";ev="beta";}else{P.cap++;P.quark="down";ev="cap";}
+      if(P.lastWeak>=0)P.gaps[Math.min(60,P.t-P.lastWeak)]++;P.lastWeak=P.t;
+      log(`flash: ${NAMES[best]} flips ${bits(before)}→${bits(after)} — ${up?"<b>beta-type</b>: down→up, ν̄ out":"<b>capture-type</b>: up→down, ν out"} (unrealized ${m.map(v=>Math.round(v*7)+"/7").join(" ")}, D ${Dv(m).toFixed(4)})`);}
+    P.rf=[0,0,0];P.cs=[0,0,0];anim=[0,1,2,3,4];
+  }
+  P.hist.push({cs:P.cs.slice(),ev});if(P.hist.length>300)P.hist.shift();
+  P.t++;
 }
-function log(s) { const d = document.createElement("div"); d.textContent = s; const L = document.getElementById("log"); L.prepend(d); }
-
-// Section 5 flash rule: a neighbor's displayed photograph arrives.
-function receive(shown) {
-  if (busy) return;
-  const before = P.cs.slice();
-  for (let k = 0; k < 3; k++) { const mine = (P.pat >> k) & 1, theirs = (shown >> k) & 1; if (mine === theirs) P.rf[k]++; else P.cs[k]++; }
-  log(`neighbor shows ${bits(shown)}: matches → reinforcement, mismatches → memory (memory ${before.join(",")} → ${P.cs.join(",")})`);
-  after();
-}
-// Rule 20: antineutrino acts only on a filled point, neutrino only on an empty point.
-function arrive(k, anti) {
-  if (busy) return;
-  const filled = (P.pat >> k) & 1;
-  if (anti && !filled) { log(`antineutrino at ${NAMES[k]}: point is empty, passes through (acts only on filled points)`); return; }
-  if (!anti && filled) { log(`neutrino at ${NAMES[k]}: point is filled, passes through (acts only on empty points)`); return; }
-  P.cs[k]++;
-  log(`${anti ? "antineutrino" : "neutrino"} absorbed at ${NAMES[k]}: +1 memory there (pushes toward ${anti ? "emptying" : "filling"})`);
-  after();
-}
-function after() { draw(); if (P.cs[0] + P.cs[1] + P.cs[2] >= 3) flash(); }
-
-// One turn: quark node -> e -> mu -> tau -> neutrino node.
-function flash() {
-  busy = true;
-  const before = P.pat;
-  // quark flash (one_cell): flip the cell with the largest memory surplus over reinforcement
-  let best = -1, sur = 0;
-  for (let k = 0; k < 3; k++) if (P.cs[k] > P.rf[k] && P.cs[k] - P.rf[k] > sur) { sur = P.cs[k] - P.rf[k]; best = k; }
-  const after_ = best >= 0 ? P.pat ^ (1 << best) : P.pat;
-  const released = P.cs.slice();
-  const steps = [
-    () => { P.lit = 0; log(best >= 0 ? `① quark node: change — ${NAMES[best]} cell flips (${bits(before)} → ${bits(after_)})` : `① quark node: no change (no cell has more memory than reinforcement)`); },
-    () => { P.pat = after_; P.lit = 1; log(`② e point displays: ${((after_ >> 0) & 1) ? "electron shown" : "empty"}`); },
-    () => { P.lit = 2; log(`③ μ point displays: ${((after_ >> 1) & 1) ? "electron shown" : "empty"}`); },
-    () => { P.lit = 3; log(`④ τ point displays: ${((after_ >> 2) & 1) ? "electron shown" : "empty"} — photograph ${bits(after_)}`); },
-    () => {
-      P.lit = 4; P.flashes++;
-      if (after_ === before) { P.light++; log(`⑤ neutrino node: display only — memory ${released.join(",")} leaves with the light, no neutrino`); }
-      else {
-        const m = makeup(after_), up = pc(after_) > pc(before);
-        if (up) { P.beta++; P.quark = "up"; } else { P.cap++; P.quark = "down"; }
-        log(`⑤ neutrino node: weak event, ${up ? "beta-type (down → up, electron created): antineutrino out" : "capture-type (up → down, electron absorbed): neutrino out"} — carries unrealized possibility ${m.map(v => (v*7).toFixed(0) + "/7").join(", ")} (D ${Dv(m).toFixed(4)})`);
-      }
-      P.rf = [0,0,0]; P.cs = [0,0,0];
-    },
-    () => { P.lit = -1; busy = false; draw(); }
-  ];
-  steps.forEach((f, i) => setTimeout(() => { f(); draw(); }, i * 420));
-}
-
-function draw() {
-  const svg = document.getElementById("px"); svg.innerHTML = "";
-  const el = (t, a, txt) => { const n = document.createElementNS("http://www.w3.org/2000/svg", t); for (const k in a) n.setAttribute(k, a[k]); if (txt !== undefined) n.textContent = txt; svg.appendChild(n); return n; };
-  const Q = [210, 460], NU = [210, 60], L = [[110, 300], [310, 300], [210, 180]];
-  const lit = P.lit, fc = css("--flash");
-  for (const p of L) { el("line", { x1: Q[0], y1: Q[1], x2: p[0], y2: p[1], stroke: css("--grid"), "stroke-width": 2 }); el("line", { x1: p[0], y1: p[1], x2: NU[0], y2: NU[1], stroke: css("--grid"), "stroke-width": 2 }); }
-  el("polygon", { points: L.map(p => p.join(",")).join(" "), fill: "none", stroke: css("--lep"), "stroke-width": 2, "stroke-dasharray": "5 4" });
-  // quark node
-  el("circle", { cx: Q[0], cy: Q[1], r: 30, fill: lit === 0 ? fc : css("--q") });
-  el("text", { x: Q[0], y: Q[1] + 5, "text-anchor": "middle", "font-size": 13, fill: "#fff", "font-weight": 600 }, P.quark);
-  el("text", { x: Q[0] + 42, y: Q[1] + 5, "font-size": 12, fill: css("--ink-2") }, "quark family (south pole)");
-  // neutrino node with memory bars
-  el("circle", { cx: NU[0], cy: NU[1], r: 30, fill: lit === 4 ? fc : css("--nu") });
-  el("text", { x: NU[0], y: NU[1] + 5, "text-anchor": "middle", "font-size": 13, fill: "#fff", "font-weight": 600 }, "ν");
-  el("text", { x: NU[0] + 42, y: NU[1] + 5, "font-size": 12, fill: css("--ink-2") }, "neutrino family (identity pole)");
-  // lepton points
-  L.forEach((p, k) => {
-    const on = (P.pat >> k) & 1, isLit = lit === k + 1;
-    el("circle", { cx: p[0], cy: p[1], r: 26, fill: isLit ? fc : (on ? css("--lep") : css("--surface")), stroke: css("--lep"), "stroke-width": 3 });
-    el("text", { x: p[0], y: p[1] + 5, "text-anchor": "middle", "font-size": 15, "font-weight": 600, fill: on || isLit ? "#fff" : css("--lep") }, NAMES[k]);
-    const bx = p[0] - 22, by = p[1] + 34;
-    for (let u = 0; u < Math.min(P.cs[k], 6); u++) el("rect", { x: bx + u * 8, y: by, width: 6, height: 8, fill: css("--nu"), rx: 1 });
-    for (let u = 0; u < Math.min(P.rf[k], 6); u++) el("rect", { x: bx + u * 8, y: by + 11, width: 6, height: 8, fill: css("--lep"), rx: 1 });
+const ctx=$("px").getContext("2d");
+function draw(){
+  const W=900,c=ctx;c.clearRect(0,0,W,W);
+  const lit=anim.length?anim[0]:-1;
+  const Q=[450,800],NU=[450,110],L=[[230,520],[670,520],[450,300]];
+  c.lineWidth=3;c.strokeStyle="#2a2f37";
+  for(const p of L){c.beginPath();c.moveTo(Q[0],Q[1]);c.lineTo(p[0],p[1]);c.lineTo(NU[0],NU[1]);c.stroke();}
+  c.setLineDash([10,8]);c.strokeStyle="#4a90e2";c.beginPath();c.moveTo(...L[0]);c.lineTo(...L[1]);c.lineTo(...L[2]);c.closePath();c.stroke();c.setLineDash([]);
+  const node=(x,y,r,fill,label,sub)=>{c.beginPath();c.arc(x,y,r,0,7);c.fillStyle=fill;c.fill();c.fillStyle="#fff";c.font="600 30px ui-monospace,monospace";c.textAlign="center";c.fillText(label,x,y+10);if(sub){c.fillStyle="#8a919c";c.font="22px ui-monospace,monospace";c.fillText(sub,x,y+r+34);}};
+  // quark family: one entity, two charge regions (down -1/3, up +2/3); the flip moves weight between them
+  {const r=70,act=P.quark;c.lineWidth=4;
+   [["down","−⅓",Math.PI/2,Math.PI*1.5,-1],["up","+⅔",-Math.PI/2,Math.PI/2,1]].forEach(([nm,ch,a0,a1,side])=>{
+     c.beginPath();c.moveTo(Q[0],Q[1]);c.arc(Q[0],Q[1],r,a0,a1);c.closePath();
+     c.fillStyle=lit===0?"#f5b942":(act===nm?"#e8743b":"#3a2a22");c.fill();c.strokeStyle="#e8743b";c.stroke();
+     c.fillStyle=act===nm||lit===0?"#fff":"#b98a72";c.font="600 24px ui-monospace,monospace";c.textAlign="center";
+     c.fillText(nm==="down"?"d":"u",Q[0]+side*34,Q[1]-2);c.font="18px ui-monospace,monospace";c.fillText(ch,Q[0]+side*34,Q[1]+22);});
+   c.fillStyle="#8a919c";c.font="22px ui-monospace,monospace";c.fillText("quark family (one entity: down and up regions)",Q[0],Q[1]+r+34);}
+  node(NU[0],NU[1],60,lit===4?"#f5b942":"#3fbf8f","ν","");
+  c.fillStyle="#8a919c";c.font="22px ui-monospace,monospace";c.textAlign="center";c.fillText("neutrino family",NU[0],NU[1]-78);
+  L.forEach((p,k)=>{const on=(P.pat>>k)&1,isLit=lit===k+1;
+    c.beginPath();c.arc(p[0],p[1],54,0,7);c.fillStyle=isLit?"#f5b942":on?"#4a90e2":"#0e1013";c.fill();c.lineWidth=5;c.strokeStyle="#4a90e2";c.stroke();
+    c.fillStyle=on||isLit?"#fff":"#4a90e2";c.font="600 34px ui-monospace,monospace";c.fillText(NAMES[k],p[0],p[1]+12);
+    const bx=p[0]-60,by=p[1]+74;for(let u=0;u<Math.min(P.cs[k],8);u++){c.fillStyle="#3fbf8f";c.fillRect(bx+u*16,by,12,16);}
+    for(let u=0;u<Math.min(P.rf[k],8);u++){c.fillStyle="#4a90e2";c.fillRect(bx+u*16,by+22,12,16);}
+    if(P.rf[k]>8){c.fillStyle="#8a919c";c.font="18px ui-monospace,monospace";c.textAlign="left";c.fillText("+"+(P.rf[k]-8),bx+132,by+36);c.textAlign="center";}
   });
-  el("text", { x: 20, y: 300, "font-size": 12, fill: css("--ink-2") }, "lepton");
-  el("text", { x: 20, y: 315, "font-size": 12, fill: css("--ink-2") }, "family");
-  // stats
-  const set = (id, v) => document.getElementById(id).textContent = v;
-  set("s-pat", bits(P.pat)); set("s-q", P.quark); set("s-mem", P.cs[0] + P.cs[1] + P.cs[2]); set("s-fl", P.flashes);
-  set("s-beta", P.beta); set("s-cap", P.cap); set("s-light", P.light);
-  for (let k = 0; k < 3; k++) { set("c" + k, ((P.pat >> k) & 1) ? "yes" : "no"); set("r" + k, P.rf[k]); set("m" + k, P.cs[k]); }
+  c.fillStyle="#8a919c";c.font="22px ui-monospace,monospace";c.fillText("charged-lepton family",450,640);
+  $("st-t").textContent=P.t;$("st-p").textContent=bits(P.pat);$("st-q").textContent=P.quark;$("st-m").textContent=P.cs[0]+P.cs[1]+P.cs[2];
+  $("c-f").textContent=P.flashes;$("c-b").textContent=P.beta;$("c-c").textContent=P.cap;$("c-l").textContent=P.light;
+  drawTs();drawBars();drawHaz();
 }
-function patBtn(p, onclick) {
-  const b = document.createElement("button"); b.title = bits(p);
-  b.innerHTML = '<span class="pat">' + [0,1,2].map(k => `<i class="${(p >> k) & 1 ? "on" : ""}"></i>`).join("") + "</span>";
-  b.onclick = onclick; return b;
-}
-for (let p = 0; p < 8; p++) document.getElementById("nbtns").appendChild(patBtn(p, () => receive(p)));
-for (let p = 0; p < 8; p++) document.getElementById("sbtns").appendChild(patBtn(p, () => { startPat = p; reset(); }));
-document.querySelectorAll("[data-a]").forEach(b => b.onclick = () => arrive(+b.dataset.a, true));
-document.querySelectorAll("[data-n]").forEach(b => b.onclick = () => arrive(+b.dataset.n, false));
-document.getElementById("reset").onclick = () => { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; document.getElementById("auto").textContent = "Auto-feed: neighbors cycle 000→111"; } reset(); };
-document.getElementById("auto").onclick = () => {
-  const b = document.getElementById("auto");
-  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; b.textContent = "Auto-feed: neighbors cycle 000→111"; return; }
-  b.textContent = "Stop auto-feed";
-  autoTimer = setInterval(() => { if (!busy) { receive(autoQ); autoQ = (autoQ + 1) % 8; } }, 700);
-};
+function drawTs(){const cv=$("ts"),c=cv.getContext("2d"),W=cv.width,H=cv.height;c.clearRect(0,0,W,H);const n=P.hist.length;if(!n)return;
+  const bw=W/300,base=H-20,sc=(H-40)/3;
+  P.hist.forEach((h,i)=>{const x=i*bw;let y=base;["#2f8f6c","#3fbf8f","#7fdcb7"].forEach((col,k)=>{const v=h.cs[k]*sc;c.fillStyle=col;c.fillRect(x,y-v,bw,v);y-=v;});
+    if(h.ev){c.fillStyle=h.ev==="beta"?"#f5b942":h.ev==="cap"?"#5cc8ff":"#c9a6ff";c.fillRect(x,8,Math.max(2,bw),10);}});
+  c.strokeStyle="#8a919c";c.setLineDash([4,4]);c.beginPath();c.moveTo(0,base-3*sc);c.lineTo(W,base-3*sc);c.stroke();c.setLineDash([]);
+  c.fillStyle="#8a919c";c.font="11px ui-monospace,monospace";c.fillText("trigger 3",4,base-3*sc-4);}
+function drawBars(){const cv=$("bars"),c=cv.getContext("2d"),W=cv.width,H=cv.height;c.clearRect(0,0,W,H);const tot=P.real.reduce((a,b)=>a+b,0);
+  const bw=(W-40)/8;c.font="11px ui-monospace,monospace";c.textAlign="center";
+  for(let q=0;q<8;q++){const s=tot?P.real[q]/tot:0,h=(H-36)*Math.min(1,s/0.5);c.fillStyle=PC[q];c.fillRect(20+q*bw+8,H-20-h,bw-16,h);c.fillStyle="#8a919c";c.fillText(bits(q),20+q*bw+bw/2,H-6);if(tot)c.fillText((100*s).toFixed(0)+"%",20+q*bw+bw/2,H-24-h);}}
+function drawHaz(){const cv=$("haz"),c=cv.getContext("2d"),W=cv.width,H=cv.height;c.clearRect(0,0,W,H);
+  let rem=0;for(let k=1;k<=60;k++)rem+=P.gaps[k];const tot=rem;c.fillStyle="#8a919c";c.font="11px ui-monospace,monospace";
+  if(tot<5){c.textAlign="center";c.fillText("needs a few weak events — press Run",W/2,H/2);return;}
+  const hz=[];for(let k=1;k<=30;k++){hz.push(rem>0?P.gaps[k]/rem:NaN);rem-=P.gaps[k];}
+  const rate=P.t?(P.beta+P.cap)/P.t:0;let ym=0.1;for(const v of hz)if(v>ym)ym=v;ym=Math.min(1,Math.ceil(ym*10)/10);
+  const L=40,R=W-10,T=10,B=H-24,X=k=>L+(k-1)/29*(R-L),Y=v=>B-(v/ym)*(B-T);
+  c.strokeStyle="#2a2f37";for(let i=0;i<=4;i++){const y=T+(B-T)*i/4;c.beginPath();c.moveTo(L,y);c.lineTo(R,y);c.stroke();c.textAlign="right";c.fillText((ym*(1-i/4)).toFixed(2),L-4,y+4);}
+  c.textAlign="center";for(let k=1;k<=30;k+=4)c.fillText(k,X(k),H-8);
+  c.strokeStyle="#e6e8eb";c.setLineDash([5,4]);c.beginPath();c.moveTo(L,Y(rate));c.lineTo(R,Y(rate));c.stroke();c.setLineDash([]);
+  c.strokeStyle="#f5b942";c.lineWidth=2;c.beginPath();let st=false;hz.forEach((v,i)=>{if(isNaN(v))return;const x=X(i+1),y=Y(v);st?c.lineTo(x,y):(c.moveTo(x,y),st=true);});c.stroke();c.lineWidth=1;}
+function loop(){if(!running)return;const n=+$("speed").value;const steps=Math.max(1,Math.round(n/8));for(let i=0;i<steps;i++)tick();
+  if(anim.length&&n<=10){/* show flash sequence one node per frame */}
+  draw();if(anim.length)anim.shift();setTimeout(()=>requestAnimationFrame(loop),Math.max(0,400/n));}
+$("play").onclick=()=>{running=!running;$("play").textContent=running?"❚❚ Pause":"▶ Run";$("play").classList.toggle("on",running);if(running)loop();};
+$("step").onclick=()=>{tick();draw();let i=0;const iv=setInterval(()=>{if(!anim.length){clearInterval(iv);return;}anim.shift();draw();},150);};
+$("reset").onclick=reset;$("start").onchange=reset;
 reset();
-</script>
-</body>
-</html>
+</script></body></html>
