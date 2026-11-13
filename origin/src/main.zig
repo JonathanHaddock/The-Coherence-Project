@@ -96,6 +96,7 @@ fn help() void {
         \\  origin structure [--no-open]
         \\  origin possibility [--no-open]
         \\  origin photo [all7|next] [ticks] [none|same|unreal]
+        \\  origin pixel [--no-open]
         \\  origin record mode=lattice|v1|signed|turing|control core=.. p=.. ticks=.. every=.. [display=.. update=.. gravity=on seed=..]
         \\  origin help
         \\
@@ -630,6 +631,16 @@ fn chart(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !
 const app_template = @embedFile("app/app.html");
 const structure_template = @embedFile("app/structure.html");
 const possibility_template = @embedFile("app/possibility.html");
+const pixel_template = @embedFile("app/pixel.html");
+
+/// One pixel: quark node, the three lepton points, neutrino node. Driven by hand.
+fn pixelPage(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
+    var open_it = true;
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--no-open")) open_it = false;
+    }
+    try writeAndOpen(io, gpa, "pixel.html", pixel_template, open_it);
+}
 
 /// Unrealized-possibility model: a flash realizes 1 of the 8 three-cell
 /// patterns; the neutrino is the other 7. Compared with measured PMNS columns.
@@ -1527,6 +1538,8 @@ pub fn main(init: std.process.Init) void {
         chargeReport();
     } else if (std.mem.eql(u8, command, "weak")) {
         weakReport(init.io, init.gpa, &args) catch |err| fail(err);
+    } else if (std.mem.eql(u8, command, "pixel")) {
+        pixelPage(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "photo")) {
         photoReport(&args);
     } else if (std.mem.eql(u8, command, "possibility")) {
