@@ -1,74 +1,105 @@
-# Handoff: pixel engine (November 10, 2026)
+# Handoff: pixel engine (updated November 12, 2026)
 
 ## Where things are
 
-- Code is on branch `engine-pixel` in The-Coherence-Project, inside `origin/`, pushed to GitHub November 10, 2026. Patches 0001-0004 are the first four commits.
-- Rules doc: `engine-rules.txt`, kept outside the repo. Its change log records every rule choice and result from November 10. **Rule:** nothing may be changed after seeing output without logging the change and the reason first.
-- Toolchain: Zig 0.17.1. If it isn't installed: `pip install --break-system-packages ziglang==0.17.1`, then use `python3 -m ziglang build`.
-- Build for speed: `zig build -Doptimize=ReleaseFast`. A 3D run takes about 17 seconds.
-- Viewer: "Pixel Engine Viewer" artifact on claude.ai. It's a JS port of the **2D** engine and matches the Zig numbers exactly. It still has only the original fill/empty display rule; hold, one-cell and flip-all haven't been added yet.
+- **Code:** `main` of The-Coherence-Project, inside `origin/`. The old `engine-pixel` branch is fully merged into main.
+- **Branch `front-porch`:** local and not pushed. It holds the 2026-11-11/12 session work, three commits on top of `main` (90e2b33).
+- **Rules:** `RULES.md` is the running list. It is numbered in order, nothing is ever deleted, and a rule proven false is struck through with a note. The master log is still `engine-rules.txt`, outside the repo. **Rule:** nothing may change after seeing output without logging the change and the reason first.
+- **Build plan:** the claude.ai doc "ORIGIN engine — missing pieces build spec" (R-A to R-E, in build order).
+- **Results:** they go into the repo as data files (TSV), not only into chats.
+- **Toolchain:** Zig 0.17.1. If it isn't installed, run `pip install --break-system-packages ziglang==0.17.1`, then use `python3 -m ziglang build`.
+  - `zig build -Doptimize=ReleaseFast` builds the fast binary.
+  - `zig build -Doptimize=ReleaseFast -Dside=96 --prefix zig-out-96` builds a 96³ lattice into its own folder.
+- **Viewers:** `viewer/index.html` (3D lattice, all modes) and `viewer/engine.js` (the same engine for Node scripts). Both are JS ports that match Zig exactly for the same seed.
 
 ## Files
 
 | File | What it is |
 |---|---|
-| `src/engine/pixel.zig` | Pixel, flash rule, beta-decay bookkeeping, 2D grid (64×64, 4 neighbors, wrapping edges). Config: display rule, update order, start state, seed. |
-| `src/engine/clocks.zig` | Per-region clocks on the 2D grid: 64 regions of 8×8. Raw count, merged count (coherent pixels flashing together count as one tick), coherence, and the correlation between coherence and clock rate. |
-| `src/engine/grid3.zig` | 3D lattice (48³, 6 neighbors) plus the carrier field. |
-| `src/main.zig` | Commands `engine`, `clocks`, `lattice3`. |
-| `results/engine_*`, `clocks_*`, `lattice3_*` | Saved runs. |
+| `src/engine/pixel.zig` | Pixel, flash rule, beta-decay bookkeeping, 2D grid |
+| `src/engine/clocks.zig` | Per-region clocks on the 2D grid |
+| `src/engine/grid3.zig` | 3D lattice (48³ by default, 6 neighbours), carrier, rule 6 gravity, rule 21 cancel |
+| `src/engine/lepton.zig` | Lepton mode, rules 7–11 |
+| `src/engine/photo.zig` | Photograph mode, rules 12–16 |
+| `src/engine/record.zig` | Run recorder: meta.json, series.csv, shells.csv, gaps.csv, slice.csv |
+| `src/engine/onepixel.zig` | One pixel engine model from Rule Spec v0. Choices P1–P4 are in `experiments/one-pixel` and aren't numbered rules. |
+| `viewer/war.html`, `viewer/pixel.html` | War vs twin vs nudge (with Earth's real war record), and the one-pixel turn |
+| `src/app/porch.html` | Front porch: the experiment menu (`origin porch`) |
 
-## Commands
+## Engine commands
 
 ```
-origin engine [ticks] [seed]                       # build steps 1-3, 2D, first-run rules
-origin clocks [seed]                               # all rule combos, region clocks
-origin lattice3 [display] [update] [core] [ticks]  # display: fill_empty|hold|one_cell|flip_all
-                                                   # update: sync|sweep; core = sphere radius (0 = none)
+origin engine [ticks] [seed]                          # 2D, build steps 1-3
+origin clocks [seed]                                  # 2D region clocks, all rule combos
+origin lattice3 [display] [update] [core] [ticks] [gravity|cancel]
+origin lepton [core] [ticks] [v1|signed|turing]
+origin photo ...                                      # photograph mode, rules 12-16
+origin record mode=lattice|v1|signed|turing|control display=.. update=.. core=.. ticks=..
+              [gravity=on | feedback=reinforce|cancel] seed=.. every=..
+origin pixel                                          # pixel page (quark entity, lepton points, neutrino node)
+origin onepixel [start] [row|bipyramid] [nC|t ...]    # one pixel engine turn, charge ledger
+origin porch                                          # experiment menu
 ```
 
-## Rule choices (all logged in the doc)
+The `display` options are fill_empty, hold, one_cell and flip_all; `update` is sync or sweep.
 
-1. **Display** (what a pixel shows when it flashes):
-   - `fill_empty`: the first-run version, a mistranslation. Kept only to reproduce that run.
-   - `hold`: B keeps its pattern and the difference goes to memory.
-   - `one_cell`: B flips the one cell with the largest mismatch surplus (section 12).
-   - `flip_all`: B flips every cell where mismatches outweigh matches.
-2. **Trigger:** a pixel flashes when its conserved share totals 3.
-3. **No memory:** a flash releases the whole conserved share and clears reinforcement.
-4. **Update:** synchronous ticks or a sequential sweep.
-5. **Carrier** (provisional, measurement only): released neutrino units spread one hop per tick to the 6 neighbors and are lost at the box edge. They have **no effect** on pixels yet.
+## Rules
 
-There are no tuning knobs. The only number is the trigger of 3.
+There are 21. See `RULES.md`. The newest is 21, carrier cancels memory (build spec R-A).
 
-## Findings so far
+## Findings
 
-- **Steps 1–2 pass:** charge balances in thirds, and the flash rule behaves as written.
-- **2D, first-run rule:** the grid runs away (99% flashing) and neighbor agreement stays near 0.57. That's barely above 0.5, the value for two random patterns.
-- **2D, correct reading (flip rules):** the grid coheres (agreement 0.83–0.92), then freezes within about 100 ticks.
-- **2D, hold:** it keeps flashing but never organizes; agreement stays at exactly 0.500.
-- **Trigger:** 3 runs away, 4 gives a strict two-tick rhythm, and 5 and up dies. None of these looks like a constant chance per tick.
-- **Region clocks:** coherence and clock rate move opposite to each other almost everywhere (down to −1.00 with a core and hold). That follows directly from the flash rule, since matching cells add nothing to memory. It isn't independent support for section 11.
-- **Falloff, 2D and 3D:** flash rate vs distance from a dense core is a step, not 1/distance.
-- **3D, one-cell:** it does **not** freeze. About 5% of pixels keep flashing through 1500 ticks.
-- **3D carrier:** a point source gives 1/distance, as geometry predicts. But in the engine the dense core is quiet and emits almost nothing, and the carrier comes from everywhere outside it. Mass shows up as a hole in the flashing, not a source.
+**Up to November 10** (earlier handoff):
+- Steps 1–2 pass.
+- 2D flip rules cohere, then freeze.
+- Trigger values 3, 4 and 5 give no constant chance per tick.
+- Mass shows up as a hole in the flashing, not a source.
+- A point source of carrier gives 1/distance by geometry.
 
-## Open decisions (the user's to make)
+**Parameter sweep** (`results/sweep-2026-11-10`, 150 runs):
+- No setting shows a decay-like flat hazard.
+- The core is brighter than its surroundings in only 1 run (flip_all · sync · gravity · core 8, seed 2).
+- v1 freezes with every pixel an electron.
 
-1. **Source of mass.** Section 11 says massive regions give off *more* flashes, and every version of the engine does the opposite. Either mass isn't the coherent region, or coherent regions should flash more, for example in a single synchronized burst.
-2. **Carrier feedback.** How carrier acts on pixels: adding reinforcement, cancelling memory, or something else. It has to come from geometry, with no strength knob.
-3. **Carrier speed:** one hop per tick (current), the same as a flash.
-4. **Reverse stroke** (section 6): what refills memory once a region has cohered.
-5. **Lattice vs no lattice.** Any fixed lattice puts distance in by hand. The thesis-faithful version links pixels by which ones flashed together and measures distance by hops afterward.
-6. **Five nodes:** where they sit relative to the three cells. Not in the code.
+**Box size** (`box-size.tsv`): the falloff trend with core size came from the box edge. On a 96³ box it nearly disappears.
 
-## Next checks
+**Rule 21** (`results/rule21-2026-11-12`):
+- Flashing goes to 0 in every setting.
+- Mass stays a hole under feedback off, reinforce and cancel.
 
-- Hazard table for the 3D one-cell run. Is the ongoing ~5% flashing a constant chance per tick, which decay needs?
-- Neighbor agreement and region clocks on the 3D lattice. They're only measured in 2D now.
-- Add hold, one-cell, flip-all and a start control to the viewer, or build a 3D slice viewer.
+**War experiments** (`experiments/war-history`):
+- The engine is chaotic: a one-cell nudge spreads almost as far as a war.
+- Earth's real war record (1400–2000) leaves the world more restless and more uniform than its twin, and that doesn't heal. In flip_all · sweep, which isn't chaotic, the wars' mark is permanent.
+
+**Precompression analogue** (`experiments/precompression`):
+- Holding 1 site in 8 fixed raises the jostling level that order survives, by +0.03 to +0.15.
+- A regular cage beats random holds slightly in every setting.
+- Gravity makes order more fragile.
+
+## Build plan status (spec R-A to R-E)
+
+| Step | Status |
+|---|---|
+| R-A carrier feedback | **Done** as rule 21 (cancel). Reinforcement already existed as rule 6. Not tested: whether separate regions attract or merge, because there is only a single-core start. |
+| R-B exclusion | **Waiting on Jono:** what counts as "same state"? The pattern, the phase, or handedness (rule 20)? |
+| R-C three carriers | Not started. Open question: do the channels share one conserved total or each conserve separately? |
+| R-D colour and confinement (protons, neutrons) | Not started. Needs R-C's strong channel. |
+| R-E antiparticles | Not started. |
+| Nucleus | Only after R-D, and only if it emerges. |
+
+## Open decisions (Jono's)
+
+1. **Source of mass:** the engine always shows it as a hole.
+2. ~~Carrier feedback~~: built as rules 6 and 21. Choosing between them is still open.
+3. **Carrier speed:** currently one hop per tick.
+4. **Reverse stroke:** what refills memory.
+5. **Lattice vs no lattice.**
+6. **Five nodes:** where they sit relative to the three cells.
+7. **Two-core start:** needed to test attraction under rule 21 or rule 6.
+8. **The organized colour-regions result:** it lives only in a claude.ai chat. It isn't in the repo yet, so it isn't a baseline.
 
 ## Working style
 
 - Jono is terse and direct. He wants room to think out loud, not a verdict plus next action every turn.
-- Every rule change goes into the doc log **before** a run is used.
+- Every rule change goes into `RULES.md` (and the log) **before** a run is used.
+- Jono reviews locally before anything is pushed.
