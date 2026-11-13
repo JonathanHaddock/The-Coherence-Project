@@ -37,6 +37,7 @@ input[type=range]{accent-color:var(--acc)}
   <button id="gravity">gravity: off</button>
   <button id="cancel">cancel memory (21): off</button>
   <button id="excl">exclusion (22): off</button>
+  <button id="ch3">3 carriers (23): off</button>
   <label>neutrino delivery <select id="deliver"><option value="none">none (rule 14)</option><option value="same">same information (15)</option><option value="unreal">unrealized information (15)</option><option value="weak">weak events only (17-19)</option><option value="weakhand">weak events + handedness (20)</option></select></label>
   <label>neutrino weighting <select id="weight"><option value="all7">all 7 unrealized</option><option value="next">3 next-step</option></select></label>
   <label>control p <input id="p" type="number" min="0.01" max="0.99" step="0.01" value="0.20" style="width:64px"></label>
@@ -126,6 +127,7 @@ class Engine {
     this.fired = new Uint8Array(N);
     this.carrier = new Float64Array(N);
     this.next = new Float64Array(N);
+    this.car3 = new Float64Array(N * 3); this.nxt3 = new Float64Array(N * 3); this.absorbed = new Float64Array(12);
     this.car6 = new Float64Array(N * 6); this.nxt6 = new Float64Array(N * 6);
     this.t = 0; this.total = 0;
     const M = (1n << 64n) - 1n;
@@ -178,7 +180,11 @@ class Engine {
     this.pat[i] = p & 7;
     const rel = c[b] + c[b + 1] + c[b + 2];
     r[b] = r[b + 1] = r[b + 2] = c[b] = c[b + 1] = c[b + 2] = 0;
-    this.carrier[i] += rel;
+    if (this.cfg.channels) {
+      const sl = Engine.select(this.pat[i]); let k = 0; for (const on of sl) k += on ? 1 : 0;
+      const share = rel / k;
+      for (let ch = 0; ch < 3; ch++) if (sl[ch]) this.car3[i * 3 + ch] += share;
+    } else this.carrier[i] += rel;
     this.fired[i] = 1;
   }
   receive(j, shown) {
@@ -335,8 +341,13 @@ class Engine {
         const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh);
       }
     }
-    this.spread();
-    if (this.cfg.gravity) this.absorb(); else if (this.cfg.cancel) this.cancelMemory();
+    if (this.cfg.channels) {
+      this.spread3(); this.absorb3();
+      for (let i = 0; i < N; i++) this.carrier[i] = this.car3[i * 3] + this.car3[i * 3 + 1] + this.car3[i * 3 + 2];
+    } else {
+      this.spread();
+      if (this.cfg.gravity) this.absorb(); else if (this.cfg.cancel) this.cancelMemory();
+    }
     this.t++; this.total += count;
     return count;
   }
@@ -353,6 +364,34 @@ class Engine {
       if (z > 0) nx[i - S * S] += sh;
     }
     this.carrier = nx; this.next = c;
+  }
+  // RULE 23: channel selection (0 weak, 1 EM, 2 strong) by charge.
+  static select(p) { const c = (p & 1) + ((p >> 1) & 1) + ((p >> 2) & 1);
+    return c === 0 ? [true, false, false] : c === 3 ? [true, true, false] : [true, true, true]; }
+  spread3() {
+    const c = this.car3, nx = this.nxt3; nx.fill(0);
+    for (let i = 0; i < N; i++) for (let ch = 0; ch < 3; ch++) {
+      const q = c[i * 3 + ch]; if (q === 0) continue;
+      const sh = q / 6, x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
+      if (x + 1 < S) nx[(i + 1) * 3 + ch] += sh;
+      if (x > 0) nx[(i - 1) * 3 + ch] += sh;
+      if (y + 1 < S) nx[(i + S) * 3 + ch] += sh;
+      if (y > 0) nx[(i - S) * 3 + ch] += sh;
+      if (z + 1 < S) nx[(i + S * S) * 3 + ch] += sh;
+      if (z > 0) nx[(i - S * S) * 3 + ch] += sh;
+    }
+    this.car3 = nx; this.nxt3 = c;
+  }
+  absorb3() {
+    const c = this.car3, rf = this.rf;
+    for (let i = 0; i < N; i++) {
+      const sl = Engine.select(this.pat[i]), p = this.pat[i], kind = (p & 1) + ((p >> 1) & 1) + ((p >> 2) & 1);
+      for (let ch = 0; ch < 3; ch++) {
+        const v = c[i * 3 + ch]; if (!sl[ch] || v < 3) continue;
+        const k = Math.floor(v / 3); c[i * 3 + ch] = v - k * 3;
+        rf[i * 3] += k; rf[i * 3 + 1] += k; rf[i * 3 + 2] += k; this.absorbed[kind * 3 + ch] += k;
+      }
+    }
   }
   // RULE 21: each whole pixel's worth of carrier (3 units) cancels one conserved unit
   // on each cell that holds one; one carrier unit used per memory unit cancelled.
@@ -385,7 +424,7 @@ let eng, running=false, recent=new Float32Array(N), hist=[];
 const BINS=H; let rate=new Float64Array(BINS), agr=new Float64Array(BINS), seen=false;
 const binOf=new Int16Array(N), cnt=new Float64Array(BINS);
 for(let i=0;i<N;i++){const b=Math.floor(RAD[i]);binOf[i]=b<BINS?b:-1;if(b<BINS)cnt[b]++;}
-function cfg(){const dv=$("deliver").value;return{deliver:(dv==="weak"||dv==="weakhand")?"unreal":dv,weak:dv==="weak"||dv==="weakhand",hand:dv==="weakhand",weight:$("weight").value,p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on"),exclusion:$("excl").classList.contains("on"),cancel:!$("gravity").classList.contains("on")&&$("cancel").classList.contains("on")};}
+function cfg(){const dv=$("deliver").value;return{deliver:(dv==="weak"||dv==="weakhand")?"unreal":dv,weak:dv==="weak"||dv==="weakhand",hand:dv==="weakhand",weight:$("weight").value,p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on"),exclusion:$("excl").classList.contains("on"),channels:$("ch3").classList.contains("on"),cancel:!$("gravity").classList.contains("on")&&$("cancel").classList.contains("on")};}
 const KG=24;let lastF=new Int32Array(N),gapH=new Float64Array(KG+1),flashSum=0,tickSum=0;
 function reset(){lastF.fill(-1);gapH.fill(0);flashSum=0;tickSum=0;eng=new Engine(cfg());recent.fill(0);hist=[];rate.fill(0);agr.fill(0);seen=false;measure(0);draw();}
 function measure(alpha){
@@ -485,7 +524,7 @@ function stateText(){
   const c=eng.cfg, lat=c.mode==="lattice";
   let a=0,mem=0;const fill=[0,0,0];for(let i=0;i<N;i++){a+=eng.agreement(i);mem+=eng.cs[i*3]+eng.cs[i*3+1]+eng.cs[i*3+2];for(let k=0;k<3;k++)fill[k]+=(eng.pat[i]>>k)&1;}
   const last=hist.length?hist[hist.length-1]:0;
-  const cmd="origin record mode="+c.mode+" core="+c.core+" ticks="+eng.t+(lat?" display="+c.display+" update="+c.update+(c.gravity?" gravity=on":c.cancel?" feedback=cancel":"")+(c.exclusion?" exclusion=on":""):"")+" every=10";
+  const cmd="origin record mode="+c.mode+" core="+c.core+" ticks="+eng.t+(lat?" display="+c.display+" update="+c.update+(c.gravity?" gravity=on":c.cancel?" feedback=cancel":"")+(c.exclusion?" exclusion=on":"")+(c.channels?" channels=on":""):"")+" every=10";
   const s={record:cmd,mode:c.mode,display:lat?c.display:"one_cell",update:lat?c.update:"sync",core:c.core,gravity:lat?c.gravity:false,seed:"20261110",
     tick:eng.t,total_flashes:eng.total,flashes_this_tick:last,flashing:+(last/N).toFixed(4),agreement:+(a/N).toFixed(4),memory:mem,
     filled:fill.map(v=>+(v/N).toFixed(4)),view:$("view").value,slice_z:+$("z").value,
@@ -497,6 +536,7 @@ $("copy").onclick=async()=>{const txt=stateText(),box=$("copybox");box.value=txt
   catch(e){box.style.display="block";box.select();$("copy").textContent="Select + copy below";}
   setTimeout(()=>$("copy").textContent="Copy state",2000);};
 $("gravity").onclick=()=>{const b=$("gravity");b.classList.toggle("on");b.textContent="gravity: "+(b.classList.contains("on")?"ON":"off");if(b.classList.contains("on")){$("cancel").classList.remove("on");$("cancel").textContent="cancel memory (21): off";}reset();};
+$("ch3").onclick=()=>{const b=$("ch3");b.classList.toggle("on");b.textContent="3 carriers (23): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("excl").onclick=()=>{const b=$("excl");b.classList.toggle("on");b.textContent="exclusion (22): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("cancel").onclick=()=>{const b=$("cancel");b.classList.toggle("on");b.textContent="cancel memory (21): "+(b.classList.contains("on")?"ON":"off");if(b.classList.contains("on")){$("gravity").classList.remove("on");$("gravity").textContent="gravity: off";}reset();};
 for(const id of["mode","display","update","core","p","weight","deliver"])$(id).onchange=reset;

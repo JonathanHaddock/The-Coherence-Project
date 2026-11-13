@@ -1,0 +1,14 @@
+{
+  "name": "lattice_flip_all_sync_core8_nograv_t1500_s1",
+  "mode": "lattice",
+  "display": "flip_all",
+  "update": "sync",
+  "core": 8,
+  "gravity": false,
+  "seed": 1,
+  "ticks": 1500,
+  "every": 10,
+  "lattice": "48^3, 6 neighbors",
+  "rules": "1-5; carrier lost at box edge, no feedback",
+  "files": ["series.csv", "shells.csv", "gaps.csv", "slice.csv"]
+}

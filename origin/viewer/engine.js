@@ -25,6 +25,7 @@ class Engine {
     this.fired = new Uint8Array(N);
     this.carrier = new Float64Array(N);
     this.next = new Float64Array(N);
+    this.car3 = new Float64Array(N * 3); this.nxt3 = new Float64Array(N * 3); this.absorbed = new Float64Array(12);
     this.car6 = new Float64Array(N * 6); this.nxt6 = new Float64Array(N * 6);
     this.t = 0; this.total = 0;
     const M = (1n << 64n) - 1n;
@@ -77,7 +78,11 @@ class Engine {
     this.pat[i] = p & 7;
     const rel = c[b] + c[b + 1] + c[b + 2];
     r[b] = r[b + 1] = r[b + 2] = c[b] = c[b + 1] = c[b + 2] = 0;
-    this.carrier[i] += rel;
+    if (this.cfg.channels) {
+      const sl = Engine.select(this.pat[i]); let k = 0; for (const on of sl) k += on ? 1 : 0;
+      const share = rel / k;
+      for (let ch = 0; ch < 3; ch++) if (sl[ch]) this.car3[i * 3 + ch] += share;
+    } else this.carrier[i] += rel;
     this.fired[i] = 1;
   }
   receive(j, shown) {
@@ -234,8 +239,13 @@ class Engine {
         const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh);
       }
     }
-    this.spread();
-    if (this.cfg.gravity) this.absorb(); else if (this.cfg.cancel) this.cancelMemory();
+    if (this.cfg.channels) {
+      this.spread3(); this.absorb3();
+      for (let i = 0; i < N; i++) this.carrier[i] = this.car3[i * 3] + this.car3[i * 3 + 1] + this.car3[i * 3 + 2];
+    } else {
+      this.spread();
+      if (this.cfg.gravity) this.absorb(); else if (this.cfg.cancel) this.cancelMemory();
+    }
     this.t++; this.total += count;
     return count;
   }
@@ -252,6 +262,34 @@ class Engine {
       if (z > 0) nx[i - S * S] += sh;
     }
     this.carrier = nx; this.next = c;
+  }
+  // RULE 23: channel selection (0 weak, 1 EM, 2 strong) by charge.
+  static select(p) { const c = (p & 1) + ((p >> 1) & 1) + ((p >> 2) & 1);
+    return c === 0 ? [true, false, false] : c === 3 ? [true, true, false] : [true, true, true]; }
+  spread3() {
+    const c = this.car3, nx = this.nxt3; nx.fill(0);
+    for (let i = 0; i < N; i++) for (let ch = 0; ch < 3; ch++) {
+      const q = c[i * 3 + ch]; if (q === 0) continue;
+      const sh = q / 6, x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
+      if (x + 1 < S) nx[(i + 1) * 3 + ch] += sh;
+      if (x > 0) nx[(i - 1) * 3 + ch] += sh;
+      if (y + 1 < S) nx[(i + S) * 3 + ch] += sh;
+      if (y > 0) nx[(i - S) * 3 + ch] += sh;
+      if (z + 1 < S) nx[(i + S * S) * 3 + ch] += sh;
+      if (z > 0) nx[(i - S * S) * 3 + ch] += sh;
+    }
+    this.car3 = nx; this.nxt3 = c;
+  }
+  absorb3() {
+    const c = this.car3, rf = this.rf;
+    for (let i = 0; i < N; i++) {
+      const sl = Engine.select(this.pat[i]), p = this.pat[i], kind = (p & 1) + ((p >> 1) & 1) + ((p >> 2) & 1);
+      for (let ch = 0; ch < 3; ch++) {
+        const v = c[i * 3 + ch]; if (!sl[ch] || v < 3) continue;
+        const k = Math.floor(v / 3); c[i * 3 + ch] = v - k * 3;
+        rf[i * 3] += k; rf[i * 3 + 1] += k; rf[i * 3 + 2] += k; this.absorbed[kind * 3 + ch] += k;
+      }
+    }
   }
   // RULE 21: each whole pixel's worth of carrier (3 units) cancels one conserved unit
   // on each cell that holds one; one carrier unit used per memory unit cancelled.

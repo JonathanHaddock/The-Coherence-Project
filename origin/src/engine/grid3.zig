@@ -61,12 +61,21 @@ pub const Grid3 = struct {
     cancel: bool,
     /// RULE 22: exclusion on the pattern (build spec R-B).
     exclusion: bool,
+    /// RULE 23: three carriers (0 weak, 1 EM, 2 strong), each conserved separately.
+    channels: bool,
+    car3: [n][3]f64,
+    nxt3: [n][3]f64,
+    /// RULE 23 measurement: reinforcement absorbed, by pixel kind (filled count) and channel.
+    absorbed: [4][3]f64,
 
     pub fn init(g: *Grid3, cfg: px.Config) void {
         g.cfg = cfg;
         g.gravity = false;
         g.cancel = false;
         g.exclusion = false;
+        g.channels = false;
+        g.car3 = @splat(.{ 0, 0, 0 });
+        g.absorbed = @splat(.{ 0, 0, 0 });
         g.fired = @splat(false);
         g.carrier = @splat(0);
         var s = cfg.seed;
@@ -90,7 +99,15 @@ pub const Grid3 = struct {
 
     fn fire(g: *Grid3, i: usize, t: i64) u32 {
         const released = g.px[i].flashWith(t, g.cfg.display);
-        g.carrier[i] += @floatFromInt(released);
+        if (g.channels) {
+            const s = select(g.px[i].pattern);
+            var k: f64 = 0;
+            for (s) |on| k += @floatFromInt(@intFromBool(on));
+            const share = @as(f64, @floatFromInt(released)) / k;
+            for (0..3) |c| if (s[c]) {
+                g.car3[i][c] += share;
+            };
+        } else g.carrier[i] += @floatFromInt(released);
         g.fired[i] = true;
         return 1;
     }
@@ -116,8 +133,14 @@ pub const Grid3 = struct {
                 for (neighbors(i)) |j| g.px[j].receive(g.px[i].pattern);
             },
         }
-        g.spread();
-        if (g.gravity) g.absorb() else if (g.cancel) g.cancelMemory();
+        if (g.channels) {
+            g.spread3();
+            g.absorb3();
+            for (0..n) |i| g.carrier[i] = g.car3[i][0] + g.car3[i][1] + g.car3[i][2];
+        } else {
+            g.spread();
+            if (g.gravity) g.absorb() else if (g.cancel) g.cancelMemory();
+        }
         return count;
     }
 
@@ -132,6 +155,50 @@ pub const Grid3 = struct {
             const k: u32 = @intFromFloat(@floor(g.carrier[i] / unit));
             g.carrier[i] -= @as(f64, @floatFromInt(k)) * unit;
             for (0..px.cells) |c| g.px[i].reinforce[c] += k;
+        }
+    }
+
+    /// RULE 23: which channels a pattern selects (0 weak, 1 EM, 2 strong), by charge:
+    /// neutrino (0 filled) weak; quarks (1, 2) all three; electron (3) EM + weak.
+    pub fn select(pattern: u3) [3]bool {
+        return switch (@popCount(pattern)) {
+            0 => .{ true, false, false },
+            1, 2 => .{ true, true, true },
+            else => .{ true, true, false },
+        };
+    }
+
+    /// RULE 23: rule 5 spreading, per channel.
+    pub fn spread3(g: *Grid3) void {
+        g.nxt3 = @splat(.{ 0, 0, 0 });
+        for (0..n) |i| for (0..3) |ch| {
+            const q = g.car3[i][ch];
+            if (q == 0) continue;
+            const share = q / 6.0;
+            const c = coords(i);
+            if (c[0] + 1 < side) g.nxt3[i + 1][ch] += share;
+            if (c[0] > 0) g.nxt3[i - 1][ch] += share;
+            if (c[1] + 1 < side) g.nxt3[i + side][ch] += share;
+            if (c[1] > 0) g.nxt3[i - side][ch] += share;
+            if (c[2] + 1 < side) g.nxt3[i + side * side][ch] += share;
+            if (c[2] > 0) g.nxt3[i - side * side][ch] += share;
+        };
+        g.car3 = g.nxt3;
+    }
+
+    /// RULE 23: rule 6 per channel, only where the pixel selects that channel.
+    pub fn absorb3(g: *Grid3) void {
+        const unit: f64 = px.cells;
+        for (0..n) |i| {
+            const s = select(g.px[i].pattern);
+            const kind = @popCount(g.px[i].pattern);
+            for (0..3) |ch| {
+                if (!s[ch] or g.car3[i][ch] < unit) continue;
+                const k: u32 = @intFromFloat(@floor(g.car3[i][ch] / unit));
+                g.car3[i][ch] -= @as(f64, @floatFromInt(k)) * unit;
+                for (0..px.cells) |c| g.px[i].reinforce[c] += k;
+                g.absorbed[kind][ch] += @floatFromInt(k);
+            }
         }
     }
 
@@ -222,6 +289,20 @@ test "point source in 3D gives roughly 1/distance" {
     const a = avg[4] * 4;
     const b = avg[8] * 8;
     try std.testing.expect(b / a > 0.7 and b / a < 1.05);
+}
+
+test "rule 23: neutrinos are invisible to EM and strong carrier" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{});
+    g.channels = true;
+    g.car3 = @splat(.{ 0, 0, 0 });
+    g.px[0].pattern = 0; // neutrino
+    g.px[0].reinforce = .{ 0, 0, 0 };
+    g.car3[0] = .{ 3, 3, 3 };
+    g.absorb3();
+    try std.testing.expectEqual([3]u32{ 1, 1, 1 }, g.px[0].reinforce); // weak only
+    try std.testing.expectEqual([3]f64{ 0, 3, 3 }, g.car3[0]);
 }
 
 test "rule 22: a flash into a neighbour's pattern waits" {
