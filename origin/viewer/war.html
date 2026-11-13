@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>War, Nudge, Twin</title>
+<style>
+:root{--bg:#0b0c0f;--panel:#14171c;--ink:#e6e8eb;--dim:#8a919c;--line:#2a2f37;--gold:#f5b942;--vi:#b48cff;--red:#ff5a5a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
+header{padding:14px 18px;border-bottom:1px solid var(--line)}
+h1{font-size:15px;margin:0 0 4px;letter-spacing:.04em}header p{margin:0;color:var(--dim);font-size:12px;max-width:900px}
+main{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;padding:16px}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;min-width:0}
+.card h2{font-size:11px;font-weight:600;color:var(--dim);margin:0 0 8px;text-transform:uppercase;letter-spacing:.06em}
+#stages{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:760px){#stages{grid-template-columns:1fr}}
+.stage{position:relative}.stage h3{margin:0 0 6px;font-size:13px;font-weight:500}
+#side{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.globe{display:block;width:100%;aspect-ratio:1;cursor:grab;border-radius:6px;background:#07080a}
+#over{position:absolute;left:12px;top:10px;font-size:12px;color:var(--dim);pointer-events:none}
+.big{position:absolute;left:0;right:0;bottom:14px;text-align:center;pointer-events:none}
+.big b{font-size:30px;font-weight:500;color:var(--vi)}.big span{display:block;color:var(--dim);font-size:12px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;font-size:12px;color:var(--dim)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.ctl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+label{color:var(--dim);font-size:12px;display:flex;gap:6px;align-items:center}
+select,button{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:6px 10px;font:inherit;font-size:12px}
+button{cursor:pointer}button:hover{border-color:var(--gold)}button.war{border-color:var(--red);color:var(--red)}
+button:disabled{opacity:.4;cursor:default}
+canvas.chart{display:block;width:100%;height:170px}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.stat{background:var(--bg);border-radius:6px;padding:8px 10px}
+.stat b{display:block;font-size:17px;font-weight:500}.stat i{font-style:normal;color:var(--dim);font-size:11px}
+.note{color:var(--dim);font-size:12px;margin:8px 0 0}
+section+section{margin-top:14px}
+</style></head><body>
+<header>
+ <h1>WAR vs NUDGE vs TWIN · REAL ENGINE, 48³</h1>
+ <p>Two identical worlds run the same rules from the same state. In one, a war happens: a region is forced to flash in lockstep (an outside trigger, as spec §12 allows). A third world gets only a nudge: one cell of one pixel flipped. Everything you see is measured against the untouched twin. No rules were added.</p>
+</header>
+<main>
+ <div class="card">
+  <div id="over" style="position:static;margin-bottom:8px">tick <span id="tk">0</span> · <span id="phase">warming up</span></div>
+  <div id="stages">
+   <div class="stage"><h3 style="color:var(--red)">WAR world vs twin</h3><canvas class="globe" id="g1"></canvas>
+    <div class="big"><b id="divpct">0%</b><span>no longer what it would have been</span></div></div>
+   <div class="stage"><h3 style="color:#7fd6ff">NUDGE world vs twin (one cell flipped)</h3><canvas class="globe" id="g2"></canvas>
+    <div class="big"><b id="divpct2">0%</b><span>no longer what it would have been</span></div></div>
+  </div>
+  <div class="legend">
+   <span><span class="sw" style="background:var(--gold)"></span>same as the twin</span>
+   <span><span class="sw" style="background:var(--vi)"></span>different from the twin</span>
+   <span><span class="sw" style="background:var(--red)"></span>war region, forced to flash</span>
+   <span><span class="sw" style="background:#7fd6ff"></span>the nudged pixel</span>
+   <span>drag either view to rotate both · scroll to zoom</span>
+  </div>
+ </div>
+ <div id="side">
+  <div class="card">
+   <section class="ctl">
+    <button id="warbtn" class="war" disabled>start war + nudge</button>
+    <button id="pause">❚❚ pause</button>
+    <button id="reset">↺ reset</button>
+    <label>rules <select id="set">
+     <option value="one_cell,sync,1">one_cell · sync · gravity</option>
+     <option value="one_cell,sync,0">one_cell · sync · no gravity</option>
+     <option value="flip_all,sync,1">flip_all · sync · gravity</option>
+    </select></label>
+    <label>war size <select id="rad"><option>4</option><option selected>8</option><option>12</option></select></label>
+    <label>war <select id="kind"><option value="one">one war</option><option value="real" selected>Earth's real record, 1400–2000 (3,708 wars)</option><option value="hist">random history (~1.5 wars/yr)</option></select></label>
+    <label>length <select id="len"><option>10</option><option selected>30</option><option>100</option></select> ticks</label>
+    <label><input type="checkbox" id="cut"> cut away front half</label>
+   </section>
+  </div>
+  <div class="card">
+   <h2>Divergence from the twin, % of all pixels: <span style="color:var(--red)">war</span> vs <span style="color:#7fd6ff">nudge</span></h2>
+   <canvas class="chart" id="ch1"></canvas>
+   <h2 style="margin-top:12px">What the averages say: flashing and agreement, both worlds</h2>
+   <canvas class="chart" id="ch2"></canvas>
+   <p class="note"><span style="color:var(--red)">war world</span>, <span style="color:#7fd6ff">nudge world</span> vs <span style="color:#cfd3d8">twin</span>. Solid = flash rate, dashed = neighbour agreement.</p>
+  </div>
+  <div class="card">
+   <div class="stats">
+    <div class="stat"><b id="sReg">–</b><i>pixels in the war region</i></div>
+    <div class="stat"><b id="sDiv">–</b><i>pixels now different</i></div>
+    <div class="stat"><b id="sNud">–</b><i>pixels different in the nudge world</i></div>
+    <div class="stat"><b id="sSince">–</b><i>ticks since the war ended</i></div>
+   </div>
+   <p class="note" id="read"></p>
+  </div>
+ </div>
+</main>
+<script src="engine.js"></script>
+<script src="earth-wars.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+class World extends Engine{ready(i){return super.ready(i)||(this.forced!==null&&this.forced!==undefined&&this.forced[i]===1)}}
+const WARM=150;
+let realMode=false,nextW=0;
+// Regions 1-12 get fixed spots on a 3x2x2 grid of the lattice; each war is jittered around its region (not geography). -9 = global.
+function place(w,k){if(w[2]<0)return[H,H,H];const g=w[2]-1,h=(k*2654435761)>>>0;
+  const j=n=>((h>>>(n*8))&255)/255*14-7;
+  return[(8+16*(g%3)+j(0)+S)%S|0,(12+24*((g/3|0)%2)+j(1)+S)%S|0,(12+24*((g/6|0)%2)+j(2)+S)%S|0]}
+let wars=[],started=0,A,B,Cn,NUDGE=(H*S+H)*S+H+3,reg,regN,state,warT,warEnd,paused=false,hist=[];
+
+function reset(){
+  const [display,update,g]=$("set").value.split(",");
+  const cfg={display,update,core:0,gravity:g==="1"};
+  A=new World(cfg);B=null;Cn=null;hist=[];state="warm";warT=warEnd=-1;
+  const r=+$("rad").value;reg=new Uint8Array(N);regN=0;
+  for(let i=0;i<N;i++)if(RAD[i]<=r){reg[i]=1;regN++}
+  $("warbtn").disabled=true;$("warbtn").textContent="start war + nudge";
+  $("sReg").textContent=regN.toLocaleString()+" ("+(100*regN/N).toFixed(1)+"%)";
+  $("read").textContent="";
+}
+function startWar(){
+  if(state!=="peace")return;
+  state="war";warT=A.t;Cn.pat[NUDGE]^=1;warEnd=$("kind").value!=="one"?Infinity:A.t+(+$("len").value);realMode=$("kind").value==="real";wars=[];started=0;nextW=0;
+  $("warbtn").disabled=true;$("warbtn").textContent="war under way";
+}
+function step(){
+  if(state==="warm"){A.tick();if(A.t>=WARM){ // clone: the twin starts identical
+      B=new World(A.cfg);Cn=new World(A.cfg);for(const k of["pat","rf","cs","carrier"]){B[k].set(A[k]);Cn[k].set(A[k])}B.t=Cn.t=A.t;
+      state="peace";$("warbtn").disabled=false;}
+    return;}
+  if(state==="war"&&realMode){ // real record: 1 tick = 1 year from 1400
+    const yr=1400+A.t-warT;
+    if(yr>2000){state="after";warEnd=A.t;$("warbtn").textContent="record ends at 2000";reg.fill(0)}
+    else{while(nextW<EARTH_WARS.length&&EARTH_WARS[nextW][0]<=yr){const w=EARTH_WARS[nextW++],c=place(w,nextW);wars.push({x:c[0],y:c[1],z:c[2],r:w[3],end:A.t+w[1],name:w[4],deaths:w[5]});started++}
+      wars=wars.filter(w=>w.end>A.t);reg.fill(0);
+      for(const w of wars){const r=Math.ceil(w.r);for(let dz=-r;dz<=r;dz++)for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+        if(dx*dx+dy*dy+dz*dz>w.r*w.r)continue;reg[(((w.z+dz+S)%S)*S+((w.y+dy+S)%S))*S+((w.x+dx+S)%S)]=1}}}
+  } else if(state==="war"&&warEnd===Infinity){ // Earth's history: 1 tick = 1 year, Poisson wars, r 3-8, 1-10 years
+    let k=0;const Lm=Math.exp(-1.5);let pr=Math.random();while(pr>Lm){k++;pr*=Math.random()}
+    for(let w=0;w<k;w++){wars.push({x:Math.random()*S|0,y:Math.random()*S|0,z:Math.random()*S|0,r:3+Math.random()*5,end:A.t+1+(Math.random()*10|0)});started++}
+    wars=wars.filter(w=>w.end>A.t);reg.fill(0);
+    for(const w of wars){const r=Math.ceil(w.r);for(let dz=-r;dz<=r;dz++)for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+      if(dx*dx+dy*dy+dz*dz>w.r*w.r)continue;reg[(((w.z+dz+S)%S)*S+((w.y+dy+S)%S))*S+((w.x+dx+S)%S)]=1}}}
+  A.forced=state==="war"?reg:null;
+  const fa=A.tick(),fb=B.tick(),fc=Cn.tick();
+  if(state==="war"&&A.t>=warEnd){state="after";$("warbtn").textContent="war over"}
+  let d=0,d2=0;for(let i=0;i<N;i++){if(A.pat[i]!==B.pat[i])d++;if(Cn.pat[i]!==B.pat[i])d2++}
+  let sa=0,sb=0,sc=0,n=0;for(let i=0;i<N;i+=13){sa+=A.agreement(i);sb+=B.agreement(i);sc+=Cn.agreement(i);n++}
+  hist.push({t:A.t,div:d/N,div2:d2/N,fa:fa/N,fb:fb/N,fc:fc/N,aa:sa/n,ab:sb/n,ac:sc/n,war:state==="war"});
+  return d;
+}
+
+// ---- 3D ----
+const gIdx=[];for(let i=0;i<N;i++)if(RAD[i]<=23)gIdx.push(i);
+const GN=gIdx.length,pos=new Float32Array(GN*3),col=new Float32Array(GN*3);
+gIdx.forEach((i,k)=>{pos[k*3]=i%S-H;pos[k*3+1]=((i/S)|0)%S-H;pos[k*3+2]=((i/(S*S))|0)-H});
+const cam=new THREE.PerspectiveCamera(40,1,1,500);
+const col2=new Float32Array(GN*3);
+function view(id,colors){const r=new THREE.WebGLRenderer({canvas:$(id),antialias:true});r.setPixelRatio(Math.min(2,devicePixelRatio||1));r.setClearColor(0x07080a);
+ const sc=new THREE.Scene(),g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.BufferAttribute(pos,3));g.setAttribute("color",new THREE.BufferAttribute(colors,3));
+ const pts=new THREE.Points(g,MAT);sc.add(pts);return{r,sc,g,pts,c:$(id)}}
+const dot=(()=>{const c=document.createElement("canvas");c.width=c.height=32;const x=c.getContext("2d");
+ const g=x.createRadialGradient(16,16,0,16,16,16);g.addColorStop(0,"#fff");g.addColorStop(.4,"rgba(255,255,255,.7)");g.addColorStop(1,"rgba(255,255,255,0)");
+ x.fillStyle=g;x.fillRect(0,0,32,32);return new THREE.CanvasTexture(c)})();
+const MAT=new THREE.PointsMaterial({size:1.1,map:dot,vertexColors:true,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false});
+const V=[view("g1",col),view("g2",col2)];
+let rx=0.4,ry=0.6,dist=88,drag=null;
+for(const v of V){const gc=v.c;
+gc.addEventListener("pointerdown",e=>{drag=[e.clientX,e.clientY];gc.setPointerCapture(e.pointerId);gc.style.cursor="grabbing"});
+gc.addEventListener("pointermove",e=>{if(!drag)return;ry+=(e.clientX-drag[0])*.008;rx=Math.max(-1.5,Math.min(1.5,rx+(e.clientY-drag[1])*.008));drag=[e.clientX,e.clientY]});
+gc.addEventListener("pointerup",()=>{drag=null;gc.style.cursor="grab"});
+gc.addEventListener("wheel",e=>{e.preventDefault();dist=Math.max(35,Math.min(200,dist*(1+e.deltaY*.001)))},{passive:false});}
+function size(){for(const v of V){const w=v.c.clientWidth;v.r.setSize(w,w,false)}cam.aspect=1;cam.updateProjectionMatrix()}
+addEventListener("resize",()=>{size();drawCharts()});
+const recent=new Float32Array(N);
+function draw3d(){
+  const cut=$("cut").checked,cy=Math.cos(ry),sy=Math.sin(ry),cx=Math.cos(rx),sx=Math.sin(rx),twin=B!==null;
+  for(let k=0;k<GN;k++){const i=gIdx[k];recent[i]=A.fired[i]?1:recent[i]*0.8;
+    let r=0,g=0,b=0;
+    let on=true;if(cut){const x=pos[k*3],y=pos[k*3+1],z=pos[k*3+2];if(y*sx+(-x*sy+z*cy)*cx>0)on=false}
+    let r2=0,g2=0,b2=0;
+    if(on){
+      const f=0.35+0.65*recent[i];
+      if(state==="war"&&reg[i]){r=1;g=.28;b=.28;const p=.5+.5*recent[i];r*=p;g*=p;b*=p}
+      else if(twin&&A.pat[i]!==B.pat[i]){r=.62*f;g=.42*f;b=1*f}
+      else{r=.3*f;g=.21*f;b=.055*f}
+      if(i===NUDGE&&warT>=0){r2=.5;g2=.85;b2=1}
+      else if(twin&&A.t>warT&&warT>=0&&Cn.pat[i]!==B.pat[i]){r2=.62*f;g2=.42*f;b2=1*f}
+      else{r2=.3*f;g2=.21*f;b2=.055*f}
+    }
+    col[k*3]=r*.6;col[k*3+1]=g*.6;col[k*3+2]=b*.6;col2[k*3]=r2*.6;col2[k*3+1]=g2*.6;col2[k*3+2]=b2*.6}
+  cam.position.set(0,0,dist);cam.lookAt(0,0,0);
+  for(const v of V){v.g.attributes.color.needsUpdate=true;v.pts.rotation.set(rx,ry,0);v.r.render(v.sc,cam)}
+}
+// ---- charts ----
+function chart(id,series,ymax,fmt){
+  const c=$(id),w=c.clientWidth,h=c.clientHeight,dpr=devicePixelRatio||1;c.width=w*dpr;c.height=h*dpr;
+  const x=c.getContext("2d");x.scale(dpr,dpr);x.clearRect(0,0,w,h);
+  const L=38,R=8,T=8,Bm=20,n=Math.max(60,hist.length);
+  x.font="11px ui-monospace,Menlo,monospace";x.fillStyle="#8a919c";x.strokeStyle="#2a2f37";
+  for(let q=0;q<=4;q++){const v=ymax*q/4,y=T+(h-T-Bm)*(1-q/4);x.beginPath();x.moveTo(L,y);x.lineTo(w-R,y);x.stroke();x.fillText(fmt(v),2,y+4)}
+  // war band
+  const wi=hist.findIndex(p=>p.war),we=hist.findLastIndex?hist.findLastIndex(p=>p.war):-1;
+  if(wi>=0){x.fillStyle="rgba(255,90,90,.12)";const x0=L+(w-L-R)*wi/n,x1=L+(w-L-R)*(we+1)/n;x.fillRect(x0,T,Math.max(2,x1-x0),h-T-Bm);x.fillStyle="#ff5a5a";x.fillText("war",x0+3,T+11)}
+  x.fillStyle="#8a919c";x.fillText("ticks after the twin split →",L,h-4);
+  for(const s of series){x.strokeStyle=s.c;x.lineWidth=s.w||1.8;x.setLineDash(s.dash||[]);x.beginPath();
+    hist.forEach((p,j)=>{const X=L+(w-L-R)*j/n,Y=T+(h-T-Bm)*(1-s.f(p)/ymax);j?x.lineTo(X,Y):x.moveTo(X,Y)});x.stroke()}
+  x.setLineDash([]);
+}
+function drawCharts(){
+  const dm=Math.max(.05,...hist.map(p=>Math.max(p.div,p.div2)))*1.15;
+  chart("ch1",[{c:"#ff5a5a",w:2.4,f:p=>p.div},{c:"#7fd6ff",w:2.4,f:p=>p.div2}],dm,v=>(100*v).toFixed(0)+"%");
+  chart("ch2",[{c:"#cfd3d8",f:p=>p.fb},{c:"#ff5a5a",f:p=>p.fa},{c:"#7fd6ff",f:p=>p.fc},{c:"#cfd3d8",f:p=>p.ab,dash:[4,4]},{c:"#ff5a5a",f:p=>p.aa,dash:[4,4]},{c:"#7fd6ff",f:p=>p.ac,dash:[4,4]}],1,v=>v.toFixed(2));
+}
+function panel(){
+  $("tk").textContent=A.t;
+  $("phase").textContent={warm:`warming up (${A.t}/${WARM})`,peace:"three identical worlds · press start war + nudge",war:realMode?`YEAR ${1400+A.t-warT} · ${wars.length} wars active · ${started} so far${wars.length?' · largest: '+wars.reduce((a,b)=>b.r>a.r?b:a).name:''}`:warEnd===Infinity?`EARTH'S HISTORY · year ${A.t-warT} · ${wars.length} wars active · ${started} so far`:"WAR",after:realMode?`after 2000 · year ${1400+A.t-warT} · no more wars`:"after the war"}[state];
+  const p=hist[hist.length-1];
+  if(!p){$("divpct").textContent="0%";return}
+  $("divpct").textContent=(100*p.div).toFixed(1)+"%";
+  const d=Math.round(p.div*N);$("sDiv").textContent=d.toLocaleString();
+  $("divpct2").textContent=(100*p.div2).toFixed(1)+"%";$("sNud").textContent=Math.round(p.div2*N).toLocaleString();
+  $("sSince").textContent=state==="after"?A.t-warEnd:"–";
+  if(state==="after"){
+    const df=Math.abs(p.fa-p.fb),da=Math.abs(p.aa-p.ab);
+    $("read").textContent=`Flash rate differs by ${df.toFixed(3)} and agreement by ${da.toFixed(3)} — on average the two worlds look the same. But ${(100*p.div).toFixed(1)}% of all pixels are not what they would have been, and that share is ${hist.length>40&&p.div>hist[hist.length-40].div?"still growing":"holding"}. The war touched ${(100*regN/N).toFixed(1)}%. The one-cell nudge has reached ${(100*p.div2).toFixed(1)}%.`;
+  }
+}
+let last=0;
+function loop(now){
+  if(!paused&&now-last>30){last=now;const n=state==="warm"?3:1;for(let k=0;k<n;k++)step();draw3d();panel();if(state!=="warm"&&A.t%3===0)drawCharts()}
+  else if(paused||drag)draw3d();
+  requestAnimationFrame(loop);
+}
+$("warbtn").onclick=startWar;
+$("pause").onclick=()=>{paused=!paused;$("pause").textContent=paused?"▶ run":"❚❚ pause"};
+$("reset").onclick=reset;$("set").onchange=reset;$("rad").onchange=reset;
+$("cut").onchange=draw3d;
+size();reset();requestAnimationFrame(loop);
+</script></body></html>

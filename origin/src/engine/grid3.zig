@@ -14,7 +14,8 @@
 const std = @import("std");
 const px = @import("pixel.zig");
 
-pub const side = 48;
+/// Set at build time: zig build -Dside=96 (default 48).
+pub const side: usize = @import("build_options").side;
 pub const n = side * side * side;
 
 pub fn coords(i: usize) [3]usize {

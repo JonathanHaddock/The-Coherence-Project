@@ -3,6 +3,8 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.graph.host;
     const optimize = b.standardOptimizeOption(.{});
+    const opts = b.addOptions();
+    opts.addOption(usize, "side", b.option(usize, "side", "3D lattice side length (default 48)") orelse 48);
 
     const exe = b.addExecutable(.{
         .name = "origin",
@@ -12,6 +14,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
+    exe.root_module.addOptions("build_options", opts);
 
     b.installArtifact(exe);
 
@@ -22,6 +25,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
+    tests.root_module.addOptions("build_options", opts);
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&b.addRunArtifact(tests).step);
 }

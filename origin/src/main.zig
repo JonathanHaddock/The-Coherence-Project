@@ -28,6 +28,7 @@ const grid3 = @import("engine/grid3.zig");
 const lepton = @import("engine/lepton.zig");
 const record = @import("engine/record.zig");
 const photo = @import("engine/photo.zig");
+const onepixel = @import("engine/onepixel.zig");
 
 test {
     _ = koide;
@@ -53,6 +54,7 @@ test {
     _ = lepton;
     _ = record;
     _ = photo;
+    _ = onepixel;
     _ = @import("visualization/labels.zig");
 }
 
@@ -98,6 +100,8 @@ fn help() void {
         \\  origin photo [all7|next] [ticks] [none|same|unreal]
         \\  origin pixel [--no-open]
         \\  origin record mode=lattice|v1|signed|turing|control core=.. p=.. ticks=.. every=.. [display=.. update=.. gravity=on seed=..]
+        \\  origin onepixel [start] [row|bipyramid] [nC|t ...]   (one pixel engine model, e.g. onepixel 100 row n2 t)
+        \\  origin porch [--no-open]                       (experiment menu in the browser)
         \\  origin help
         \\
     , .{});
@@ -741,6 +745,94 @@ fn app(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !vo
     try writeAndOpen(io, gpa, "app.html", html, open_it);
 }
 
+const porch_template = @embedFile("app/porch.html");
+
+/// Front porch: lists every folder in ../experiments plus the engine tools,
+/// embeds them as JSON in porch.html and opens it.
+fn porch(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
+    var open_it = true;
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--no-open")) open_it = false;
+    }
+    var arena: std.heap.ArenaAllocator = .init(gpa);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var json: std.Io.Writer.Allocating = .init(gpa);
+    defer json.deinit();
+    const w = &json.writer;
+    try w.print("{{\"experiments\":[", .{});
+    var first = true;
+    if (std.Io.Dir.cwd().openDir(io, "../experiments", .{ .iterate = true })) |dir_| {
+        var dir = dir_;
+        defer dir.close(io);
+        var names: std.ArrayList([]const u8) = .empty;
+        var it = dir.iterate();
+        while (try it.next(io)) |e| {
+            if (e.kind == .directory and e.name[0] != '.') try names.append(a, try a.dupe(u8, e.name));
+        }
+        std.mem.sort([]const u8, names.items, {}, struct {
+            fn lt(_: void, x: []const u8, y: []const u8) bool {
+                return std.mem.order(u8, x, y) == .lt;
+            }
+        }.lt);
+        for (names.items) |name| {
+            var sub = dir.openDir(io, name, .{ .iterate = true }) catch continue;
+            defer sub.close(io);
+            if (!first) try w.print(",", .{});
+            first = false;
+            try w.print("{{\"name\":", .{});
+            try std.json.Stringify.value(name, .{}, w);
+            try w.print(",\"files\":[", .{});
+            var files: std.ArrayList([]const u8) = .empty;
+            var sit = sub.iterate();
+            while (try sit.next(io)) |f| {
+                if (f.name[0] == '.' or std.mem.eql(u8, f.name, "__pycache__")) continue;
+                const label = if (f.kind == .directory) try std.fmt.allocPrint(a, "{s}/", .{f.name}) else try a.dupe(u8, f.name);
+                try files.append(a, label);
+            }
+            std.mem.sort([]const u8, files.items, {}, struct {
+                fn lt(_: void, x: []const u8, y: []const u8) bool {
+                    return std.mem.order(u8, x, y) == .lt;
+                }
+            }.lt);
+            for (files.items, 0..) |f, k| {
+                if (k > 0) try w.print(",", .{});
+                try std.json.Stringify.value(f, .{}, w);
+            }
+            try w.print("],\"summary\":", .{});
+            var summary: []const u8 = "";
+            for ([_][]const u8{ "README.md", "RESULTS.md", "summary.txt" }) |cand| {
+                summary = sub.readFileAlloc(io, cand, a, .limited(256 * 1024)) catch continue;
+                break;
+            }
+            if (summary.len == 0) for (files.items) |f| {
+                if (!std.mem.endsWith(u8, f, ".txt") or std.mem.eql(u8, f, "requirements.txt")) continue;
+                const body = sub.readFileAlloc(io, f, a, .limited(256 * 1024)) catch continue;
+                summary = try std.fmt.allocPrint(a, "[{s}]\n{s}", .{ f, body });
+                break;
+            };
+            try std.json.Stringify.value(summary[0..@min(summary.len, 4000)], .{}, w);
+            try w.print("}}", .{});
+        }
+    } else |_| {
+        std.debug.print("  (../experiments not found; run from the origin/ folder)\n", .{});
+    }
+    try w.print("]}}", .{});
+
+    const html = try std.mem.replaceOwned(u8, gpa, porch_template, "/*PORCH_DATA*/", json.written());
+    defer gpa.free(html);
+    std.debug.print(
+        \\
+        \\========================================
+        \\          FRONT PORCH
+        \\========================================
+        \\
+        \\
+    , .{});
+    try writeAndOpen(io, gpa, "porch.html", html, open_it);
+}
+
 fn generationsReport() void {
     const g = generations;
     std.debug.print(
@@ -1303,13 +1395,13 @@ fn leptonReport(args: anytype) void {
     const turing = std.mem.eql(u8, mode_s, "turing");
     std.debug.print(
         \\
-        \\--- LEPTON MODE {s} 48^3 (rule choices 7-9) ---
+        \\--- LEPTON MODE {s} {d}^3 (rule choices 7-9) ---
         \\cells = e, mu, tau. Carrier: 3 channels, wrapped edges, absorbed per whole unit as the flash rule.
         \\core {d}, {d} ticks, display one_cell, sync
         \\
         \\  tick  flashing   agree   carrier     memory    e      mu     tau   (fraction filled)
         \\
-    , .{ if (turing) "turing (rule 11)" else if (signed) "signed (rule 10)" else "v1 (rule 9)", core, ticks });
+    , .{ if (turing) "turing (rule 11)" else if (signed) "signed (rule 10)" else "v1 (rule 9)", grid3.side, core, ticks });
     lep_grid.init(20261110, core);
     lep_grid.signed = signed;
     lep_grid.turing = turing;
@@ -1350,6 +1442,40 @@ fn leptonReport(args: anytype) void {
     }
     std.debug.print("\n  profile, last third:  dist  flash  agree\n", .{});
     for (1..bins) |b| std.debug.print("                        {d:>4}  {d:.3}  {d:.3}\n", .{ b, rate[b] / cnt[b], agr[b] / cnt[b] });
+}
+
+fn onePixelReport(args: anytype) void {
+    const start = onepixel.parsePattern(args.next() orelse "100") orelse 0b001;
+    const layout = std.meta.stringToEnum(onepixel.Layout, args.next() orelse "row") orelse .row;
+    var e: onepixel.Engine = .{ .pattern = start, .layout = layout };
+    const names = onepixel.nodeNames(layout);
+    std.debug.print(
+        \\
+        \\--- ONE PIXEL ENGINE (Rule Spec v0 sections 2-4, 12; choices P1-P4) ---
+        \\start {s} ({s}), node layout {s}. Args after the layout: nC = neutrino passes cell C, t = outside trigger.
+        \\
+        \\
+    , .{ &onepixel.fmtPattern(start), @tagName(onepixel.kind(start)), @tagName(layout) });
+    while (args.next()) |a| {
+        if (a.len == 2 and a[0] == 'n' and a[1] >= '0' and a[1] <= '2') {
+            e.neutrinoPasses(@intCast(a[1] - '0'));
+            std.debug.print("  neutrino passes cell {c}     memory {any}\n", .{ a[1], e.memory });
+        } else if (std.mem.eql(u8, a, "t")) {
+            const t = e.trigger() orelse {
+                std.debug.print("  trigger: no turn ({s} pixel; only a down pixel turns)\n", .{@tagName(onepixel.kind(e.pattern))});
+                continue;
+            };
+            std.debug.print("  TURN {d}: {s} ({s}) -> {s} ({s}), cell {d} flips\n", .{ e.turns, &onepixel.fmtPattern(t.before), @tagName(onepixel.kind(t.before)), &onepixel.fmtPattern(t.after), @tagName(onepixel.kind(t.after)), t.cell });
+            for (t.flashes) |f| {
+                std.debug.print("    {s:<8} flash  charge {d:>3}/3  nodes", .{ @tagName(f.what), f.charge });
+                for (f.nodes, 0..) |on, k| if (on) std.debug.print(" {s}", .{names[k]});
+                if (f.what == .neutrino) std.debug.print("  (flavor {s})", .{@tagName(t.flavor)});
+                std.debug.print("\n", .{});
+            }
+            std.debug.print("    balanced {}  nodes fired {d}/5\n", .{ t.balanced(), t.nodesFired() });
+        }
+    }
+    std.debug.print("\n  pixel {s} ({s})  charge ledger: pixel {d}/3 + emitted {d}/3 = {d}/3\n", .{ &onepixel.fmtPattern(e.pattern), @tagName(onepixel.kind(e.pattern)), e.charge(), e.emitted_thirds, e.total() });
 }
 
 var control_grid: record.Control = undefined;
@@ -1556,6 +1682,10 @@ pub fn main(init: std.process.Init) void {
         recordRun(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "lepton")) {
         leptonReport(&args);
+    } else if (std.mem.eql(u8, command, "onepixel")) {
+        onePixelReport(&args);
+    } else if (std.mem.eql(u8, command, "porch")) {
+        porch(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "lattice3")) {
         lattice3Report(&args);
     } else if (std.mem.eql(u8, command, "clocks")) {

@@ -1,0 +1,132 @@
+mode=lattice display=hold update=sync core=0 gravity=off seed=1 ticks=1500
+mode=lattice display=hold update=sync core=0 gravity=off seed=2 ticks=1500
+mode=lattice display=hold update=sync core=0 gravity=off seed=3 ticks=1500
+mode=lattice display=hold update=sync core=0 gravity=on seed=1 ticks=1500
+mode=lattice display=hold update=sync core=0 gravity=on seed=2 ticks=1500
+mode=lattice display=hold update=sync core=0 gravity=on seed=3 ticks=1500
+mode=lattice display=hold update=sync core=4 gravity=off seed=1 ticks=1500
+mode=lattice display=hold update=sync core=4 gravity=off seed=2 ticks=1500
+mode=lattice display=hold update=sync core=4 gravity=off seed=3 ticks=1500
+mode=lattice display=hold update=sync core=4 gravity=on seed=1 ticks=1500
+mode=lattice display=hold update=sync core=4 gravity=on seed=2 ticks=1500
+mode=lattice display=hold update=sync core=4 gravity=on seed=3 ticks=1500
+mode=lattice display=hold update=sync core=8 gravity=off seed=1 ticks=1500
+mode=lattice display=hold update=sync core=8 gravity=off seed=2 ticks=1500
+mode=lattice display=hold update=sync core=8 gravity=off seed=3 ticks=1500
+mode=lattice display=hold update=sync core=8 gravity=on seed=1 ticks=1500
+mode=lattice display=hold update=sync core=8 gravity=on seed=2 ticks=1500
+mode=lattice display=hold update=sync core=8 gravity=on seed=3 ticks=1500
+mode=lattice display=hold update=sweep core=0 gravity=off seed=1 ticks=1500
+mode=lattice display=hold update=sweep core=0 gravity=off seed=2 ticks=1500
+mode=lattice display=hold update=sweep core=0 gravity=off seed=3 ticks=1500
+mode=lattice display=hold update=sweep core=0 gravity=on seed=1 ticks=1500
+mode=lattice display=hold update=sweep core=0 gravity=on seed=2 ticks=1500
+mode=lattice display=hold update=sweep core=0 gravity=on seed=3 ticks=1500
+mode=lattice display=hold update=sweep core=4 gravity=off seed=1 ticks=1500
+mode=lattice display=hold update=sweep core=4 gravity=off seed=2 ticks=1500
+mode=lattice display=hold update=sweep core=4 gravity=off seed=3 ticks=1500
+mode=lattice display=hold update=sweep core=4 gravity=on seed=1 ticks=1500
+mode=lattice display=hold update=sweep core=4 gravity=on seed=2 ticks=1500
+mode=lattice display=hold update=sweep core=4 gravity=on seed=3 ticks=1500
+mode=lattice display=hold update=sweep core=8 gravity=off seed=1 ticks=1500
+mode=lattice display=hold update=sweep core=8 gravity=off seed=2 ticks=1500
+mode=lattice display=hold update=sweep core=8 gravity=off seed=3 ticks=1500
+mode=lattice display=hold update=sweep core=8 gravity=on seed=1 ticks=1500
+mode=lattice display=hold update=sweep core=8 gravity=on seed=2 ticks=1500
+mode=lattice display=hold update=sweep core=8 gravity=on seed=3 ticks=1500
+mode=lattice display=one_cell update=sync core=0 gravity=off seed=1 ticks=1500
+mode=lattice display=one_cell update=sync core=0 gravity=off seed=2 ticks=1500
+mode=lattice display=one_cell update=sync core=0 gravity=off seed=3 ticks=1500
+mode=lattice display=one_cell update=sync core=0 gravity=on seed=1 ticks=1500
+mode=lattice display=one_cell update=sync core=0 gravity=on seed=2 ticks=1500
+mode=lattice display=one_cell update=sync core=0 gravity=on seed=3 ticks=1500
+mode=lattice display=one_cell update=sync core=4 gravity=off seed=1 ticks=1500
+mode=lattice display=one_cell update=sync core=4 gravity=off seed=2 ticks=1500
+mode=lattice display=one_cell update=sync core=4 gravity=off seed=3 ticks=1500
+mode=lattice display=one_cell update=sync core=4 gravity=on seed=1 ticks=1500
+mode=lattice display=one_cell update=sync core=4 gravity=on seed=2 ticks=1500
+mode=lattice display=one_cell update=sync core=4 gravity=on seed=3 ticks=1500
+mode=lattice display=one_cell update=sync core=8 gravity=off seed=1 ticks=1500
+mode=lattice display=one_cell update=sync core=8 gravity=off seed=2 ticks=1500
+mode=lattice display=one_cell update=sync core=8 gravity=off seed=3 ticks=1500
+mode=lattice display=one_cell update=sync core=8 gravity=on seed=1 ticks=1500
+mode=lattice display=one_cell update=sync core=8 gravity=on seed=2 ticks=1500
+mode=lattice display=one_cell update=sync core=8 gravity=on seed=3 ticks=1500
+mode=lattice display=one_cell update=sweep core=0 gravity=off seed=1 ticks=1500
+mode=lattice display=one_cell update=sweep core=0 gravity=off seed=2 ticks=1500
+mode=lattice display=one_cell update=sweep core=0 gravity=off seed=3 ticks=1500
+mode=lattice display=one_cell update=sweep core=0 gravity=on seed=1 ticks=1500
+mode=lattice display=one_cell update=sweep core=0 gravity=on seed=2 ticks=1500
+mode=lattice display=one_cell update=sweep core=0 gravity=on seed=3 ticks=1500
+mode=lattice display=one_cell update=sweep core=4 gravity=off seed=1 ticks=1500
+mode=lattice display=one_cell update=sweep core=4 gravity=off seed=2 ticks=1500
+mode=lattice display=one_cell update=sweep core=4 gravity=off seed=3 ticks=1500
+mode=lattice display=one_cell update=sweep core=4 gravity=on seed=1 ticks=1500
+mode=lattice display=one_cell update=sweep core=4 gravity=on seed=2 ticks=1500
+mode=lattice display=one_cell update=sweep core=4 gravity=on seed=3 ticks=1500
+mode=lattice display=one_cell update=sweep core=8 gravity=off seed=1 ticks=1500
+mode=lattice display=one_cell update=sweep core=8 gravity=off seed=2 ticks=1500
+mode=lattice display=one_cell update=sweep core=8 gravity=off seed=3 ticks=1500
+mode=lattice display=one_cell update=sweep core=8 gravity=on seed=1 ticks=1500
+mode=lattice display=one_cell update=sweep core=8 gravity=on seed=2 ticks=1500
+mode=lattice display=one_cell update=sweep core=8 gravity=on seed=3 ticks=1500
+mode=lattice display=flip_all update=sync core=0 gravity=off seed=1 ticks=1500
+mode=lattice display=flip_all update=sync core=0 gravity=off seed=2 ticks=1500
+mode=lattice display=flip_all update=sync core=0 gravity=off seed=3 ticks=1500
+mode=lattice display=flip_all update=sync core=0 gravity=on seed=1 ticks=1500
+mode=lattice display=flip_all update=sync core=0 gravity=on seed=2 ticks=1500
+mode=lattice display=flip_all update=sync core=0 gravity=on seed=3 ticks=1500
+mode=lattice display=flip_all update=sync core=4 gravity=off seed=1 ticks=1500
+mode=lattice display=flip_all update=sync core=4 gravity=off seed=2 ticks=1500
+mode=lattice display=flip_all update=sync core=4 gravity=off seed=3 ticks=1500
+mode=lattice display=flip_all update=sync core=4 gravity=on seed=1 ticks=1500
+mode=lattice display=flip_all update=sync core=4 gravity=on seed=2 ticks=1500
+mode=lattice display=flip_all update=sync core=4 gravity=on seed=3 ticks=1500
+mode=lattice display=flip_all update=sync core=8 gravity=off seed=1 ticks=1500
+mode=lattice display=flip_all update=sync core=8 gravity=off seed=2 ticks=1500
+mode=lattice display=flip_all update=sync core=8 gravity=off seed=3 ticks=1500
+mode=lattice display=flip_all update=sync core=8 gravity=on seed=1 ticks=1500
+mode=lattice display=flip_all update=sync core=8 gravity=on seed=2 ticks=1500
+mode=lattice display=flip_all update=sync core=8 gravity=on seed=3 ticks=1500
+mode=lattice display=flip_all update=sweep core=0 gravity=off seed=1 ticks=1500
+mode=lattice display=flip_all update=sweep core=0 gravity=off seed=2 ticks=1500
+mode=lattice display=flip_all update=sweep core=0 gravity=off seed=3 ticks=1500
+mode=lattice display=flip_all update=sweep core=0 gravity=on seed=1 ticks=1500
+mode=lattice display=flip_all update=sweep core=0 gravity=on seed=2 ticks=1500
+mode=lattice display=flip_all update=sweep core=0 gravity=on seed=3 ticks=1500
+mode=lattice display=flip_all update=sweep core=4 gravity=off seed=1 ticks=1500
+mode=lattice display=flip_all update=sweep core=4 gravity=off seed=2 ticks=1500
+mode=lattice display=flip_all update=sweep core=4 gravity=off seed=3 ticks=1500
+mode=lattice display=flip_all update=sweep core=4 gravity=on seed=1 ticks=1500
+mode=lattice display=flip_all update=sweep core=4 gravity=on seed=2 ticks=1500
+mode=lattice display=flip_all update=sweep core=4 gravity=on seed=3 ticks=1500
+mode=lattice display=flip_all update=sweep core=8 gravity=off seed=1 ticks=1500
+mode=lattice display=flip_all update=sweep core=8 gravity=off seed=2 ticks=1500
+mode=lattice display=flip_all update=sweep core=8 gravity=off seed=3 ticks=1500
+mode=lattice display=flip_all update=sweep core=8 gravity=on seed=1 ticks=1500
+mode=lattice display=flip_all update=sweep core=8 gravity=on seed=2 ticks=1500
+mode=lattice display=flip_all update=sweep core=8 gravity=on seed=3 ticks=1500
+mode=v1 core=0 seed=1 ticks=1500
+mode=v1 core=0 seed=2 ticks=1500
+mode=v1 core=0 seed=3 ticks=1500
+mode=v1 core=8 seed=1 ticks=1500
+mode=v1 core=8 seed=2 ticks=1500
+mode=v1 core=8 seed=3 ticks=1500
+mode=signed core=0 seed=1 ticks=1500
+mode=signed core=0 seed=2 ticks=1500
+mode=signed core=0 seed=3 ticks=1500
+mode=signed core=8 seed=1 ticks=1500
+mode=signed core=8 seed=2 ticks=1500
+mode=signed core=8 seed=3 ticks=1500
+mode=turing core=0 seed=1 ticks=1500
+mode=turing core=0 seed=2 ticks=1500
+mode=turing core=0 seed=3 ticks=1500
+mode=turing core=8 seed=1 ticks=1500
+mode=turing core=8 seed=2 ticks=1500
+mode=turing core=8 seed=3 ticks=1500
+mode=control p=0.05 seed=1 ticks=1500
+mode=control p=0.05 seed=2 ticks=1500
+mode=control p=0.05 seed=3 ticks=1500
+mode=control p=0.2 seed=1 ticks=1500
+mode=control p=0.2 seed=2 ticks=1500
+mode=control p=0.2 seed=3 ticks=1500
