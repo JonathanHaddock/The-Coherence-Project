@@ -28,6 +28,7 @@ class Engine {
     this.car3 = new Float64Array(N * 3); this.nxt3 = new Float64Array(N * 3); this.absorbed = new Float64Array(12);
     this.car6 = new Float64Array(N * 6); this.nxt6 = new Float64Array(N * 6);
     this.t = 0; this.total = 0;
+    this.home = new Uint32Array(N).map((_, i) => i); this.moved = new Uint8Array(N); this.swaps = 0;
     const M = (1n << 64n) - 1n;
     let s = BigInt(this.cfg.seed);
     for (let i = 0; i < N; i++) {
@@ -246,8 +247,24 @@ class Engine {
       this.spread();
       if (this.cfg.gravity) this.absorb(); else if (this.cfg.cancel) this.cancelMemory();
     }
+    if (this.cfg.motion) this.move();
     this.t++; this.total += count;
     return count;
+  }
+  // RULE 24: a pixel that flashed hops toward the neighbour with the most carrier (if more than
+  // its own site), swapping whole state with a pixel that didn't flash. Carrier stays.
+  move() {
+    const c = this.carrier, f = this.fired, m = this.moved; m.fill(0); this.swaps = 0;
+    const sw = (a, x, y) => { const t = a[x]; a[x] = a[y]; a[y] = t; };
+    for (let i = 0; i < N; i++) {
+      if (!f[i] || m[i]) continue;
+      let best = i, bc = c[i];
+      for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q]; if (c[j] > bc) { best = j; bc = c[j]; } }
+      if (best === i || f[best] || m[best]) continue;
+      sw(this.pat, i, best); sw(this.home, i, best); sw(f, i, best);
+      for (let k = 0; k < 3; k++) { sw(this.rf, i * 3 + k, best * 3 + k); sw(this.cs, i * 3 + k, best * 3 + k); }
+      m[i] = m[best] = 1; this.swaps++;
+    }
   }
   spread() {
     const c = this.carrier, nx = this.next; nx.fill(0);

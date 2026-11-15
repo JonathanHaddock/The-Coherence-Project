@@ -23,6 +23,7 @@
 | `src/engine/photo.zig` | Photograph mode, rules 12–16 |
 | `src/engine/record.zig` | Run recorder: meta.json, series.csv, shells.csv, gaps.csv, slice.csv |
 | `src/engine/onepixel.zig` | One pixel engine model from Rule Spec v0. Choices P1–P4 are in `experiments/one-pixel` and aren't numbered rules. |
+| `viewer/observe.html`, `viewer/observe-core.js` | Particle observer: kinds, charge, quark groups and triplets, carriers. `scripts/observe-run.js` writes the same counts as a TSV. |
 | `viewer/war.html`, `viewer/pixel.html` | War vs twin vs nudge (with Earth's real war record), and the one-pixel turn |
 | `src/app/porch.html` | Front porch: the experiment menu (`origin porch`) |
 
@@ -45,7 +46,9 @@ The `display` options are fill_empty, hold, one_cell and flip_all; `update` is s
 
 ## Rules
 
-There are 23. See `RULES.md`. 21 = R-A, 22 = R-B, 23 = R-C.
+There are 24. See `RULES.md`. 21 = R-A, 22 = R-B, 23 = R-C, 24 = PLAN-fields F-0 (motion).
+
+**Next build plan:** `PLAN-fields.md` (every known field, steps F-0 to F-8).
 
 ## Findings
 

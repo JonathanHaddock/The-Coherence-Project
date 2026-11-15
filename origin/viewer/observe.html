@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Origin Particle Observer</title>
+<style>
+:root{--bg:#0d0f14;--card:#161a22;--ink:#e6e8ee;--dim:#8a91a3;--line:#262c38;--nu:#9aa3b5;--d:#4f8cff;--u:#ff6b5a;--e:#f5c542;--p:#3ddc97;--n:#c18cff}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,sans-serif}
+header{padding:12px 16px;border-bottom:1px solid var(--line)}h1{font-size:17px;margin:0}header p{margin:4px 0 0;color:var(--dim);font-size:12px}
+main{display:grid;grid-template-columns:1fr 360px;gap:12px;padding:12px 16px}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:12px}
+h2{font-size:13px;margin:0 0 8px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+#view{height:62vh;min-height:320px;border-radius:8px;overflow:hidden;background:#000}
+label{display:inline-flex;gap:4px;align-items:center;margin:2px 8px 2px 0;font-size:13px}
+select,button,input{background:#202634;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:3px 6px;font:inherit}
+button{cursor:pointer}button.on{background:#2d3b5a}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}td{padding:2px 4px;border-bottom:1px solid var(--line)}td:last-child,td.r{text-align:right}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+canvas.chart{width:100%;height:140px;display:block}
+#pick{font-size:12px;color:var(--dim);white-space:pre-wrap}
+.note{font-size:12px;color:var(--dim)}
+</style></head><body>
+<header><h1>Origin particle observer</h1>
+<p>The pixels run unchanged. This page only watches them: it labels each pixel by filled-cell count, follows quark groups, and records charge, flashes and carriers. It adds no rule.</p></header>
+<main>
+<section>
+  <div class="card">
+    <label>display <select id="display"><option>one_cell</option><option>flip_all</option><option>hold</option><option>fill_empty</option></select></label>
+    <label>update <select id="update"><option>sync</option><option>sweep</option></select></label>
+    <label>core <input id="core" type="number" value="8" min="0" max="20" style="width:52px"></label>
+    <label>seed <input id="seed" type="number" value="1" style="width:60px"></label>
+    <label>feedback <select id="feedback"><option value="off">off</option><option value="reinforce">gravity (6)</option><option value="cancel">cancel (21)</option></select></label>
+    <label><input type="checkbox" id="exclusion"> exclusion (22)</label>
+    <label><input type="checkbox" id="channels"> 3 carriers (23)</label>
+    <div style="margin-top:6px">
+      <button id="reset">reset</button> <button id="run">run</button> <button id="step">step</button>
+      <label>speed <input id="speed" type="range" min="1" max="10" value="1"></label>
+      <span id="tick" class="note"></span>
+    </div>
+  </div>
+  <div id="view"></div>
+  <div class="card" style="margin-top:12px">
+    <h2>Show</h2>
+    <label><input type="checkbox" data-show="0"><span class="sw" style="background:var(--nu)"></span>neutrino</label>
+    <label><input type="checkbox" data-show="1"><span class="sw" style="background:var(--d)"></span>down</label>
+    <label><input type="checkbox" data-show="2"><span class="sw" style="background:var(--u)"></span>up</label>
+    <label><input type="checkbox" data-show="3" checked><span class="sw" style="background:var(--e)"></span>electron</label>
+    <label><input type="checkbox" id="showTrip" checked><span class="sw" style="background:var(--p)"></span>isolated triplets</label>
+    <label><input type="checkbox" id="onlyFlash"> only pixels flashing now</label>
+    <label>slice z ≤ <input id="slice" type="range" min="0" max="47" value="47"></label>
+    <div id="pick">Click a dot to inspect that pixel.</div>
+  </div>
+</section>
+<aside>
+  <div class="card"><h2>Census</h2><table id="census"></table></div>
+  <div class="card"><h2>Composites</h2><table id="comp"></table>
+    <p class="note">Triplet = exactly 3 connected quark pixels with no other quark touching them. uud = proton-like, udd = neutron-like. Age = ticks the same triplet has survived on the same sites.</p></div>
+  <div class="card"><h2>Over time</h2><canvas class="chart" id="chart"></canvas>
+    <div class="note"><span class="sw" style="background:var(--nu)"></span>ν <span class="sw" style="background:var(--d)"></span>d <span class="sw" style="background:var(--u)"></span>u <span class="sw" style="background:var(--e)"></span>e <span class="sw" style="background:#fff"></span>flashing (share)</div></div>
+  <div class="card"><h2>Carriers</h2><table id="car"></table></div>
+  <div class="card"><button id="dl">download census TSV</button></div>
+</aside>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="engine.js"></script>
+<script src="observe-core.js"></script>
+<script>
+const { Observer, POP } = OriginObserve;
+const $ = id => document.getElementById(id);
+const COL = [[.60,.64,.71],[.31,.55,1],[1,.42,.35],[.96,.77,.26]], TRIPCOL = {uud:[.24,.86,.59],udd:[.76,.55,1],uuu:[1,1,1],ddd:[.4,.4,.4]};
+let eng, ob, stats, hist = [], rows = [], running = false;
+
+// three.js scene
+const view = $("view"), renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio); view.appendChild(renderer.domElement);
+const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(45, 1, .1, 1000);
+const geo = new THREE.BufferGeometry(), posA = new Float32Array(N * 3), colA = new Float32Array(N * 3);
+geo.setAttribute("position", new THREE.BufferAttribute(posA, 3)); geo.setAttribute("color", new THREE.BufferAttribute(colA, 3));
+const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: .9, vertexColors: true, transparent: true, opacity: .85 }));
+scene.add(pts);
+const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(S, S, S)), new THREE.LineBasicMaterial({ color: 0x334 }));
+scene.add(box);
+let th = .8, ph = .5, dist = 95, drag = null;
+view.addEventListener("pointerdown", e => drag = { x: e.clientX, y: e.clientY, moved: 0 });
+addEventListener("pointerup", e => { if (drag && drag.moved < 4 && e.target === renderer.domElement) pick(e); drag = null; });
+addEventListener("pointermove", e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.moved += Math.abs(dx) + Math.abs(dy);
+  th -= dx * .008; ph = Math.max(-1.5, Math.min(1.5, ph + dy * .008)); drag.x = e.clientX; drag.y = e.clientY; render(); });
+view.addEventListener("wheel", e => { e.preventDefault(); dist = Math.max(20, Math.min(250, dist * (1 + e.deltaY * .001))); render(); }, { passive: false });
+function size() { const w = view.clientWidth, h = view.clientHeight; renderer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); render(); }
+addEventListener("resize", size);
+function render() { cam.position.set(dist * Math.cos(ph) * Math.sin(th), dist * Math.sin(ph), dist * Math.cos(ph) * Math.cos(th)); cam.lookAt(0, 0, 0); renderer.render(scene, cam); }
+
+let shown = new Int32Array(N), nShown = 0;
+function draw() {
+  const show = [...document.querySelectorAll("[data-show]")].map(c => c.checked), only = $("onlyFlash").checked, zmax = +$("slice").value;
+  const trip = new Map(); if ($("showTrip").checked && stats) for (const t of stats.triplets) for (const s of t.sites) trip.set(s, TRIPCOL[t.name]);
+  let n = 0;
+  for (let i = 0; i < N; i++) {
+    const z = (i / (S * S)) | 0; if (z > zmax) continue;
+    const tc = trip.get(i), k = POP[eng.pat[i]];
+    if (!tc && (!show[k] || (only && !eng.fired[i]))) continue;
+    const x = i % S, y = ((i / S) | 0) % S, c = tc || COL[k], b = eng.fired[i] ? 1 : .55;
+    posA.set([x - H, y - H, z - H], n * 3); colA.set([c[0] * b, c[1] * b, c[2] * b], n * 3); shown[n++] = i;
+  }
+  nShown = n; geo.setDrawRange(0, n); geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true;
+  geo.computeBoundingSphere(); render();
+}
+const ray = new THREE.Raycaster(); ray.params.Points.threshold = .6;
+function pick(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera({ x: (e.clientX - r.left) / r.width * 2 - 1, y: -(e.clientY - r.top) / r.height * 2 + 1 }, cam);
+  const hit = ray.intersectObject(pts)[0]; if (!hit) return;
+  const i = shown[hit.index], p = eng.pat[i], k = POP[p], b = i * 3;
+  const x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
+  const nb = []; for (let q = 0; q < 6; q++) nb.push(["ν","d","u","e"][POP[eng.pat[NB[i*6+q]]]]);
+  $("pick").textContent = `pixel (${x},${y},${z})  ${OriginObserve.KIND[k]}  pattern ${p.toString(2).padStart(3,"0")}  charge ${["0","−1/3","+2/3","−1"][k]}
+memory (conserved) ${[eng.cs[b],eng.cs[b+1],eng.cs[b+2]].join(" ")}   reinforcement ${[eng.rf[b],eng.rf[b+1],eng.rf[b+2]].join(" ")}
+carrier ${eng.carrier[i].toFixed(2)}${eng.cfg.channels ? `  (weak ${eng.car3[b].toFixed(2)} em ${eng.car3[b+1].toFixed(2)} strong ${eng.car3[b+2].toFixed(2)})` : ""}
+flashing now: ${eng.fired[i] ? "yes" : "no"}   neighbours: ${nb.join(" ")}   agreement ${eng.agreement(i).toFixed(2)}`;
+}
+
+function cfg() { const f = $("feedback").value; return { mode: "lattice", display: $("display").value, update: $("update").value, core: +$("core").value,
+  gravity: f === "reinforce", cancel: f === "cancel", exclusion: $("exclusion").checked, channels: $("channels").checked, seed: BigInt($("seed").value || 1) }; }
+function reset() { eng = new Engine(cfg()); ob = new Observer(N, NB); hist = []; rows = []; stats = ob.observe(eng); panels(0); draw(); }
+function step() { const f = eng.tickLattice(); stats = ob.observe(eng); stats.flashes = f; hist.push([...stats.kinds.map(v => v / N), f / N]); if (hist.length > 400) hist.shift();
+  rows.push([eng.t, f, ...stats.kinds, stats.charge3, ...stats.flashByKind, stats.trip.uud, stats.trip.udd, stats.trip.uuu, stats.trip.ddd, stats.pairs, stats.bigGroups, stats.bigSites, stats.maxGroup, stats.isolatedElectrons, stats.oldest, stats.carrierTotal.toFixed(1), ...stats.carrier.map(v => v.toFixed(1))].join("\t"));
+  return f; }
+const pct = v => (100 * v / N).toFixed(1) + "%";
+function panels(f) {
+  const s = stats, K = OriginObserve.KIND, sw = ["nu","d","u","e"];
+  $("tick").textContent = `tick ${eng.t} · ${f ?? 0} flashed`;
+  $("census").innerHTML = `<tr><td></td><td class="r">pixels</td><td class="r">share</td><td class="r">flashing</td></tr>` +
+    K.map((k, i) => `<tr><td><span class="sw" style="background:var(--${sw[i]})"></span>${k}</td><td class="r">${s.kinds[i]}</td><td class="r">${pct(s.kinds[i])}</td><td class="r">${s.kinds[i] ? (100 * s.flashByKind[i] / s.kinds[i]).toFixed(1) + "%" : "–"}</td></tr>`).join("") +
+    `<tr><td>net charge</td><td class="r" colspan="3">${(s.charge3 / 3).toFixed(1)} (${s.charge3 >= 0 ? "+" : ""}${s.charge3}/3)</td></tr><tr><td>lone electrons</td><td class="r" colspan="3">${s.isolatedElectrons}</td></tr>`;
+  const L = ob.lifetimes();
+  $("comp").innerHTML = `<tr><td></td><td class="r">now</td><td class="r">ended</td><td class="r">mean life</td><td class="r">max</td></tr>` +
+    ["uud","udd","uuu","ddd"].map(n => `<tr><td>${OriginObserve.TRIP_LABEL[n]}</td><td class="r">${s.trip[n]}</td><td class="r">${L[n].ended}</td><td class="r">${L[n].mean.toFixed(1)}</td><td class="r">${L[n].max}</td></tr>`).join("") +
+    `<tr><td>quark pairs</td><td class="r" colspan="4">${s.pairs}</td></tr><tr><td>larger quark groups</td><td class="r" colspan="4">${s.bigGroups} (${s.bigSites} sites, biggest ${s.maxGroup})</td></tr><tr><td>oldest triplet now</td><td class="r" colspan="4">${s.oldest} ticks</td></tr>`;
+  $("car").innerHTML = `<tr><td>total carrier</td><td class="r">${s.carrierTotal.toFixed(0)}</td></tr>` + (eng.cfg.channels ? ["weak","EM","strong"].map((n, i) => `<tr><td>${n}</td><td class="r">${s.carrier[i].toFixed(0)}</td></tr>`).join("") : `<tr><td colspan="2" class="note">Turn on 3 carriers (23) to split by channel.</td></tr>`);
+  chart();
+}
+function chart() {
+  const c = $("chart"), w = c.width = c.clientWidth * devicePixelRatio, h = c.height = c.clientHeight * devicePixelRatio, g = c.getContext("2d");
+  g.clearRect(0, 0, w, h); if (hist.length < 2) return;
+  const cols = ["#9aa3b5","#4f8cff","#ff6b5a","#f5c542","#ffffff"];
+  for (let k = 0; k < 5; k++) { g.strokeStyle = cols[k]; g.lineWidth = devicePixelRatio * 1.5; g.beginPath();
+    hist.forEach((r, j) => { const x = j / (hist.length - 1) * w, y = h - r[k] * h * .95; j ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); }
+}
+function loop() { if (!running) return; let f; for (let i = 0; i < +$("speed").value; i++) f = step(); panels(f); draw(); requestAnimationFrame(loop); }
+$("reset").onclick = () => { running = false; $("run").textContent = "run"; reset(); };
+$("run").onclick = () => { running = !running; $("run").textContent = running ? "pause" : "run"; $("run").classList.toggle("on", running); loop(); };
+$("step").onclick = () => { const f = step(); panels(f); draw(); };
+document.querySelectorAll("[data-show],#showTrip,#onlyFlash,#slice").forEach(el => el.oninput = draw);
+$("dl").onclick = () => { const head = "tick\tflashes\tneutrino\tdown\tup\telectron\tcharge3\tflash_nu\tflash_d\tflash_u\tflash_e\tuud\tudd\tuuu\tddd\tpairs\tbig_groups\tbig_sites\tmax_group\tlone_electrons\toldest_triplet\tcarrier\tweak\tem\tstrong";
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([head + "\n" + rows.join("\n") + "\n"], { type: "text/tab-separated-values" }));
+  a.download = `observe_${eng.cfg.display}_${eng.cfg.update}_s${eng.cfg.seed}.tsv`; a.click(); };
+size(); reset();
+</script></body></html>

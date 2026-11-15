@@ -38,6 +38,7 @@ input[type=range]{accent-color:var(--acc)}
   <button id="cancel">cancel memory (21): off</button>
   <button id="excl">exclusion (22): off</button>
   <button id="ch3">3 carriers (23): off</button>
+  <button id="motion">motion (24): off</button>
   <label>neutrino delivery <select id="deliver"><option value="none">none (rule 14)</option><option value="same">same information (15)</option><option value="unreal">unrealized information (15)</option><option value="weak">weak events only (17-19)</option><option value="weakhand">weak events + handedness (20)</option></select></label>
   <label>neutrino weighting <select id="weight"><option value="all7">all 7 unrealized</option><option value="next">3 next-step</option></select></label>
   <label>control p <input id="p" type="number" min="0.01" max="0.99" step="0.01" value="0.20" style="width:64px"></label>
@@ -130,6 +131,7 @@ class Engine {
     this.car3 = new Float64Array(N * 3); this.nxt3 = new Float64Array(N * 3); this.absorbed = new Float64Array(12);
     this.car6 = new Float64Array(N * 6); this.nxt6 = new Float64Array(N * 6);
     this.t = 0; this.total = 0;
+    this.home = new Uint32Array(N).map((_, i) => i); this.moved = new Uint8Array(N); this.swaps = 0;
     const M = (1n << 64n) - 1n;
     let s = BigInt(this.cfg.seed);
     for (let i = 0; i < N; i++) {
@@ -348,8 +350,24 @@ class Engine {
       this.spread();
       if (this.cfg.gravity) this.absorb(); else if (this.cfg.cancel) this.cancelMemory();
     }
+    if (this.cfg.motion) this.move();
     this.t++; this.total += count;
     return count;
+  }
+  // RULE 24: a pixel that flashed hops toward the neighbour with the most carrier (if more than
+  // its own site), swapping whole state with a pixel that didn't flash. Carrier stays.
+  move() {
+    const c = this.carrier, f = this.fired, m = this.moved; m.fill(0); this.swaps = 0;
+    const sw = (a, x, y) => { const t = a[x]; a[x] = a[y]; a[y] = t; };
+    for (let i = 0; i < N; i++) {
+      if (!f[i] || m[i]) continue;
+      let best = i, bc = c[i];
+      for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q]; if (c[j] > bc) { best = j; bc = c[j]; } }
+      if (best === i || f[best] || m[best]) continue;
+      sw(this.pat, i, best); sw(this.home, i, best); sw(f, i, best);
+      for (let k = 0; k < 3; k++) { sw(this.rf, i * 3 + k, best * 3 + k); sw(this.cs, i * 3 + k, best * 3 + k); }
+      m[i] = m[best] = 1; this.swaps++;
+    }
   }
   spread() {
     const c = this.carrier, nx = this.next; nx.fill(0);
@@ -424,7 +442,7 @@ let eng, running=false, recent=new Float32Array(N), hist=[];
 const BINS=H; let rate=new Float64Array(BINS), agr=new Float64Array(BINS), seen=false;
 const binOf=new Int16Array(N), cnt=new Float64Array(BINS);
 for(let i=0;i<N;i++){const b=Math.floor(RAD[i]);binOf[i]=b<BINS?b:-1;if(b<BINS)cnt[b]++;}
-function cfg(){const dv=$("deliver").value;return{deliver:(dv==="weak"||dv==="weakhand")?"unreal":dv,weak:dv==="weak"||dv==="weakhand",hand:dv==="weakhand",weight:$("weight").value,p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on"),exclusion:$("excl").classList.contains("on"),channels:$("ch3").classList.contains("on"),cancel:!$("gravity").classList.contains("on")&&$("cancel").classList.contains("on")};}
+function cfg(){const dv=$("deliver").value;return{deliver:(dv==="weak"||dv==="weakhand")?"unreal":dv,weak:dv==="weak"||dv==="weakhand",hand:dv==="weakhand",weight:$("weight").value,p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on"),exclusion:$("excl").classList.contains("on"),channels:$("ch3").classList.contains("on"),motion:$("motion").classList.contains("on"),cancel:!$("gravity").classList.contains("on")&&$("cancel").classList.contains("on")};}
 const KG=24;let lastF=new Int32Array(N),gapH=new Float64Array(KG+1),flashSum=0,tickSum=0;
 function reset(){lastF.fill(-1);gapH.fill(0);flashSum=0;tickSum=0;eng=new Engine(cfg());recent.fill(0);hist=[];rate.fill(0);agr.fill(0);seen=false;measure(0);draw();}
 function measure(alpha){
@@ -536,6 +554,7 @@ $("copy").onclick=async()=>{const txt=stateText(),box=$("copybox");box.value=txt
   catch(e){box.style.display="block";box.select();$("copy").textContent="Select + copy below";}
   setTimeout(()=>$("copy").textContent="Copy state",2000);};
 $("gravity").onclick=()=>{const b=$("gravity");b.classList.toggle("on");b.textContent="gravity: "+(b.classList.contains("on")?"ON":"off");if(b.classList.contains("on")){$("cancel").classList.remove("on");$("cancel").textContent="cancel memory (21): off";}reset();};
+$("motion").onclick=()=>{const b=$("motion");b.classList.toggle("on");b.textContent="motion (24): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("ch3").onclick=()=>{const b=$("ch3");b.classList.toggle("on");b.textContent="3 carriers (23): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("excl").onclick=()=>{const b=$("excl");b.classList.toggle("on");b.textContent="exclusion (22): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("cancel").onclick=()=>{const b=$("cancel");b.classList.toggle("on");b.textContent="cancel memory (21): "+(b.classList.contains("on")?"ON":"off");if(b.classList.contains("on")){$("gravity").classList.remove("on");$("gravity").textContent="gravity: off";}reset();};

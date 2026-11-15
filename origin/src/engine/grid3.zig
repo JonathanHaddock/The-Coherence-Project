@@ -67,6 +67,12 @@ pub const Grid3 = struct {
     nxt3: [n][3]f64,
     /// RULE 23 measurement: reinforcement absorbed, by pixel kind (filled count) and channel.
     absorbed: [4][3]f64,
+    /// RULE 24: motion (PLAN-fields F-0).
+    motion: bool,
+    /// Measurement for rule 24: the starting site of the pixel now at each site, and swaps last tick.
+    home: [n]u32,
+    moved: [n]bool,
+    swaps: u32,
 
     pub fn init(g: *Grid3, cfg: px.Config) void {
         g.cfg = cfg;
@@ -74,6 +80,9 @@ pub const Grid3 = struct {
         g.cancel = false;
         g.exclusion = false;
         g.channels = false;
+        g.motion = false;
+        g.swaps = 0;
+        for (&g.home, 0..) |*h, i| h.* = @intCast(i);
         g.car3 = @splat(.{ 0, 0, 0 });
         g.absorbed = @splat(.{ 0, 0, 0 });
         g.fired = @splat(false);
@@ -141,6 +150,7 @@ pub const Grid3 = struct {
             g.spread();
             if (g.gravity) g.absorb() else if (g.cancel) g.cancelMemory();
         }
+        if (g.motion) g.move();
         return count;
     }
 
@@ -204,6 +214,29 @@ pub const Grid3 = struct {
 
     /// RULE 22: a flash may not display a pattern any neighbour is showing.
     /// A blocked pixel waits: no flash, pattern and memory kept.
+    /// RULE 24: a pixel that flashed this tick hops toward the neighbour with the most
+    /// carrier (if more than its own site), swapping whole state with a pixel that didn't flash.
+    pub fn move(g: *Grid3) void {
+        g.moved = @splat(false);
+        g.swaps = 0;
+        for (0..n) |i| {
+            if (!g.fired[i] or g.moved[i]) continue;
+            var best = i;
+            var bc = g.carrier[i];
+            for (neighbors(i)) |j| if (g.carrier[j] > bc) {
+                best = j;
+                bc = g.carrier[j];
+            };
+            if (best == i or g.fired[best] or g.moved[best]) continue;
+            std.mem.swap(px.Pixel, &g.px[i], &g.px[best]);
+            std.mem.swap(u32, &g.home[i], &g.home[best]);
+            std.mem.swap(bool, &g.fired[i], &g.fired[best]);
+            g.moved[i] = true;
+            g.moved[best] = true;
+            g.swaps += 1;
+        }
+    }
+
     pub fn blocked(g: *const Grid3, i: usize) bool {
         if (!g.exclusion) return false;
         const next = g.px[i].nextPattern(g.cfg.display);
@@ -289,6 +322,26 @@ test "point source in 3D gives roughly 1/distance" {
     const a = avg[4] * 4;
     const b = avg[8] * 8;
     try std.testing.expect(b / a > 0.7 and b / a < 1.05);
+}
+
+test "rule 24: a flashed pixel swaps toward more carrier" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{});
+    g.carrier = @splat(0);
+    g.fired = @splat(false);
+    const i = index(5, 5, 5);
+    const j = neighbors(i)[2];
+    g.px[i].pattern = 0b111;
+    g.px[j].pattern = 0b000;
+    g.fired[i] = true;
+    g.carrier[j] = 2;
+    g.move();
+    try std.testing.expectEqual(@as(u3, 0b111), g.px[j].pattern);
+    try std.testing.expectEqual(@as(u3, 0b000), g.px[i].pattern);
+    try std.testing.expectEqual(@as(u32, @intCast(i)), g.home[j]);
+    try std.testing.expectEqual(@as(f64, 2), g.carrier[j]); // carrier stays
+    try std.testing.expectEqual(@as(u32, 1), g.swaps);
 }
 
 test "rule 23: neutrinos are invisible to EM and strong carrier" {
