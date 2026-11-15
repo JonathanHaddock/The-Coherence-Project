@@ -11,7 +11,7 @@ h2{font-size:12px;margin:0 0 8px;color:var(--dim);font-weight:600;text-transform
 .row{display:grid;grid-template-columns:120px 1fr 54px;gap:6px;align-items:center;margin:3px 0;font-size:13px}
 .row output{text-align:right;font-variant-numeric:tabular-nums;color:var(--dim)}
 select,button{background:#202634;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font:inherit;cursor:pointer}button.on{background:#2d3b5a}
-canvas#c{width:100%;aspect-ratio:1/1;display:block;background:#090b10;border-radius:8px}
+canvas#c{width:100%;display:block;max-height:80vh;object-fit:contain;background:#090b10;border-radius:8px}
 canvas.chart{width:100%;height:130px;display:block}
 table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}td{padding:2px 4px;border-bottom:1px solid var(--line)}td.r{text-align:right}
 .note{font-size:12px;color:var(--dim)}
@@ -37,6 +37,8 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
     <div id="lam" style="font-size:56px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums">–</div>
     <div id="lamsub" class="note"></div>
     <p class="note">For each electron: energy with the lattice as it is now, minus with the lattice perfect, divided by its kinetic energy (½ v<sub>F</sub>²), averaged over all electrons. Positive = the lattice has bent toward the electrons (the glue). Lattice convention λ = E<sub>p</sub>/(z t); conventions differ between papers, so compare lab runs with each other, not with a metal's λ.</p></div>
+  <div class="card"><h2>Pairing signatures (compare with control)</h2><table id="sig"></table>
+    <p class="note"><b>Wake-following</b>: how often an electron passes where another one was a moment earlier, vs chance (1×). The lattice's pull is delayed, so real glue should show a peak at some delay, above the control. <b>Opposite momenta</b>: mean cosine between nearby electrons' directions; 0 = none, negative = they tend to move opposite ways (the k, −k of Cooper pairs). Use 20+ electrons, and run the control to compare.</p></div>
   <div class="card"><h2>Measured (this run)</h2><table id="meas"></table></div>
   <div class="card"><h2>Tc estimate (layer 3)</h2>
     <div class="row"><span>reference metal</span><select id="ref"></select><span></span></div>
@@ -47,16 +49,19 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
 </main>
 <script src="sim.js"></script>
 <script src="tc.js"></script>
+<script src="measures.js"></script>
 <script>
 const { Lab2D, DEFAULTS } = SCLab, $ = id => document.getElementById(id);
 const SL = [["cells","cells",6,24,1],["M","ion mass M",50,4000,10],["k1","bond stiffness",0.2,4,0.05],["k0","site spring",0,1,0.02],["g","coupling g",0,4,0.05],["sigma","pull width σ",0.3,1,0.02],
   ["U","e–e repulsion U",0,4,0.05],["screen","screening",0.3,4,0.1],["ne","electrons",1,40,1],["vF","Fermi speed",0.1,3,0.05],["T","temperature",0,0.05,0.0005],["vacancy","vacancies",0,0.3,0.01],["speed","steps / frame",1,200,1]];
 const P = Object.assign({}, DEFAULTS, { speed: 40 });
 $("sliders").innerHTML = SL.map(([k, lab, mn, mx, st]) => `<div class="row"><span>${lab}</span><input type="range" id="s_${k}" min="${mn}" max="${mx}" step="${st}" value="${P[k]}"><output id="o_${k}">${P[k]}</output></div>`).join("");
-let lab, hist = [], meas, running = true, control = false, baseline;
+let pm, lab, hist = [], meas, running = true, control = false, baseline;
 function build() {
   const q = Object.assign({}, P, { lattice: $("lattice").value, g: control ? 0 : P.g }); delete q.speed;
   lab = new Lab2D(q); hist = []; meas = { n: 0, near2: 0, sumr: 0 }; lamAvg = 0; lamN = 0;
+  pm = new SCMeasures.PairMeasures(lab);
+  const cv = $("c"); cv.width = 900; cv.height = Math.round(900 * lab.Ly / lab.Lx); // fit the box (honeycomb and triangular aren't square)
   const m = SCTc.phononMoments(lab.phonons(16));
   if (!baseline || baseline.lattice !== q.lattice) { const b = new Lab2D(Object.assign({}, DEFAULTS, { lattice: q.lattice, ne: 0, cells: 4 })); baseline = Object.assign({ lattice: q.lattice, g: DEFAULTS.g, M: DEFAULTS.M }, SCTc.phononMoments(b.phonons(16))); }
   lab.moments = m; tcPanel();
@@ -74,8 +79,8 @@ $("lattice").onchange = build; $("reset").onclick = build;
 $("run").onclick = () => { running = !running; $("run").textContent = running ? "pause" : "run"; $("run").classList.toggle("on", running); };
 $("ctrl").onclick = () => { control = !control; $("ctrl").classList.toggle("on", control); build(); };
 function draw() {
-  const c = $("c"), g = c.getContext("2d"), W = c.width, s = W / Math.max(lab.Lx, lab.Ly);
-  g.fillStyle = "#090b10"; g.fillRect(0, 0, W, W);
+  const c = $("c"), g = c.getContext("2d"), W = c.width, s = W / lab.Lx;
+  g.fillStyle = "#090b10"; g.fillRect(0, 0, W, c.height);
   const comp = lab.compression();
   for (let k = 0; k < lab.n; k++) {
     const x = (lab.x0[k] + lab.ux[k]) * s, y = (lab.y0[k] + lab.uy[k]) * s, v = Math.max(-1, Math.min(1, comp[k] * 12));
@@ -101,6 +106,9 @@ function panel() {
   const lam = lab.coupling(), now = lam.length ? lam.reduce((a, b) => a + b, 0) / lam.length : 0;
   lamAvg = (lamAvg * lamN + now) / (lamN + 1); lamN++;
   $("lam").textContent = now.toFixed(3);
+  const r = pm.result();
+  $("sig").innerHTML = r.delayTime.map((d, k) => `<tr><td>wake-following, delay ${d.toFixed(1)}</td><td class="r">${r.wake[k].toFixed(2)}×</td></tr>`).join("") +
+    `<tr><td>opposite momenta (cos, ${r.oppN} pairs)</td><td class="r">${r.oppCos.toFixed(3)}</td></tr>`;
   $("lamsub").textContent = lam.length ? `run average ${lamAvg.toFixed(3)} · range now ${Math.min(...lam).toFixed(3)} to ${Math.max(...lam).toFixed(3)} over ${lam.length} electrons` : "no electrons";
   const A = lab.Lx * lab.Ly, near = meas.n ? (meas.near2 / meas.n) / (Math.PI * 4 / A) : 0, comp = lab.compression();
   let mx = 0; for (const v of comp) mx = Math.max(mx, v);
@@ -110,7 +118,7 @@ function panel() {
 }
 let frame = 0;
 function loop() {
-  if (running) for (let i = 0; i < P.speed; i++) { lab.step(); if (lab.ne > 1 && i % 10 === 0) { for (const r of lab.pairDistances()) { meas.n++; meas.sumr += r; if (r < 2) meas.near2++; } } }
+  if (running) for (let i = 0; i < P.speed; i++) { lab.step(); pm.tick(); if (lab.ne > 1 && i % 10 === 0) { for (const r of lab.pairDistances()) { meas.n++; meas.sumr += r; if (r < 2) meas.near2++; } } }
   if (running && lab.ne > 1) { hist.push(lab.pairDistances()[0]); if (hist.length > 600) hist.shift(); }
   draw(); if (frame++ % 6 === 0) { chart(); panel(); }
   requestAnimationFrame(loop);

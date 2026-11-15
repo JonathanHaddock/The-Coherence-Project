@@ -82,3 +82,35 @@ Next: sweep g across 1.5–2.8 against stiffness, ion mass and lattice type, to 
 - [Two-channel Allen–Dynes framework (values used)](https://arxiv.org/html/2604.04719)
 - [QMC bipolarons on FCC/BCC (2025)](https://arxiv.org/pdf/2507.17398); [Hubbard–Holstein bipolaron (2004)](https://arxiv.org/pdf/cond-mat/0401305)
 - [Cooper pair](https://en.wikipedia.org/wiki/Cooper_pair); [Velarde & Neißner 2008](https://www.ucm.es/data/cont/media/www/pag-40479/2008-VN-IJBC.pdf)
+
+## Experiment 2: where is the self-trapping cliff? (`results/coupling-cliff/`)
+
+10 electrons, square lattice, T 0.0005, 60,000 steps (first 10,000 skipped), seeds 1–3. λ is the average coupling (see the page); mobility is net distance travelled per unit time over the Fermi speed.
+
+| g | λ | trapped share | mobility |
+|---|---|---|---|
+| 1.0 | 0.03 | 0.1% | 0.16 |
+| 1.2 | 0.08 | 2% | 0.13 |
+| 1.4 | 0.14 | 8% | 0.12 |
+| 1.5 | 19.5 | 31% | 0.08 |
+| 1.7 | 107 | 93% | 0.02 |
+| 2.0 | 104 | 100% | 0.001 |
+
+The cliff is at g ≈ 1.45–1.5. λ jumps about 140× in one step of 0.1, the abrupt self-trapping transition known for 2D and 3D (Emin & Holstein). Strongest coupling with mobile electrons: g ≈ 1.3–1.4, λ ≈ 0.1.
+
+## Experiment 3: pairing signatures vs the g = 0 control (`results/pairing-signatures/`)
+
+30 electrons, square lattice, 150,000 steps, seeds 1–3, g 0 / 1.0 / 1.3 / 1.4 × T 0.0002 / 0.002 / 0.01. Measures from `measures.js`: wake-following at delays (vs chance) and opposite momenta (mean cosine among electrons within 3 bonds).
+
+**Weak delayed glue at g 1.0, low temperature.** Wake-following above the control, in all 3 seeds:
+
+| delay | 0 | 0.5 | 1 | 2 | 4 | 8 | 16 |
+|---|---|---|---|---|---|---|---|
+| control (g 0) | 0.53 | 0.55 | 0.73 | 0.96 | 1.01 | 1.09 | 1.03 |
+| g 1.0, T 0.0002 | 0.54 | 0.56 | **0.76** | **1.01** | 1.04 | 1.11 | 1.04 |
+
+At delays 1–2 every seed with coupling (0.758–0.760, 1.004–1.019) sits above every control seed (0.732–0.735, 0.958–0.965): an excess of about 4–5%. At delay 0 both sit well below chance (repulsion keeps electrons apart). That's the retarded-attraction shape the literature describes, but weak. Opposite momenta: no preference (cos ≈ 0).
+
+**With 30 electrons, the cliff moves down.** At g 1.3 and 1.4 the electrons don't pair; they clump into droplets (g 1.3, T 0.002, seed 1: three clumps of 11, 10 and 9 electrons), λ ≈ 60. Wake-following is then about 20–30× at every delay, which is just electrons sitting together. Heat makes it worse: at g 1.0 and T 0.01, a 15-electron droplet forms (λ 42). This is the competing state the literature warns about for classical-lattice models (charge ordering instead of pairing). The negative momentum cosine in the droplets (−0.04 to −0.14) is electrons circling inside a pit, not Cooper pairing.
+
+**Reading:** the classical lab shows the glue (a small, delayed attraction), shows self-trapping and droplets on either side of it, and doesn't show bound mobile pairs. As expected for a classical model, whether the glue makes a real pair is the quantum question for layer 2.
