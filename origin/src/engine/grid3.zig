@@ -77,6 +77,9 @@ pub const Grid3 = struct {
     em: bool,
     /// RULE 26: carrier excites (adds memory).
     excite: bool,
+    /// RULE 27: hearing conserves (a flash hands out its released memory).
+    conserve: bool,
+    rel3: [n][3]u32,
     phi: [n]f64,
     phin: [n]f64,
 
@@ -89,6 +92,7 @@ pub const Grid3 = struct {
         g.motion = false;
         g.em = false;
         g.excite = false;
+        g.conserve = false;
         g.phi = @splat(0);
         g.swaps = 0;
         for (&g.home, 0..) |*h, i| h.* = @intCast(i);
@@ -115,19 +119,52 @@ pub const Grid3 = struct {
         }
     }
 
-    fn fire(g: *Grid3, i: usize, t: i64) u32 {
-        const released = g.px[i].flashWith(t, g.cfg.display);
+    fn deposit(g: *Grid3, i: usize, amount: f64) void {
         if (g.channels) {
             const s = select(g.px[i].pattern);
             var k: f64 = 0;
             for (s) |on| k += @floatFromInt(@intFromBool(on));
-            const share = @as(f64, @floatFromInt(released)) / k;
+            const share = amount / k;
             for (0..3) |c| if (s[c]) {
                 g.car3[i][c] += share;
             };
-        } else g.carrier[i] += @floatFromInt(released);
+        } else g.carrier[i] += amount;
+    }
+
+    fn fire(g: *Grid3, i: usize, t: i64) u32 {
+        if (g.conserve) g.rel3[i] = g.px[i].conserved;
+        const released = g.px[i].flashWith(t, g.cfg.display);
+        if (!g.conserve) g.deposit(i, @floatFromInt(released));
         g.fired[i] = true;
         return 1;
+    }
+
+    /// Neighbours hear pixel i's flash. RULE 27: memory is dealt out, not created.
+    fn shout(g: *Grid3, i: usize) void {
+        const sh = g.px[i].pattern;
+        const nb = neighbors(i);
+        if (!g.conserve) {
+            for (nb) |j| g.px[j].receive(sh);
+            return;
+        }
+        for (0..3) |k| {
+            const bit = (sh >> @intCast(k)) & 1;
+            var targets: [6]usize = undefined;
+            var m: usize = 0;
+            for (nb) |j| {
+                if (((g.px[j].pattern >> @intCast(k)) & 1) == bit) g.px[j].reinforce[k] += 1 else {
+                    targets[m] = j;
+                    m += 1;
+                }
+            }
+            const units = g.rel3[i][k];
+            if (m == 0) {
+                g.deposit(i, @floatFromInt(units));
+                continue;
+            }
+            var u: usize = 0;
+            while (u < units) : (u += 1) g.px[targets[u % m]].conserved[k] += 1;
+        }
     }
 
     pub fn tick(g: *Grid3, t: i64, kick: ?usize) u32 {
@@ -141,14 +178,14 @@ pub const Grid3 = struct {
                 };
                 for (0..n) |i| {
                     if (!g.fired[i]) continue;
-                    for (neighbors(i)) |j| g.px[j].receive(g.px[i].pattern);
+                    g.shout(i);
                 }
             },
             .sweep => for (0..n) |i| {
                 if (!(g.px[i].ready() or kick == i)) continue;
                 if (g.blocked(i)) continue;
                 count += g.fire(i, t);
-                for (neighbors(i)) |j| g.px[j].receive(g.px[i].pattern);
+                g.shout(i);
             },
         }
         if (g.channels) {
@@ -372,6 +409,31 @@ test "point source in 3D gives roughly 1/distance" {
     const a = avg[4] * 4;
     const b = avg[8] * 8;
     try std.testing.expect(b / a > 0.7 and b / a < 1.05);
+}
+
+test "rule 27: released memory is dealt to mismatched neighbours, none created" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{ .display = .hold });
+    g.conserve = true;
+    g.carrier = @splat(0);
+    const i = index(5, 5, 5);
+    const nb = neighbors(i);
+    g.px[i].pattern = 0b000;
+    g.px[i].conserved = .{ 3, 0, 1 };
+    for (nb) |j| {
+        g.px[j].pattern = 0b000;
+        g.px[j].conserved = .{ 0, 0, 0 };
+        g.px[j].reinforce = .{ 0, 0, 0 };
+    }
+    g.px[nb[2]].pattern = 0b001; // only this neighbour differs on cell 0
+    _ = g.fire(i, 0);
+    g.shout(i);
+    try std.testing.expectEqual(@as(u32, 3), g.px[nb[2]].conserved[0]);
+    try std.testing.expectEqual(@as(u32, 0), g.px[nb[0]].conserved[0]);
+    try std.testing.expectEqual(@as(u32, 1), g.px[nb[0]].reinforce[0]);
+    // cell 2: every neighbour matches, so its 1 unit becomes carrier here
+    try std.testing.expectApproxEqAbs(@as(f64, 1), g.carrier[i], 1e-12);
 }
 
 test "rule 26: carrier becomes memory, 3 units for 3" {

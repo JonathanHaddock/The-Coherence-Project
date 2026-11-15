@@ -80,13 +80,30 @@ class Engine {
     }
     this.pat[i] = p & 7;
     const rel = c[b] + c[b + 1] + c[b + 2];
+    if (this.cfg.conserve) { if (!this.rel3) this.rel3 = new Uint32Array(N * 3); this.rel3[b] = c[b]; this.rel3[b + 1] = c[b + 1]; this.rel3[b + 2] = c[b + 2]; }
     r[b] = r[b + 1] = r[b + 2] = c[b] = c[b + 1] = c[b + 2] = 0;
+    if (!this.cfg.conserve) this.deposit(i, rel);
+    this.fired[i] = 1;
+  }
+  deposit(i, amt) {
     if (this.cfg.channels) {
       const sl = Engine.select(this.pat[i]); let k = 0; for (const on of sl) k += on ? 1 : 0;
-      const share = rel / k;
+      const share = amt / k;
       for (let ch = 0; ch < 3; ch++) if (sl[ch]) this.car3[i * 3 + ch] += share;
-    } else this.carrier[i] += rel;
-    this.fired[i] = 1;
+    } else this.carrier[i] += amt;
+  }
+  // neighbours hear pixel i's flash. RULE 27: memory is dealt out, not created.
+  shout(i) {
+    const sh = this.pat[i];
+    if (!this.cfg.conserve) { for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh); return; }
+    const tg = [0, 0, 0, 0, 0, 0];
+    for (let k = 0; k < 3; k++) {
+      const bit = (sh >> k) & 1; let m = 0;
+      for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q]; if (((this.pat[j] >> k) & 1) === bit) this.rf[j * 3 + k]++; else tg[m++] = j; }
+      const units = this.rel3[i * 3 + k];
+      if (m === 0) { this.deposit(i, units); continue; }
+      for (let u = 0; u < units; u++) this.cs[tg[u % m] * 3 + k]++;
+    }
   }
   receive(j, shown) {
     const p = this.pat[j], b = j * 3;
@@ -233,13 +250,13 @@ class Engine {
     if (this.cfg.update === "sync") {
       for (let i = 0; i < N; i++) this.fired[i] = ((this.ready(i) || i === kick) && !this.blocked(i)) ? 1 : 0;
       for (let i = 0; i < N; i++) if (this.fired[i]) { this.flash(i); count++; }
-      for (let i = 0; i < N; i++) if (this.fired[i]) { const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh); }
+      for (let i = 0; i < N; i++) if (this.fired[i]) this.shout(i);
     } else {
       for (let i = 0; i < N; i++) {
         if (!(this.ready(i) || i === kick)) continue;
         if (this.blocked(i)) continue;
         this.flash(i); count++;
-        const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh);
+        this.shout(i);
       }
     }
     if (this.cfg.channels) {

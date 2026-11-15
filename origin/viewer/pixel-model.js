@@ -8,7 +8,7 @@
 // Field must give exactly the same results as engine.js (the reference) for the same seed.
 //
 // Rules carried by the Pixel: 1-3 (display, trigger, no memory), 5 (carrier), 6 (gravity),
-// 21 (cancel), 22 (exclusion), 23 (three carriers), 24 (motion), 25 (signed EM), 26 (carrier excites).
+// 21 (cancel), 22 (exclusion), 23 (three carriers), 24 (motion), 25 (signed EM), 26 (carrier excites), 27 (hearing conserves).
 (function (root) {
   const POPC = [0, 1, 1, 2, 1, 2, 2, 3];
   const CHARGE3 = [0, -1, 2, -3];           // thirds: neutrino, down, up, electron
@@ -64,18 +64,25 @@
       return false;
     }
     // --- rules 1-3 (+23 split): flash. Returns what it shows; carrier goes into itself ---
-    flash(display, channels) {
+    flash(display, channels, conserve = false) {
       this.pattern = this.wouldShow(display);
       const rel = this.memory;
+      this.released = this.cs.slice();       // rule 27: what it has to hand out, per cell
       this.rf = [0, 0, 0]; this.cs = [0, 0, 0];
-      if (channels) {
-        const sl = Pixel.select(this.pattern); let k = 0; for (const on of sl) k += on ? 1 : 0;
-        const share = rel / k;
-        for (let ch = 0; ch < 3; ch++) if (sl[ch]) this.car3[ch] += share;
-      } else this.carrier += rel;
+      if (!conserve) this.deposit(rel, channels);
       this.fired = true; this.flashes++;
       return this.pattern;
     }
+    // released memory becomes carrier at this site (rule 5, or split by rule 23)
+    deposit(amt, channels) {
+      if (channels) {
+        const sl = Pixel.select(this.pattern); let k = 0; for (const on of sl) k += on ? 1 : 0;
+        const share = amt / k;
+        for (let ch = 0; ch < 3; ch++) if (sl[ch]) this.car3[ch] += share;
+      } else this.carrier += amt;
+    }
+    // rule 27: hearing one cell of a flash. Match -> reinforce. Mismatch -> may be dealt memory.
+    matches(shown, k) { return ((this.pattern >> k) & 1) === ((shown >> k) & 1); }
     // --- hearing a neighbour's flash: matching cells reinforce, others go to memory ---
     hear(shown) {
       for (let k = 0; k < 3; k++) { if (((this.pattern >> k) & 1) === ((shown >> k) & 1)) this.rf[k]++; else this.cs[k]++; }
@@ -154,7 +161,18 @@
       this.boundary = []; for (let i = 0; i < N; i++) { let e = 0; for (let f = 0; f < 6; f++) e |= this.edge[i * 6 + f]; if (e) this.boundary.push(i); }
     }
     neighbourPatterns(i) { const o = []; for (let f = 0; f < 6; f++) o.push(this.px[this.nb[i * 6 + f]].pattern); return o; }
-    shout(i) { const sh = this.px[i].pattern; for (let f = 0; f < 6; f++) this.px[this.nb[i * 6 + f]].hear(sh); }
+    shout(i) {
+      const p = this.px[i], sh = p.pattern;
+      if (!this.cfg.conserve) { for (let f = 0; f < 6; f++) this.px[this.nb[i * 6 + f]].hear(sh); return; }
+      // rule 27: the flashing pixel deals out its released memory, cell by cell, in face order
+      for (let k = 0; k < 3; k++) {
+        const tg = [];
+        for (let f = 0; f < 6; f++) { const q = this.px[this.nb[i * 6 + f]]; if (q.matches(sh, k)) q.rf[k]++; else tg.push(q); }
+        const units = p.released[k];
+        if (!tg.length) { p.deposit(units, this.cfg.channels); continue; }
+        for (let u = 0; u < units; u++) tg[u % tg.length].cs[k]++;
+      }
+    }
     // carrier passes face to face: each pixel sends 1/6 out of every face; edge faces lose it.
     passOn(get, set) {
       const N = this.N, inbox = new Float64Array(N); let lost = 0;
@@ -173,10 +191,10 @@
       const may = i => (px[i].ready() || i === kick || this.forced[i] === 1) && !(c.exclusion && px[i].blocked(c.display, this.neighbourPatterns(i)));
       if (c.update === "sync") {
         const go = new Uint8Array(N); for (let i = 0; i < N; i++) go[i] = may(i) ? 1 : 0;
-        for (let i = 0; i < N; i++) if (go[i]) { px[i].flash(c.display, c.channels); count++; }
+        for (let i = 0; i < N; i++) if (go[i]) { px[i].flash(c.display, c.channels, c.conserve); count++; }
         for (let i = 0; i < N; i++) if (go[i]) this.shout(i);
       } else {
-        for (let i = 0; i < N; i++) if (may(i)) { px[i].flash(c.display, c.channels); count++; this.shout(i); }
+        for (let i = 0; i < N; i++) if (may(i)) { px[i].flash(c.display, c.channels, c.conserve); count++; this.shout(i); }
       }
       if (c.channels) {
         for (let ch = 0; ch < 3; ch++) this.passOn(p => p.car3[ch], (p, v) => { p.car3[ch] = v; });

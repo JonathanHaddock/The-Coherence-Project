@@ -99,7 +99,7 @@ fn help() void {
         \\  origin possibility [--no-open]
         \\  origin photo [all7|next] [ticks] [none|same|unreal]
         \\  origin pixel [--no-open]
-        \\  origin record mode=lattice|v1|signed|turing|control core=.. p=.. ticks=.. every=.. [display=.. update=.. gravity=on | feedback=reinforce|cancel exclusion=on channels=on motion=on em=on excite=on seed=..]
+        \\  origin record mode=lattice|v1|signed|turing|control core=.. p=.. ticks=.. every=.. [display=.. update=.. gravity=on | feedback=reinforce|cancel exclusion=on channels=on motion=on em=on excite=on conserve=on seed=..]
         \\  origin onepixel [start] [row|bipyramid] [nC|t ...]   (one pixel engine model, e.g. onepixel 100 row n2 t)
         \\  origin porch [--no-open]                       (experiment menu in the browser)
         \\  origin help
@@ -1497,6 +1497,7 @@ fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
     var motion = false;
     var em = false;
     var excite = false;
+    var conserve = false;
     var seed: u64 = 20261110;
     var p: f64 = 0.2;
     while (args.next()) |a| {
@@ -1515,6 +1516,7 @@ fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
         else if (std.mem.eql(u8, k, "motion")) motion = std.mem.eql(u8, v, "on")
         else if (std.mem.eql(u8, k, "em")) em = std.mem.eql(u8, v, "on")
         else if (std.mem.eql(u8, k, "excite")) excite = std.mem.eql(u8, v, "on")
+        else if (std.mem.eql(u8, k, "conserve")) conserve = std.mem.eql(u8, v, "on")
         else if (std.mem.eql(u8, k, "feedback")) {
             gravity = std.mem.eql(u8, v, "reinforce");
             cancel = std.mem.eql(u8, v, "cancel");
@@ -1533,6 +1535,7 @@ fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
         motion = false;
         em = false;
         excite = false;
+        conserve = false;
     }
     if (std.mem.eql(u8, mode, "control")) {
         const cname = try std.fmt.allocPrint(gpa, "control_p{d}_t{d}_s{d}", .{ p, ticks, seed });
@@ -1545,7 +1548,7 @@ fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
         return;
     }
     const name = if (is_lattice)
-        try std.fmt.allocPrint(gpa, "lattice_{s}_{s}_core{d}{s}{s}{s}{s}{s}_{s}_t{d}_s{d}", .{ disp_s, update, core, if (excite and !gravity and !cancel) "_exc" else "", if (exclusion) "_excl" else "", if (channels) "_ch3" else "", if (motion) "_move" else "", if (em) "_em" else "", if (gravity) "grav" else if (cancel) "cancel" else "nograv", ticks, seed })
+        try std.fmt.allocPrint(gpa, "lattice_{s}_{s}_core{d}{s}{s}{s}{s}{s}{s}_{s}_t{d}_s{d}", .{ disp_s, update, core, if (conserve) "_cons" else "", if (excite and !gravity and !cancel) "_exc" else "", if (exclusion) "_excl" else "", if (channels) "_ch3" else "", if (motion) "_move" else "", if (em) "_em" else "", if (gravity) "grav" else if (cancel) "cancel" else "nograv", ticks, seed })
     else
         try std.fmt.allocPrint(gpa, "{s}_core{d}_t{d}_s{d}", .{ mode, core, ticks, seed });
     defer gpa.free(name);
@@ -1555,8 +1558,8 @@ fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
     else if (std.mem.eql(u8, mode, "signed")) "1-4, 7, 8, 10 (signed carrier)"
     else if (std.mem.eql(u8, mode, "turing")) "1-4, 7, 8, 11 (carrier cancels memory)"
     else return error.UnknownMode;
-    const extra = is_lattice and (exclusion or channels or motion or em or excite);
-    const rules_x = if (extra) try std.fmt.allocPrint(gpa, "{s}{s}{s}{s}{s}{s}", .{ rules, if (excite and !gravity and !cancel) "; + 26 (carrier excites: 3 units -> +1 memory per cell)" else "", if (exclusion) "; + 22 (exclusion on the pattern)" else "", if (channels) "; + 23 (three carriers weak/EM/strong, separately conserved, replaces 5-6)" else "", if (motion) "; + 24 (motion: a flashed pixel swaps one hop toward more carrier)" else "", if (em) "; + 25 (signed EM field: charge spreads; charged pixels move toward lowest q*phi)" else "" }) else rules;
+    const extra = is_lattice and (exclusion or channels or motion or em or excite or conserve);
+    const rules_x = if (extra) try std.fmt.allocPrint(gpa, "{s}{s}{s}{s}{s}{s}{s}", .{ rules, if (conserve) "; + 27 (hearing conserves: a flash deals out its released memory)" else "", if (excite and !gravity and !cancel) "; + 26 (carrier excites: 3 units -> +1 memory per cell)" else "", if (exclusion) "; + 22 (exclusion on the pattern)" else "", if (channels) "; + 23 (three carriers weak/EM/strong, separately conserved, replaces 5-6)" else "", if (motion) "; + 24 (motion: a flashed pixel swaps one hop toward more carrier)" else "", if (em) "; + 25 (signed EM field: charge spreads; charged pixels move toward lowest q*phi)" else "" }) else rules;
     defer if (extra) gpa.free(rules_x);
     const meta: record.Meta = .{ .name = name, .mode = mode, .display = disp_s, .update = update, .core = core, .gravity = gravity, .seed = seed, .ticks = ticks, .every = every, .rules = rules_x };
     const start: engine.Start = if (core == 0) .random else .{ .core = core };
@@ -1574,6 +1577,7 @@ fn recordRun(io: std.Io, gpa: std.mem.Allocator, args: anytype) !void {
         lattice.motion = motion;
         lattice.em = em;
         lattice.excite = excite;
+        lattice.conserve = conserve;
         break :blk try record.run(io, gpa, &lattice, meta, "results/runs");
     } else blk: {
         lep_grid.init(seed, core);

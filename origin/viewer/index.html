@@ -38,6 +38,7 @@ input[type=range]{accent-color:var(--acc)}
   <button id="cancel">cancel memory (21): off</button>
   <button id="excl">exclusion (22): off</button>
   <button id="ch3">3 carriers (23): off</button>
+  <button id="conserve" class="on" title="Rule 27: a flash hands out the memory it releases; hearing no longer creates memory">hearing conserves (27): ON</button>
   <button id="excite" class="on" title="Rule 26: carrier adds memory (always on by Jono's choice; off = old runs)">carrier excites (26): ON</button>
   <button id="pixels" class="on" title="Lattice mode runs on copies of the one-pixel model (pixel-model.js). Off = the array engine. Both give identical results.">built from pixels: ON</button>
   <button id="motion">motion (24): off</button>
@@ -187,13 +188,30 @@ class Engine {
     }
     this.pat[i] = p & 7;
     const rel = c[b] + c[b + 1] + c[b + 2];
+    if (this.cfg.conserve) { if (!this.rel3) this.rel3 = new Uint32Array(N * 3); this.rel3[b] = c[b]; this.rel3[b + 1] = c[b + 1]; this.rel3[b + 2] = c[b + 2]; }
     r[b] = r[b + 1] = r[b + 2] = c[b] = c[b + 1] = c[b + 2] = 0;
+    if (!this.cfg.conserve) this.deposit(i, rel);
+    this.fired[i] = 1;
+  }
+  deposit(i, amt) {
     if (this.cfg.channels) {
       const sl = Engine.select(this.pat[i]); let k = 0; for (const on of sl) k += on ? 1 : 0;
-      const share = rel / k;
+      const share = amt / k;
       for (let ch = 0; ch < 3; ch++) if (sl[ch]) this.car3[i * 3 + ch] += share;
-    } else this.carrier[i] += rel;
-    this.fired[i] = 1;
+    } else this.carrier[i] += amt;
+  }
+  // neighbours hear pixel i's flash. RULE 27: memory is dealt out, not created.
+  shout(i) {
+    const sh = this.pat[i];
+    if (!this.cfg.conserve) { for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh); return; }
+    const tg = [0, 0, 0, 0, 0, 0];
+    for (let k = 0; k < 3; k++) {
+      const bit = (sh >> k) & 1; let m = 0;
+      for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q]; if (((this.pat[j] >> k) & 1) === bit) this.rf[j * 3 + k]++; else tg[m++] = j; }
+      const units = this.rel3[i * 3 + k];
+      if (m === 0) { this.deposit(i, units); continue; }
+      for (let u = 0; u < units; u++) this.cs[tg[u % m] * 3 + k]++;
+    }
   }
   receive(j, shown) {
     const p = this.pat[j], b = j * 3;
@@ -340,13 +358,13 @@ class Engine {
     if (this.cfg.update === "sync") {
       for (let i = 0; i < N; i++) this.fired[i] = ((this.ready(i) || i === kick) && !this.blocked(i)) ? 1 : 0;
       for (let i = 0; i < N; i++) if (this.fired[i]) { this.flash(i); count++; }
-      for (let i = 0; i < N; i++) if (this.fired[i]) { const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh); }
+      for (let i = 0; i < N; i++) if (this.fired[i]) this.shout(i);
     } else {
       for (let i = 0; i < N; i++) {
         if (!(this.ready(i) || i === kick)) continue;
         if (this.blocked(i)) continue;
         this.flash(i); count++;
-        const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh);
+        this.shout(i);
       }
     }
     if (this.cfg.channels) {
@@ -482,7 +500,7 @@ let eng, running=false, recent=new Float32Array(N), hist=[];
 const BINS=H; let rate=new Float64Array(BINS), agr=new Float64Array(BINS), seen=false;
 const binOf=new Int16Array(N), cnt=new Float64Array(BINS);
 for(let i=0;i<N;i++){const b=Math.floor(RAD[i]);binOf[i]=b<BINS?b:-1;if(b<BINS)cnt[b]++;}
-function cfg(){const dv=$("deliver").value;return{deliver:(dv==="weak"||dv==="weakhand")?"unreal":dv,weak:dv==="weak"||dv==="weakhand",hand:dv==="weakhand",weight:$("weight").value,p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on"),exclusion:$("excl").classList.contains("on"),channels:$("ch3").classList.contains("on"),motion:$("motion").classList.contains("on"),excite:$("excite").classList.contains("on"),em:$("em").classList.contains("on"),cancel:!$("gravity").classList.contains("on")&&$("cancel").classList.contains("on")};}
+function cfg(){const dv=$("deliver").value;return{deliver:(dv==="weak"||dv==="weakhand")?"unreal":dv,weak:dv==="weak"||dv==="weakhand",hand:dv==="weakhand",weight:$("weight").value,p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on"),exclusion:$("excl").classList.contains("on"),channels:$("ch3").classList.contains("on"),motion:$("motion").classList.contains("on"),excite:$("excite").classList.contains("on"),conserve:$("conserve").classList.contains("on"),em:$("em").classList.contains("on"),cancel:!$("gravity").classList.contains("on")&&$("cancel").classList.contains("on")};}
 const KG=24;let lastF=new Int32Array(N),gapH=new Float64Array(KG+1),flashSum=0,tickSum=0;
 // The lattice made of copies of the one-pixel model (pixel-model.js). It exposes the same
 // arrays the page reads (pat, cs, fired, carrier), copied from the pixels after every tick.
@@ -610,6 +628,7 @@ $("copy").onclick=async()=>{const txt=stateText(),box=$("copybox");box.value=txt
 $("gravity").onclick=()=>{const b=$("gravity");b.classList.toggle("on");b.textContent="gravity: "+(b.classList.contains("on")?"ON":"off");if(b.classList.contains("on")){$("cancel").classList.remove("on");$("cancel").textContent="cancel memory (21): off";}reset();};
 $("em").onclick=()=>{const b=$("em");b.classList.toggle("on");if(b.classList.contains("on")&&!$("motion").classList.contains("on")){$("motion").classList.add("on");$("motion").textContent="motion (24): ON";}b.textContent="signed EM (25): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("motion").onclick=()=>{const b=$("motion");b.classList.toggle("on");b.textContent="motion (24): "+(b.classList.contains("on")?"ON":"off");reset();};
+$("conserve").onclick=()=>{const b=$("conserve");b.classList.toggle("on");b.textContent="hearing conserves (27): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("excite").onclick=()=>{const b=$("excite");b.classList.toggle("on");b.textContent="carrier excites (26): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("pixels").onclick=()=>{const b=$("pixels");b.classList.toggle("on");b.textContent="built from pixels: "+(b.classList.contains("on")?"ON":"off");reset();};
 $("ch3").onclick=()=>{const b=$("ch3");b.classList.toggle("on");b.textContent="3 carriers (23): "+(b.classList.contains("on")?"ON":"off");reset();};
