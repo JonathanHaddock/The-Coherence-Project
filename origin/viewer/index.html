@@ -38,6 +38,7 @@ input[type=range]{accent-color:var(--acc)}
   <button id="cancel">cancel memory (21): off</button>
   <button id="excl">exclusion (22): off</button>
   <button id="ch3">3 carriers (23): off</button>
+  <button id="pixels" class="on" title="Lattice mode runs on copies of the one-pixel model (pixel-model.js). Off = the array engine. Both give identical results.">built from pixels: ON</button>
   <button id="motion">motion (24): off</button>
   <button id="em">signed EM (25): off</button>
   <label>neutrino delivery <select id="deliver"><option value="none">none (rule 14)</option><option value="same">same information (15)</option><option value="unreal">unrealized information (15)</option><option value="weak">weak events only (17-19)</option><option value="weakhand">weak events + handedness (20)</option></select></label>
@@ -101,6 +102,7 @@ input[type=range]{accent-color:var(--acc)}
 </section>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="pixel-model.js"></script>
 <script>
 // JS port of origin/src/engine/grid3.zig + pixel.zig (3D lattice, carrier, rule 6 gravity).
 const S = 48, N = S * S * S, H = 24;
@@ -472,7 +474,21 @@ const binOf=new Int16Array(N), cnt=new Float64Array(BINS);
 for(let i=0;i<N;i++){const b=Math.floor(RAD[i]);binOf[i]=b<BINS?b:-1;if(b<BINS)cnt[b]++;}
 function cfg(){const dv=$("deliver").value;return{deliver:(dv==="weak"||dv==="weakhand")?"unreal":dv,weak:dv==="weak"||dv==="weakhand",hand:dv==="weakhand",weight:$("weight").value,p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on"),exclusion:$("excl").classList.contains("on"),channels:$("ch3").classList.contains("on"),motion:$("motion").classList.contains("on"),em:$("em").classList.contains("on"),cancel:!$("gravity").classList.contains("on")&&$("cancel").classList.contains("on")};}
 const KG=24;let lastF=new Int32Array(N),gapH=new Float64Array(KG+1),flashSum=0,tickSum=0;
-function reset(){lastF.fill(-1);gapH.fill(0);flashSum=0;tickSum=0;eng=new Engine(cfg());recent.fill(0);hist=[];rate.fill(0);agr.fill(0);seen=false;measure(0);draw();}
+// The lattice made of copies of the one-pixel model (pixel-model.js). It exposes the same
+// arrays the page reads (pat, cs, fired, carrier), copied from the pixels after every tick.
+class PixelEngine {
+  constructor(cfg) {
+    this.cfg = cfg; this.field = new OriginPixel.Field(cfg, S);
+    this.pat = new Uint8Array(N); this.cs = new Uint32Array(N * 3); this.fired = new Uint8Array(N); this.carrier = new Float64Array(N);
+    this.t = 0; this.total = 0; this.sync();
+  }
+  sync() { const px = this.field.px; for (let i = 0; i < N; i++) { const p = px[i]; this.pat[i] = p.pattern; this.cs[i*3] = p.cs[0]; this.cs[i*3+1] = p.cs[1]; this.cs[i*3+2] = p.cs[2]; this.fired[i] = p.fired ? 1 : 0; this.carrier[i] = p.carrier; } }
+  tick() { const c = this.field.tick(); this.t = this.field.t; this.total = this.field.total; this.sync(); return c; }
+  agreement(i) { let m = 0; const p = this.pat[i];
+    for (let q = 0; q < 6; q++) { const x = p ^ this.pat[NB[i * 6 + q]]; m += 3 - ((x & 1) + ((x >> 1) & 1) + ((x >> 2) & 1)); } return m / 18; }
+  fieldD() { return 0; }
+}
+function reset(){lastF.fill(-1);gapH.fill(0);flashSum=0;tickSum=0;{const c=cfg();eng=(c.mode==="lattice"&&$("pixels").classList.contains("on"))?new PixelEngine(c):new Engine(c);}recent.fill(0);hist=[];rate.fill(0);agr.fill(0);seen=false;measure(0);draw();}
 function measure(alpha){
   const r=new Float64Array(BINS),a=new Float64Array(BINS);
   for(let i=0;i<N;i++){const b=binOf[i];if(b<0)continue;if(eng.fired[i])r[b]++;a[b]+=eng.agreement(i);}
@@ -584,6 +600,7 @@ $("copy").onclick=async()=>{const txt=stateText(),box=$("copybox");box.value=txt
 $("gravity").onclick=()=>{const b=$("gravity");b.classList.toggle("on");b.textContent="gravity: "+(b.classList.contains("on")?"ON":"off");if(b.classList.contains("on")){$("cancel").classList.remove("on");$("cancel").textContent="cancel memory (21): off";}reset();};
 $("em").onclick=()=>{const b=$("em");b.classList.toggle("on");b.textContent="signed EM (25): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("motion").onclick=()=>{const b=$("motion");b.classList.toggle("on");b.textContent="motion (24): "+(b.classList.contains("on")?"ON":"off");reset();};
+$("pixels").onclick=()=>{const b=$("pixels");b.classList.toggle("on");b.textContent="built from pixels: "+(b.classList.contains("on")?"ON":"off");reset();};
 $("ch3").onclick=()=>{const b=$("ch3");b.classList.toggle("on");b.textContent="3 carriers (23): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("excl").onclick=()=>{const b=$("excl");b.classList.toggle("on");b.textContent="exclusion (22): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("cancel").onclick=()=>{const b=$("cancel");b.classList.toggle("on");b.textContent="cancel memory (21): "+(b.classList.contains("on")?"ON":"off");if(b.classList.contains("on")){$("gravity").classList.remove("on");$("gravity").textContent="gravity: off";}reset();};
