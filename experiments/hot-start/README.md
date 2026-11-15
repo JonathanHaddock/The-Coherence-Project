@@ -45,3 +45,22 @@ Seeds agree closely (at t3000 the spread is under 0.002 in every row). Energy pe
 ## Reading
 
 Energy never leaves (closed box), so "running down" can only mean the energy becoming too even to use. A hot start puts the world far enough from even that it lasts at least 3,000 ticks, and in most settings shows no sign of stopping. The slow decline at T 2–3 is the thing to watch; a longer run (20,000+ ticks) would show whether it levels off.
+
+## Long run: 20,000 ticks (added 2026-11-14)
+
+T 2 and T 3 with seeds 1–3, and T 1 and T 5 with seed 1, all with Higgs off (`long-commands.txt`, `long-run.tsv`). Share of pixels flashing:
+
+| T | seed | t100 | t1000 | t3000 | t5000 | t10000 | t15000 | t20000 | drop per 1,000 ticks, 3k–10k | 10k–20k |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 1 | 0.210 | 0.210 | 0.210 | 0.210 | 0.210 | 0.210 | 0.210 | 0 | 0 |
+| 2 | 1 | 0.459 | 0.438 | 0.419 | 0.413 | 0.409 | 0.405 | 0.404 | 0.0015 | 0.0005 |
+| 2 | 2 | 0.458 | 0.436 | 0.416 | 0.410 | 0.405 | 0.403 | 0.402 | 0.0016 | 0.0003 |
+| 2 | 3 | 0.457 | 0.438 | 0.420 | 0.412 | 0.407 | 0.405 | 0.404 | 0.0018 | 0.0002 |
+| 3 | 1 | 0.548 | 0.518 | 0.490 | 0.468 | 0.441 | 0.434 | 0.431 | 0.0069 | 0.0010 |
+| 3 | 2 | 0.547 | 0.517 | 0.490 | 0.468 | 0.442 | 0.434 | 0.430 | 0.0069 | 0.0011 |
+| 3 | 3 | 0.549 | 0.518 | 0.490 | 0.468 | 0.440 | 0.432 | 0.429 | 0.0072 | 0.0011 |
+| 5 | 1 | 0.622 | 0.559 | 0.550 | 0.541 | 0.519 | 0.506 | 0.500 | 0.0045 | 0.0019 |
+
+Energy per pixel is unchanged from tick 1 to tick 20,000 in every run.
+
+**It levels off; it doesn't run down.** The decline slows by 3–7× between the two halves at T 2 and T 3, and all three seeds agree to within 0.003. T 2 settles near 0.40, T 3 near 0.43. T 5 is still slowly falling at tick 20,000 (0.0019 per 1,000 ticks, down from 0.0045). T 1 hasn't moved since tick 100. A hot start gives a world that settles into lasting activity.
