@@ -33,6 +33,10 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
     <div class="note">Yellow line = distance between electrons 1 and 2. Dashed = 2 bonds, the "close" mark.</div></div>
 </section>
 <aside>
+  <div class="card"><h2>Average coupling λ (all electrons)</h2>
+    <div id="lam" style="font-size:56px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums">–</div>
+    <div id="lamsub" class="note"></div>
+    <p class="note">For each electron: energy with the lattice as it is now, minus with the lattice perfect, divided by its kinetic energy (½ v<sub>F</sub>²), averaged over all electrons. Positive = the lattice has bent toward the electrons (the glue). Lattice convention λ = E<sub>p</sub>/(z t); conventions differ between papers, so compare lab runs with each other, not with a metal's λ.</p></div>
   <div class="card"><h2>Measured (this run)</h2><table id="meas"></table></div>
   <div class="card"><h2>Tc estimate (layer 3)</h2>
     <div class="row"><span>reference metal</span><select id="ref"></select><span></span></div>
@@ -52,7 +56,7 @@ $("sliders").innerHTML = SL.map(([k, lab, mn, mx, st]) => `<div class="row"><spa
 let lab, hist = [], meas, running = true, control = false, baseline;
 function build() {
   const q = Object.assign({}, P, { lattice: $("lattice").value, g: control ? 0 : P.g }); delete q.speed;
-  lab = new Lab2D(q); hist = []; meas = { n: 0, near2: 0, sumr: 0 };
+  lab = new Lab2D(q); hist = []; meas = { n: 0, near2: 0, sumr: 0 }; lamAvg = 0; lamN = 0;
   const m = SCTc.phononMoments(lab.phonons(16));
   if (!baseline || baseline.lattice !== q.lattice) { const b = new Lab2D(Object.assign({}, DEFAULTS, { lattice: q.lattice, ne: 0, cells: 4 })); baseline = Object.assign({ lattice: q.lattice, g: DEFAULTS.g, M: DEFAULTS.M }, SCTc.phononMoments(b.phonons(16))); }
   lab.moments = m; tcPanel();
@@ -92,12 +96,17 @@ function chart() {
   if (hist.length < 2) return; g.strokeStyle = "#f5c542"; g.lineWidth = 1.5 * devicePixelRatio; g.beginPath();
   hist.forEach((r, i) => { const x = i / (hist.length - 1) * w, y = h - Math.min(1, r / ymax) * h; i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke();
 }
+let lamAvg = 0, lamN = 0;
 function panel() {
+  const lam = lab.coupling(), now = lam.length ? lam.reduce((a, b) => a + b, 0) / lam.length : 0;
+  lamAvg = (lamAvg * lamN + now) / (lamN + 1); lamN++;
+  $("lam").textContent = now.toFixed(3);
+  $("lamsub").textContent = lam.length ? `run average ${lamAvg.toFixed(3)} · range now ${Math.min(...lam).toFixed(3)} to ${Math.max(...lam).toFixed(3)} over ${lam.length} electrons` : "no electrons";
   const A = lab.Lx * lab.Ly, near = meas.n ? (meas.near2 / meas.n) / (Math.PI * 4 / A) : 0, comp = lab.compression();
   let mx = 0; for (const v of comp) mx = Math.max(mx, v);
   $("meas").innerHTML = [["time", lab.t.toFixed(0)], ["ions / electrons", `${lab.n} / ${lab.ne}`], ["phonon ω_log (lab units)", lab.moments.wlog.toFixed(4)],
     ["pairs within 2 bonds, vs chance", near.toFixed(2) + "×"], ["mean pair distance", meas.n ? (meas.sumr / meas.n).toFixed(2) : "–"], ["deepest bond squeeze", (mx * 100).toFixed(1) + "%"],
-    ["mode", control ? "<b>control: g = 0</b>" : "coupling on"]].map(([a, b]) => `<tr><td>${a}</td><td class="r">${b}</td></tr>`).join("");
+    ["coupling", control ? "<b>off: control button (g = 0)</b>" : P.g === 0 ? "<b>off: slider g = 0</b>" : "on, g = " + P.g]].map(([a, b]) => `<tr><td>${a}</td><td class="r">${b}</td></tr>`).join("");
 }
 let frame = 0;
 function loop() {

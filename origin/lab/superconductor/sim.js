@@ -161,6 +161,25 @@
         o.push(Math.hypot(this.wrapD(this.ex[b] - this.ex[a], this.Lx), this.wrapD(this.ey[b] - this.ey[a], this.Ly)));
       return o;
     }
+    // Electron-lattice coupling, per electron, as a dimensionless lambda (lattice convention
+    // lambda = E_p / (z t): polaron energy over kinetic scale). E_p = the electron's energy with the
+    // lattice as it is now, minus with the lattice perfect (negative = the lattice has bent toward it).
+    // lambda_e = -E_p / (1/2 vF^2). Conventions differ between papers, so compare lab runs with each
+    // other, not with a metal's lambda.
+    coupling() {
+      const p = this.p, s2 = p.sigma * p.sigma, cut = 5 * p.sigma, vcut = Math.exp(-12.5), ke = 0.5 * p.vF * p.vF, out = [];
+      for (let e = 0; e < this.ne; e++) {
+        const x = this.ex[e], y = this.ey[e]; let now = 0, flat = 0;
+        this.near(x, y, cut + 0.5, this.bins, (k, dx0, dy0) => {
+          const dx = this.wrapD(this.x0[k] + this.ux[k] - x, this.Lx), dy = this.wrapD(this.y0[k] + this.uy[k] - y, this.Ly);
+          const r2 = dx * dx + dy * dy, r20 = dx0 * dx0 + dy0 * dy0;
+          if (r2 <= cut * cut) now -= p.g * (Math.exp(-r2 / (2 * s2)) - vcut);
+          if (r20 <= cut * cut) flat -= p.g * (Math.exp(-r20 / (2 * s2)) - vcut);
+        });
+        out.push(-(now - flat) / ke);
+      }
+      return out;
+    }
     // local compression of each ion: mean bond shortening (positive = squeezed = extra positive charge)
     compression() {
       const c = new Float64Array(this.n), m = new Float64Array(this.n);
