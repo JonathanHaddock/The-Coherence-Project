@@ -142,23 +142,29 @@
         this.px[i] = p;
       }
       this.kick = (H * S + H) * S + H; this.t = 0; this.total = 0; this.swaps = 0;
+      // Outside conditions (experiments only, not rules): sites forced to flash every tick,
+      // and an open edge that feeds back in the carrier the box edge lost that tick.
+      this.forced = new Uint8Array(N); this.openEdge = false; this.lost = 0;
+      this.boundary = []; for (let i = 0; i < N; i++) { let e = 0; for (let f = 0; f < 6; f++) e |= this.edge[i * 6 + f]; if (e) this.boundary.push(i); }
     }
     neighbourPatterns(i) { const o = []; for (let f = 0; f < 6; f++) o.push(this.px[this.nb[i * 6 + f]].pattern); return o; }
     shout(i) { const sh = this.px[i].pattern; for (let f = 0; f < 6; f++) this.px[this.nb[i * 6 + f]].hear(sh); }
     // carrier passes face to face: each pixel sends 1/6 out of every face; edge faces lose it.
     passOn(get, set) {
-      const N = this.N, inbox = new Float64Array(N);
+      const N = this.N, inbox = new Float64Array(N); let lost = 0;
       for (let i = 0; i < N; i++) {
         const q = get(this.px[i]); if (q === 0) continue; const sh = q / 6;
-        for (let f = 0; f < 6; f++) if (!this.edge[i * 6 + f]) inbox[this.nb[i * 6 + f]] += sh;
+        for (let f = 0; f < 6; f++) if (!this.edge[i * 6 + f]) inbox[this.nb[i * 6 + f]] += sh; else lost += sh;
       }
+      if (this.openEdge && lost) { const add = lost / this.boundary.length; for (const i of this.boundary) inbox[i] += add; }
       for (let i = 0; i < N; i++) set(this.px[i], inbox[i]);
+      return lost;
     }
     tick() {
       const c = this.cfg, N = this.N, px = this.px, kick = this.t === 0 ? this.kick : -1;
       let count = 0;
       for (const p of px) p.fired = false;
-      const may = i => (px[i].ready() || i === kick) && !(c.exclusion && px[i].blocked(c.display, this.neighbourPatterns(i)));
+      const may = i => (px[i].ready() || i === kick || this.forced[i] === 1) && !(c.exclusion && px[i].blocked(c.display, this.neighbourPatterns(i)));
       if (c.update === "sync") {
         const go = new Uint8Array(N); for (let i = 0; i < N; i++) go[i] = may(i) ? 1 : 0;
         for (let i = 0; i < N; i++) if (go[i]) { px[i].flash(c.display, c.channels); count++; }
