@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Origin One Pixel</title>
+<style>
+:root{--bg:#0d0f14;--card:#161a22;--ink:#e6e8ee;--dim:#8a91a3;--line:#262c38;--on:#f5c542;--off:#2a3040;--rf:#3ddc97;--cs:#ff6b5a;--car:#4f8cff}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,sans-serif}
+header{padding:12px 16px;border-bottom:1px solid var(--line)}h1{font-size:17px;margin:0}header p{margin:4px 0 0;color:var(--dim);font-size:12px;max-width:900px}
+main{display:grid;grid-template-columns:1fr 380px;gap:12px;padding:12px 16px}@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:12px}
+h2{font-size:12px;margin:0 0 8px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+canvas#c{width:100%;aspect-ratio:1/1;max-height:70vh;display:block;background:#090b10;border-radius:8px}
+label{display:inline-flex;gap:4px;align-items:center;margin:2px 10px 2px 0;font-size:13px}
+select,button{background:#202634;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font:inherit;cursor:pointer}button.on{background:#2d3b5a}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}td{padding:2px 4px;border-bottom:1px solid var(--line)}td.r{text-align:right}
+#log{font:12px ui-monospace,monospace;max-height:260px;overflow:auto;white-space:pre-wrap;color:var(--dim)}#log b{color:var(--ink)}
+.note{font-size:12px;color:var(--dim)}
+</style></head><body>
+<header><h1>Origin: one pixel, running</h1>
+<p>This is the actual pixel object (<code>pixel-model.js</code>) that the 3D field is built from. The 3D field is just copies of it wired face to face, and gives the engine's exact results. Here one pixel sits in the middle with six neighbours, which are copies of the same object. The neighbours' outer sides hear a random flash each tick. That is the only made-up part, and it stands in for the rest of the universe.</p></header>
+<main>
+<section>
+  <div class="card">
+    <label>display <select id="display"><option>one_cell</option><option>flip_all</option><option>hold</option><option>fill_empty</option></select></label>
+    <label>update <select id="update"><option>sync</option><option>sweep</option></select></label>
+    <label>outer world <select id="world"><option value="rand">random flashes</option><option value="quiet">silent</option><option value="same">all show 111</option></select></label>
+    <label>seed <select id="seed"><option>1</option><option>2</option><option>3</option></select></label>
+    <div style="margin-top:6px">
+      <button data-r="gravity">gravity (6)</button> <button data-r="cancel">cancel (21)</button> <button data-r="exclusion">exclusion (22)</button>
+      <button data-r="channels">3 carriers (23)</button> <button data-r="motion">motion (24)</button> <button data-r="em">signed EM (25)</button>
+    </div>
+    <div style="margin-top:6px"><button id="reset">reset</button> <button id="run">run</button> <button id="step">step</button>
+      <label>speed <select id="speed"><option value="600">slow</option><option value="200" selected>medium</option><option value="40">fast</option></select></label>
+      <span id="tick" class="note"></span></div>
+  </div>
+  <canvas id="c" width="900" height="900"></canvas>
+</section>
+<aside>
+  <div class="card"><h2>The pixel</h2><table id="state"></table></div>
+  <div class="card"><h2>What happened this tick</h2><div id="log"></div></div>
+  <div class="card note">Cells: lit = filled. Green bars = reinforcement (heard a match), red bars = memory (heard a mismatch). The pixel flashes when its memory reaches 3. Blue = carrier at the site. An arrow from a face = a flash heard (in) or sent (out). A dashed arrow = the face the pixel wants to move through (rules 24/25).</div>
+</aside>
+</main>
+<script src="pixel-model.js"></script>
+<script>
+const { Pixel, KIND, FACES } = OriginPixel;
+const $ = id => document.getElementById(id);
+const rules = { gravity: false, cancel: false, exclusion: false, channels: false, motion: false, em: false };
+let P, NB, t, rng, running = false, timer, events, lastWant = -1, heardFrom = [], sentTo = false;
+const OPPF = [1, 0, 3, 2, 5, 4];
+function xs() { let x = rng; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; rng = x >>> 0; return rng; }
+function reset() {
+  rng = 2463534242 ^ +$("seed").value; t = 0;
+  P = new Pixel(xs() & 7, [xs() & 1, xs() & 1, xs() & 1]);
+  NB = FACES.map(() => new Pixel(xs() & 7, [xs() & 1, xs() & 1, xs() & 1]));
+  events = ["<b>reset</b>: centre shows " + bits(P.pattern) + " (" + P.kind + ")"]; heardFrom = []; sentTo = false; lastWant = -1; show();
+}
+const bits = p => [0, 1, 2].map(k => (p >> k) & 1).join("");
+function tick() {
+  const d = $("display").value, w = $("world").value, all = [P, ...NB]; events = []; heardFrom = []; sentTo = false;
+  for (const p of all) p.fired = false;
+  // outer world: each neighbour's far side hears one flash
+  if (w !== "quiet") NB.forEach(q => q.hear(w === "same" ? 7 : xs() & 7));
+  // who may flash (centre's neighbours = the 6; a neighbour's neighbours = centre + outer world)
+  const pats = i => i === 0 ? NB.map(q => q.pattern) : [P.pattern];
+  const may = all.map((p, i) => p.ready() && !(rules.exclusion && p.blocked(d, pats(i))));
+  const flashOne = (i) => {
+    const p = all[i], before = p.pattern, s = p.flash(d, rules.channels);
+    if (i === 0) { sentTo = true; NB.forEach(q => q.hear(s)); events.push(`<b>centre flashes</b> ${bits(before)} → ${bits(s)} (${P.kind}); all 6 neighbours hear ${bits(s)}`); }
+    else { P.hear(s); heardFrom.push(i - 1); events.push(`face ${FACES[i - 1]} flashes ${bits(s)}; centre hears it`); }
+  };
+  if ($("update").value === "sync") { const go = may.slice(); go.forEach((g, i) => { if (!g) return; const p = all[i], s = p.flash(d, rules.channels);
+      if (i === 0) { sentTo = true; events.push(`<b>centre flashes</b> → ${bits(s)} (${P.kind})`); } else { heardFrom.push(i - 1); events.push(`face ${FACES[i - 1]} flashes ${bits(s)}`); } });
+    go.forEach((g, i) => { if (!g) return; if (i === 0) NB.forEach(q => q.hear(P.pattern)); else P.hear(all[i].pattern); }); }
+  else all.forEach((p, i) => { if (p.ready() && !(rules.exclusion && p.blocked(d, pats(i)))) flashOne(i); });
+  if (may[0] === false && P.ready()) events.push("centre is ready but <b>blocked</b> (rule 22): a neighbour already shows " + bits(P.wouldShow(d)));
+  // carrier: each pixel sends 1/6 out of each face; centre <-> neighbours, neighbours' outer faces lose it
+  const pass = (get, set) => { const inC = NB.reduce((a, q) => a + get(q) / 6, 0), inN = get(P) / 6; set(P, inC); NB.forEach(q => set(q, inN)); };
+  if (rules.channels) { for (let ch = 0; ch < 3; ch++) pass(p => p.car3[ch], (p, v) => { p.car3[ch] = v; }); all.forEach(p => { p.absorb3(); p.carrier = p.car3[0] + p.car3[1] + p.car3[2]; }); }
+  else { pass(p => p.carrier, (p, v) => { p.carrier = v; }); if (rules.gravity) all.forEach(p => p.absorb()); else if (rules.cancel) all.forEach(p => p.cancel()); }
+  if (rules.em) { all.forEach(p => p.emitCharge()); pass(p => p.phi, (p, v) => { p.phi = v; }); }
+  lastWant = -1;
+  if (rules.motion && P.fired) { lastWant = P.wantMove(rules.em, NB); if (lastWant >= 0) {
+      const q = NB[lastWant]; if (!q.fired) { const a = P.takeBody(); P.putBody(q.takeBody()); q.putBody(a); events.push(`<b>moves</b> through ${FACES[lastWant]}: it swaps places with that neighbour (now shown as the centre)`); } else events.push(`wants to move through ${FACES[lastWant]}, but that neighbour flashed too`); } }
+  if (!events.length) events.push("quiet tick: memory " + P.memory + "/3");
+  t++; show();
+}
+function show() {
+  $("tick").textContent = "tick " + t;
+  const col = P.colour < 0 ? "–" : ["cell 1 (red)", "cell 2 (green)", "cell 3 (blue)"][P.colour];
+  $("state").innerHTML = [["pattern", bits(P.pattern)], ["kind", P.kind], ["charge", ["0", "−1/3", "+2/3", "−1"][P.filled]], ["colour (odd cell)", col],
+    ["memory (to flash at 3)", P.cs.join(" ") + "  = " + P.memory], ["reinforcement", P.rf.join(" ")],
+    ["carrier here", P.carrier.toFixed(2) + (rules.channels ? `  (w ${P.car3[0].toFixed(1)} em ${P.car3[1].toFixed(1)} s ${P.car3[2].toFixed(1)})` : "")],
+    ["signed EM φ here", P.phi.toFixed(2)], ["flashes so far", P.flashes]].map(([a, b]) => `<tr><td>${a}</td><td class="r">${b}</td></tr>`).join("");
+  $("log").innerHTML = `<b>tick ${t}</b>\n` + events.join("\n"); draw();
+}
+function draw() {
+  const c = $("c"), g = c.getContext("2d"), W = c.width, cx = W / 2, cy = W / 2; g.clearRect(0, 0, W, W);
+  // faces laid out: +x right, -x left, +y up, -y down, +z up-right, -z down-left
+  const pos = [[cx + 300, cy], [cx - 300, cy], [cx, cy - 300], [cx, cy + 300], [cx + 210, cy - 210], [cx - 210, cy + 210]];
+  const pix = (p, x, y, sz, label) => {
+    g.save(); g.translate(x, y);
+    if (p.fired) { g.fillStyle = "rgba(245,197,66,.18)"; g.beginPath(); g.arc(0, 0, sz * 1.25, 0, 7); g.fill(); }
+    for (let k = 0; k < 3; k++) { const a = -Math.PI / 2 + k * 2 * Math.PI / 3; const on = (p.pattern >> k) & 1;
+      g.fillStyle = on ? "#f5c542" : "#2a3040"; g.strokeStyle = "#556"; g.lineWidth = 2;
+      g.beginPath(); g.arc(Math.cos(a) * sz * .45, Math.sin(a) * sz * .45, sz * .32, 0, 7); g.fill(); g.stroke();
+      // memory / reinforcement bars per cell
+      const bx = Math.cos(a) * sz * .45 - sz * .2, by = Math.sin(a) * sz * .45 + sz * .38;
+      g.fillStyle = "#3ddc97"; g.fillRect(bx, by, Math.min(p.rf[k], 6) * sz * .033, sz * .06);
+      g.fillStyle = "#ff6b5a"; g.fillRect(bx, by + sz * .08, Math.min(p.cs[k], 3) * sz * .066, sz * .06); }
+    g.fillStyle = "#4f8cff"; g.globalAlpha = Math.min(1, p.carrier / 6); g.beginPath(); g.arc(0, 0, sz * .12, 0, 7); g.fill(); g.globalAlpha = 1;
+    g.fillStyle = "#e6e8ee"; g.font = `${Math.round(sz * .2)}px system-ui`; g.textAlign = "center";
+    g.fillText(label, 0, -sz * 1.05); g.fillStyle = "#8a91a3"; g.fillText(p.kind + " " + bits(p.pattern), 0, sz * 1.25);
+    g.restore(); };
+  const arrow = (x1, y1, x2, y2, color, dash) => { g.strokeStyle = color; g.lineWidth = 6; g.setLineDash(dash ? [14, 10] : []);
+    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); g.setLineDash([]);
+    const a = Math.atan2(y2 - y1, x2 - x1); g.fillStyle = color; g.beginPath(); g.moveTo(x2, y2); g.lineTo(x2 - 22 * Math.cos(a - .4), y2 - 22 * Math.sin(a - .4)); g.lineTo(x2 - 22 * Math.cos(a + .4), y2 - 22 * Math.sin(a + .4)); g.fill(); };
+  pos.forEach(([x, y], f) => { g.strokeStyle = "#262c38"; g.lineWidth = 2; g.beginPath(); g.moveTo(cx, cy); g.lineTo(x, y); g.stroke(); });
+  pos.forEach(([x, y], f) => { const ux = (x - cx) / Math.hypot(x - cx, y - cy), uy = (y - cy) / Math.hypot(x - cx, y - cy);
+    if (heardFrom.includes(f)) arrow(x - ux * 90, y - uy * 90, cx + ux * 170, cy + uy * 170, "#3ddc97");
+    if (sentTo) arrow(cx + ux * 170, cy + uy * 170, x - ux * 95, y - uy * 95, "#f5c542");
+    if (lastWant === f) arrow(cx + ux * 120, cy + uy * 120, x - ux * 120, y - uy * 120, "#c18cff", true); });
+  NB.forEach((q, f) => pix(q, pos[f][0], pos[f][1], 70, FACES[f]));
+  pix(P, cx, cy, 150, "THE PIXEL");
+}
+document.querySelectorAll("[data-r]").forEach(b => b.onclick = () => { const r = b.dataset.r; rules[r] = !rules[r]; b.classList.toggle("on", rules[r]);
+  if (r === "gravity" && rules.gravity) { rules.cancel = false; document.querySelector('[data-r=cancel]').classList.remove("on"); }
+  if (r === "cancel" && rules.cancel) { rules.gravity = false; document.querySelector('[data-r=gravity]').classList.remove("on"); } });
+$("reset").onclick = () => { stop(); reset(); };
+$("step").onclick = () => { stop(); tick(); };
+function stop() { running = false; clearInterval(timer); $("run").textContent = "run"; $("run").classList.remove("on"); }
+$("run").onclick = () => { if (running) return stop(); running = true; $("run").textContent = "pause"; $("run").classList.add("on"); timer = setInterval(tick, +$("speed").value); };
+$("speed").onchange = () => { if (running) { clearInterval(timer); timer = setInterval(tick, +$("speed").value); } };
+["display", "seed", "world", "update"].forEach(id => $(id).onchange = () => { stop(); reset(); });
+reset();
+</script></body></html>

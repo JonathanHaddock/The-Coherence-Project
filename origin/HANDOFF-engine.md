@@ -23,6 +23,8 @@
 | `src/engine/photo.zig` | Photograph mode, rules 12–16 |
 | `src/engine/record.zig` | Run recorder: meta.json, series.csv, shells.csv, gaps.csv, slice.csv |
 | `src/engine/onepixel.zig` | One pixel engine model from Rule Spec v0. Choices P1–P4 are in `experiments/one-pixel` and aren't numbered rules. |
+| `viewer/pixel-model.js` | **One pixel as an active object** (all rules 1–6, 21–25 run inside it) plus `Field`, a 3D field made only of copies of it. `scripts/pixel-parity.js` checks that Field = engine.js exactly (8 rule combinations). |
+| `viewer/one-pixel.html` | One live pixel with six neighbour copies; run or step it and watch it hear, remember, flash, send carrier and move. |
 | `viewer/observe.html`, `viewer/observe-core.js` | Particle observer: kinds, charge, quark groups and triplets, carriers. `scripts/observe-run.js` writes the same counts as a TSV. |
 | `viewer/war.html`, `viewer/pixel.html` | War vs twin vs nudge (with Earth's real war record), and the one-pixel turn |
 | `src/app/porch.html` | Front porch: the experiment menu (`origin porch`) |
