@@ -73,6 +73,10 @@ pub const Grid3 = struct {
     home: [n]u32,
     moved: [n]bool,
     swaps: u32,
+    /// RULE 25: signed EM field (PLAN-fields F-1).
+    em: bool,
+    phi: [n]f64,
+    phin: [n]f64,
 
     pub fn init(g: *Grid3, cfg: px.Config) void {
         g.cfg = cfg;
@@ -81,6 +85,8 @@ pub const Grid3 = struct {
         g.exclusion = false;
         g.channels = false;
         g.motion = false;
+        g.em = false;
+        g.phi = @splat(0);
         g.swaps = 0;
         for (&g.home, 0..) |*h, i| h.* = @intCast(i);
         g.car3 = @splat(.{ 0, 0, 0 });
@@ -150,6 +156,7 @@ pub const Grid3 = struct {
             g.spread();
             if (g.gravity) g.absorb() else if (g.cancel) g.cancelMemory();
         }
+        if (g.em) g.emField();
         if (g.motion) g.move();
         return count;
     }
@@ -222,11 +229,21 @@ pub const Grid3 = struct {
         for (0..n) |i| {
             if (!g.fired[i] or g.moved[i]) continue;
             var best = i;
-            var bc = g.carrier[i];
-            for (neighbors(i)) |j| if (g.carrier[j] > bc) {
-                best = j;
-                bc = g.carrier[j];
-            };
+            const q: f64 = @floatFromInt(px.chargeThirds(g.px[i].pattern));
+            if (g.em and q != 0) {
+                // RULE 25: toward the lowest q*phi
+                var bv = q * g.phi[i];
+                for (neighbors(i)) |j| if (q * g.phi[j] < bv) {
+                    best = j;
+                    bv = q * g.phi[j];
+                };
+            } else {
+                var bc = g.carrier[i];
+                for (neighbors(i)) |j| if (g.carrier[j] > bc) {
+                    best = j;
+                    bc = g.carrier[j];
+                };
+            }
             if (best == i or g.fired[best] or g.moved[best]) continue;
             std.mem.swap(px.Pixel, &g.px[i], &g.px[best]);
             std.mem.swap(u32, &g.home[i], &g.home[best]);
@@ -235,6 +252,25 @@ pub const Grid3 = struct {
             g.moved[best] = true;
             g.swaps += 1;
         }
+    }
+
+    /// RULE 25: every pixel adds its charge (thirds) to phi at its site; phi spreads like rule 5.
+    pub fn emField(g: *Grid3) void {
+        for (0..n) |i| g.phi[i] += @floatFromInt(px.chargeThirds(g.px[i].pattern));
+        g.phin = @splat(0);
+        for (0..n) |i| {
+            const q = g.phi[i];
+            if (q == 0) continue;
+            const share = q / 6.0;
+            const c = coords(i);
+            if (c[0] + 1 < side) g.phin[i + 1] += share;
+            if (c[0] > 0) g.phin[i - 1] += share;
+            if (c[1] + 1 < side) g.phin[i + side] += share;
+            if (c[1] > 0) g.phin[i - side] += share;
+            if (c[2] + 1 < side) g.phin[i + side * side] += share;
+            if (c[2] > 0) g.phin[i - side * side] += share;
+        }
+        g.phi = g.phin;
     }
 
     pub fn blocked(g: *const Grid3, i: usize) bool {
@@ -322,6 +358,33 @@ test "point source in 3D gives roughly 1/distance" {
     const a = avg[4] * 4;
     const b = avg[8] * 8;
     try std.testing.expect(b / a > 0.7 and b / a < 1.05);
+}
+
+test "rule 25: an electron moves toward positive phi, an up quark away" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{});
+    g.em = true;
+    g.carrier = @splat(0);
+    g.phi = @splat(0);
+    g.fired = @splat(false);
+    const i = index(5, 5, 5);
+    const j = neighbors(i)[0];
+    const k = neighbors(i)[1];
+    g.px[i].pattern = 0b111; // electron, q = -3
+    g.px[j].pattern = 0;
+    g.px[k].pattern = 0;
+    g.fired[i] = true;
+    g.phi[j] = 2;
+    g.phi[k] = -2;
+    g.move();
+    try std.testing.expectEqual(@as(u3, 0b111), g.px[j].pattern);
+    g.px[j].pattern = 0b011; // up, q = +2: now moves toward negative phi
+    g.fired = @splat(false);
+    g.fired[j] = true;
+    g.phi[i] = -5;
+    g.move();
+    try std.testing.expectEqual(@as(u3, 0b011), g.px[i].pattern);
 }
 
 test "rule 24: a flashed pixel swaps toward more carrier" {

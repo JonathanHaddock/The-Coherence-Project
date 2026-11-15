@@ -46,7 +46,7 @@ The `display` options are fill_empty, hold, one_cell and flip_all; `update` is s
 
 ## Rules
 
-There are 24. See `RULES.md`. 21 = R-A, 22 = R-B, 23 = R-C, 24 = PLAN-fields F-0 (motion).
+There are 25. See `RULES.md`. 21 = R-A, 22 = R-B, 23 = R-C, 24 = PLAN-fields F-0 (motion), 25 = F-1 (signed EM).
 
 **Next build plan:** `PLAN-fields.md` (every known field, steps F-0 to F-8).
 

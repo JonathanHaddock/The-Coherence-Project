@@ -6,6 +6,7 @@ function radius(i) {
   const x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
   return Math.sqrt((x - H) ** 2 + (y - H) ** 2 + (z - H) ** 2);
 }
+const POPC = [0, 1, 1, 2, 1, 2, 2, 3], Q3 = [0, -1, 2, -3]; // filled count; charge in thirds
 const NB = new Int32Array(N * 6);
 const RAD = new Float64Array(N);
 for (let i = 0; i < N; i++) {
@@ -29,6 +30,7 @@ class Engine {
     this.car6 = new Float64Array(N * 6); this.nxt6 = new Float64Array(N * 6);
     this.t = 0; this.total = 0;
     this.home = new Uint32Array(N).map((_, i) => i); this.moved = new Uint8Array(N); this.swaps = 0;
+    this.phi = new Float64Array(N); this.phin = new Float64Array(N);
     const M = (1n << 64n) - 1n;
     let s = BigInt(this.cfg.seed);
     for (let i = 0; i < N; i++) {
@@ -247,9 +249,27 @@ class Engine {
       this.spread();
       if (this.cfg.gravity) this.absorb(); else if (this.cfg.cancel) this.cancelMemory();
     }
+    if (this.cfg.em) this.emField();
     if (this.cfg.motion) this.move();
     this.t++; this.total += count;
     return count;
+  }
+  // RULE 25: every pixel adds its charge (thirds) to phi at its site; phi spreads like rule 5.
+  emField() {
+    const ph = this.phi, nx = this.phin;
+    for (let i = 0; i < N; i++) ph[i] += Q3[POPC[this.pat[i]]];
+    nx.fill(0);
+    for (let i = 0; i < N; i++) {
+      const q = ph[i]; if (q === 0) continue;
+      const sh = q / 6, x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
+      if (x + 1 < S) nx[i + 1] += sh;
+      if (x > 0) nx[i - 1] += sh;
+      if (y + 1 < S) nx[i + S] += sh;
+      if (y > 0) nx[i - S] += sh;
+      if (z + 1 < S) nx[i + S * S] += sh;
+      if (z > 0) nx[i - S * S] += sh;
+    }
+    this.phi = nx; this.phin = ph;
   }
   // RULE 24: a pixel that flashed hops toward the neighbour with the most carrier (if more than
   // its own site), swapping whole state with a pixel that didn't flash. Carrier stays.
@@ -258,8 +278,15 @@ class Engine {
     const sw = (a, x, y) => { const t = a[x]; a[x] = a[y]; a[y] = t; };
     for (let i = 0; i < N; i++) {
       if (!f[i] || m[i]) continue;
-      let best = i, bc = c[i];
-      for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q]; if (c[j] > bc) { best = j; bc = c[j]; } }
+      let best = i;
+      const qc = Q3[POPC[this.pat[i]]];
+      if (this.cfg.em && qc !== 0) { // RULE 25: toward the lowest q*phi
+        const ph = this.phi; let bv = qc * ph[i];
+        for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q]; if (qc * ph[j] < bv) { best = j; bv = qc * ph[j]; } }
+      } else {
+        let bc = c[i];
+        for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q]; if (c[j] > bc) { best = j; bc = c[j]; } }
+      }
       if (best === i || f[best] || m[best]) continue;
       sw(this.pat, i, best); sw(this.home, i, best); sw(f, i, best);
       for (let k = 0; k < 3; k++) { sw(this.rf, i * 3 + k, best * 3 + k); sw(this.cs, i * 3 + k, best * 3 + k); }
