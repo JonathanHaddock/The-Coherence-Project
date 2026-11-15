@@ -178,3 +178,13 @@ Exact Holstein–Hubbard solutions (layer2.js, complex Lanczos). Pair mass is ta
 - This matches the literature on "superlight" bipolarons on triangular lattices (Hague, Kornilovitch, Samson & Alexandrov, PRL 98, 037002, 2007). On a triangular lattice a pair can hop without breaking: one electron moves to a site that is still a neighbour of the other.
 
 **Caveats:** these are small clusters with finite phonon cutoffs. The honeycomb runs use only 6 sites. Treat the trends as trustworthy and the exact numbers as not.
+
+## Experiment 4: layer 1 on triangular, with repulsion turned up (2026-11-15)
+
+Classical lab, 30 electrons, T 0.002, 150,000 steps, 3 seeds each. Square and triangular lattices, U = 1 and 3, g = 0, 1.0 and 1.3.
+Runner: `node pairing.js g T seed ne steps lattice U`. Data: `results/triangular-repulsion/` (runs.tsv, table.tsv).
+
+- **The classical lab does not reproduce layer 2's triangular advantage.** On triangular, wake-following is only 1–2% above the g = 0 control, against about 3% on square at U = 1. The opposite-momentum cosine stays at about 0 everywhere (|cos| < 0.01).
+- **Triangular resists droplets.** At g 1.3, square collapses into droplets (λ about 65 at U 1 and 26 at U 3), while triangular stays spread out with λ about 0.2. Each ion has 6 springs, so the lattice is stiffer and the same g gives a much smaller λ.
+- **Repulsion (U 3) spreads electrons out** (wake at delay 1 falls from about 0.55 to 0.2–0.25). It does not create correlated pairs.
+- Reading: pair motion, k/−k correlation and the light-pair window are quantum effects. They appear in layer 2's exact solution and not in classical point electrons. The g values here are not matched in λ across lattices, so a fair next comparison would scan g on the triangular lattice up to λ ≈ 0.5–1.
