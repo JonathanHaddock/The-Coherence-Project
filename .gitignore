@@ -1,2 +1,5 @@
 .venv/
 __pycache__/
+origin/zig-out-96/
+origin/results/porch.html
+origin/results/sweep-2026-11-10/runs/

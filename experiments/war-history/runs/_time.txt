@@ -1,0 +1,1 @@
+( cat jobs.txt | xargs -P 8 -L 1 sh -c ; )  1416.66s user 3.86s system 796% cpu 2:58.44 total

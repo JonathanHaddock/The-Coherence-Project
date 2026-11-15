@@ -1,0 +1,17 @@
+display	update	channels	motion	flashing	swaps_per_tick	core_pixels_mean_radius_t600	core_pixels_outside_core_t600	seed_spread_radius
+flip_all	sweep	off	off	0.0771	0	5.97	0.000	0.00
+flip_all	sweep	off	on	0.0084	342	5.98	0.018	0.02
+flip_all	sweep	on	off	0.0834	0	5.97	0.000	0.00
+flip_all	sweep	on	on	0.0374	1714	6.24	0.095	0.25
+flip_all	sync	off	off	0.0616	0	5.97	0.000	0.00
+flip_all	sync	off	on	0.0970	5178	8.81	0.553	0.48
+flip_all	sync	on	off	0.1658	0	5.97	0.000	0.00
+flip_all	sync	on	on	0.0827	4315	8.69	0.539	0.32
+one_cell	sweep	off	off	0.0858	0	5.97	0.000	0.00
+one_cell	sweep	off	on	0.0357	2504	7.72	0.430	0.28
+one_cell	sweep	on	off	0.1789	0	5.97	0.000	0.00
+one_cell	sweep	on	on	0.0763	3563	7.98	0.450	0.25
+one_cell	sync	off	off	0.0571	0	5.97	0.000	0.00
+one_cell	sync	off	on	0.0565	4654	9.04	0.569	0.59
+one_cell	sync	on	off	0.1903	0	5.97	0.000	0.00
+one_cell	sync	on	on	0.0786	4132	7.21	0.293	0.40

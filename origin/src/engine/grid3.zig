@@ -14,7 +14,8 @@
 const std = @import("std");
 const px = @import("pixel.zig");
 
-pub const side = 48;
+/// Set at build time: zig build -Dside=96 (default 48).
+pub const side: usize = @import("build_options").side;
 pub const n = side * side * side;
 
 pub fn coords(i: usize) [3]usize {
@@ -56,10 +57,56 @@ pub const Grid3 = struct {
     cfg: px.Config,
     /// RULE CHOICE 6: carrier acts back on pixels (gravity feedback).
     gravity: bool,
+    /// RULE 21: carrier cancels memory (build spec R-A). Not used together with gravity.
+    cancel: bool,
+    /// RULE 22: exclusion on the pattern (build spec R-B).
+    exclusion: bool,
+    /// RULE 23: three carriers (0 weak, 1 EM, 2 strong), each conserved separately.
+    channels: bool,
+    car3: [n][3]f64,
+    nxt3: [n][3]f64,
+    /// RULE 23 measurement: reinforcement absorbed, by pixel kind (filled count) and channel.
+    absorbed: [4][3]f64,
+    /// RULE 24: motion (PLAN-fields F-0).
+    motion: bool,
+    /// Measurement for rule 24: the starting site of the pixel now at each site, and swaps last tick.
+    home: [n]u32,
+    moved: [n]bool,
+    swaps: u32,
+    /// RULE 25: signed EM field (PLAN-fields F-1).
+    em: bool,
+    /// RULE 26: carrier excites (adds memory).
+    excite: bool,
+    /// RULE 27: hearing conserves (a flash hands out its released memory).
+    conserve: bool,
+    rel3: [n][3]u32,
+    /// RULE 28: fields on links (weak, EM, strong). Link id = site*3 + axis.
+    links: bool,
+    lf: [3][n * 3]i32,
+    /// RULE 29: Higgs-like background (1 unit everywhere) and generation mass.
+    higgs: bool,
+    gen: [n]u8,
+    seed_after: u64,
+    phi: [n]f64,
+    phin: [n]f64,
 
     pub fn init(g: *Grid3, cfg: px.Config) void {
         g.cfg = cfg;
         g.gravity = false;
+        g.cancel = false;
+        g.exclusion = false;
+        g.channels = false;
+        g.motion = false;
+        g.em = false;
+        g.excite = false;
+        g.conserve = false;
+        g.links = false;
+        g.higgs = false;
+        g.phi = @splat(0);
+        g.swaps = 0;
+        for (&g.home, 0..) |*h, i| h.* = @intCast(i);
+        g.car3 = @splat(.{ 0, 0, 0 });
+        g.absorbed = @splat(.{ 0, 0, 0 });
         g.fired = @splat(false);
         g.carrier = @splat(0);
         var s = cfg.seed;
@@ -70,6 +117,7 @@ pub const Grid3 = struct {
             p.* = .{ .pattern = @truncate(s) };
             for (0..px.cells) |k| p.conserved[k] = @intCast((s >> @intCast(8 + 2 * k)) % 2);
         }
+        g.seed_after = s;
         switch (cfg.start) {
             .random => {},
             .core => |r| for (&g.px, 0..) |*p, i| {
@@ -81,35 +129,207 @@ pub const Grid3 = struct {
         }
     }
 
+    fn deposit(g: *Grid3, i: usize, amount: f64) void {
+        if (g.channels) {
+            const s = select(g.px[i].pattern);
+            var k: f64 = 0;
+            for (s) |on| k += @floatFromInt(@intFromBool(on));
+            const share = amount / k;
+            for (0..3) |c| if (s[c]) {
+                g.car3[i][c] += share;
+            };
+        } else g.carrier[i] += amount;
+    }
+
     fn fire(g: *Grid3, i: usize, t: i64) u32 {
+        if (g.conserve) g.rel3[i] = g.px[i].conserved;
         const released = g.px[i].flashWith(t, g.cfg.display);
-        g.carrier[i] += @floatFromInt(released);
+        if (!g.conserve) g.deposit(i, @floatFromInt(released));
         g.fired[i] = true;
         return 1;
     }
 
-    pub fn tick(g: *Grid3, t: i64, kick: ?usize) u32 {
+    /// Neighbours hear pixel i's flash. RULE 27: memory is dealt out, not created.
+    fn shout(g: *Grid3, i: usize) void {
+        const sh = g.px[i].pattern;
+        const nb = neighbors(i);
+        if (!g.conserve) {
+            for (nb) |j| g.px[j].receive(sh);
+            return;
+        }
+        for (0..3) |k| {
+            const bit = (sh >> @intCast(k)) & 1;
+            var targets: [6]usize = undefined;
+            var m: usize = 0;
+            for (nb) |j| {
+                if (((g.px[j].pattern >> @intCast(k)) & 1) == bit) g.px[j].reinforce[k] += 1 else {
+                    targets[m] = j;
+                    m += 1;
+                }
+            }
+            const units = g.rel3[i][k];
+            if (m == 0) {
+                g.deposit(i, @floatFromInt(units));
+                continue;
+            }
+            var u: usize = 0;
+            while (u < units) : (u += 1) g.px[targets[u % m]].conserved[k] += 1;
+        }
+    }
+
+    /// RULE 28/29 start: call after init and after setting g.links. Fields at rest (0);
+    /// one generation per pixel from the seed (continuing the same xorshift as init).
+    pub fn initLinks(g: *Grid3) void {
+        g.lf = @splat(@splat(0));
+        var s = g.seed_after;
+        for (&g.gen) |*x| {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            x.* = @intCast(s % 3);
+        }
+    }
+
+    /// Link through face f of site i, or null at the box edge.
+    pub fn linkOf(i: usize, f: usize) ?usize {
+        const c = coords(i);
+        return switch (f) {
+            0 => if (c[0] + 1 < side) i * 3 else null,
+            1 => if (c[0] > 0) (i - 1) * 3 else null,
+            2 => if (c[1] + 1 < side) i * 3 + 1 else null,
+            3 => if (c[1] > 0) (i - side) * 3 + 1 else null,
+            4 => if (c[2] + 1 < side) i * 3 + 2 else null,
+            else => if (c[2] > 0) (i - side * side) * 3 + 2 else null,
+        };
+    }
+
+    const MASS = [4][3]u32{ .{ 0, 0, 0 }, .{ 1, 20, 884 }, .{ 1, 721, 97300 }, .{ 1, 207, 3477 } };
+
+    pub fn mass(g: *const Grid3, i: usize) u32 {
+        return if (g.higgs) MASS[@popCount(g.px[i].pattern)][g.gen[i]] else 0;
+    }
+
+    fn readyL(g: *const Grid3, i: usize) bool {
+        return g.px[i].memoryTotal() >= 3 + g.mass(i);
+    }
+
+    fn flashL(g: *Grid3, i: usize, t: i64) void {
+        const sel = select(g.px[i].pattern);
+        const rel = g.px[i].flashWith(t, g.cfg.display);
+        g.fired[i] = true;
+        var slots: [18][2]usize = undefined;
+        var m: usize = 0;
+        // field by field (weak, EM, strong), then the next link in face order
+        for (0..6) |f| if (linkOf(i, f)) |l| {
+            for (0..3) |fl| if (sel[fl]) {
+                slots[m] = .{ fl, l };
+                m += 1;
+            };
+        };
+        var u: usize = 0;
+        while (u < rel) : (u += 1) {
+            const sl = slots[u % m];
+            g.lf[sl[0]][sl[1]] += 1;
+        }
+    }
+
+    fn flowLinks(g: *Grid3) void {
+        for (0..n) |i| {
+            const si = select(g.px[i].pattern);
+            const nb = neighbors(i);
+            for (0..3) |fl| {
+                var mx: ?usize = null;
+                var mn: ?usize = null;
+                for (0..6) |f| if (linkOf(i, f)) |l| {
+                    if (si[fl] and select(g.px[nb[f]].pattern)[fl]) continue; // held
+                    if (mx == null or g.lf[fl][l] > g.lf[fl][mx.?]) mx = l;
+                    if (mn == null or g.lf[fl][l] < g.lf[fl][mn.?]) mn = l;
+                };
+                if (mx) |a| if (g.lf[fl][a] - g.lf[fl][mn.?] >= 2) {
+                    g.lf[fl][a] -= 1;
+                    g.lf[fl][mn.?] += 1;
+                };
+            }
+        }
+    }
+
+    fn expressLinks(g: *Grid3) void {
+        for (0..n) |i| {
+            const si = select(g.px[i].pattern);
+            for (0..3) |fl| {
+                if (!si[fl]) continue;
+                var mx: ?usize = null;
+                var mn: ?usize = null;
+                for (0..6) |f| if (linkOf(i, f)) |l| {
+                    if (mx == null or g.lf[fl][l] > g.lf[fl][mx.?]) mx = l;
+                    if (mn == null or g.lf[fl][l] < g.lf[fl][mn.?]) mn = l;
+                };
+                if (g.lf[fl][mx.?] - g.lf[fl][mn.?] < 2) continue;
+                g.lf[fl][mx.?] -= 1;
+                const cs = &g.px[i].conserved;
+                var k: usize = 0;
+                if (cs[1] < cs[k]) k = 1;
+                if (cs[2] < cs[k]) k = 2;
+                cs[k] += 1;
+            }
+        }
+    }
+
+    fn tickLinks(g: *Grid3, t: i64, kick: ?usize) u32 {
         var count: u32 = 0;
         g.fired = @splat(false);
         switch (g.cfg.update) {
             .sync => {
-                for (0..n) |i| g.fired[i] = g.px[i].ready() or kick == i;
+                for (0..n) |i| g.fired[i] = (g.readyL(i) or kick == i) and !g.blocked(i);
+                for (0..n) |i| if (g.fired[i]) {
+                    g.flashL(i, t);
+                    count += 1;
+                };
+            },
+            .sweep => for (0..n) |i| {
+                if (!(g.readyL(i) or kick == i)) continue;
+                if (g.blocked(i)) continue;
+                g.flashL(i, t);
+                count += 1;
+            },
+        }
+        g.flowLinks();
+        g.expressLinks();
+        return count;
+    }
+
+    pub fn tick(g: *Grid3, t: i64, kick: ?usize) u32 {
+        if (g.links) return g.tickLinks(t, kick);
+        var count: u32 = 0;
+        g.fired = @splat(false);
+        switch (g.cfg.update) {
+            .sync => {
+                for (0..n) |i| g.fired[i] = (g.px[i].ready() or kick == i) and !g.blocked(i);
                 for (0..n) |i| if (g.fired[i]) {
                     count += g.fire(i, t);
                 };
                 for (0..n) |i| {
                     if (!g.fired[i]) continue;
-                    for (neighbors(i)) |j| g.px[j].receive(g.px[i].pattern);
+                    g.shout(i);
                 }
             },
             .sweep => for (0..n) |i| {
                 if (!(g.px[i].ready() or kick == i)) continue;
+                if (g.blocked(i)) continue;
                 count += g.fire(i, t);
-                for (neighbors(i)) |j| g.px[j].receive(g.px[i].pattern);
+                g.shout(i);
             },
         }
-        g.spread();
-        if (g.gravity) g.absorb();
+        if (g.channels) {
+            g.spread3();
+            g.absorb3();
+            for (0..n) |i| g.carrier[i] = g.car3[i][0] + g.car3[i][1] + g.car3[i][2];
+        } else {
+            g.spread();
+            if (g.gravity) g.absorb() else if (g.cancel) g.cancelMemory() else if (g.excite) g.exciteMemory();
+        }
+        if (g.em) g.emField();
+        if (g.motion) g.move();
         return count;
     }
 
@@ -124,6 +344,138 @@ pub const Grid3 = struct {
             const k: u32 = @intFromFloat(@floor(g.carrier[i] / unit));
             g.carrier[i] -= @as(f64, @floatFromInt(k)) * unit;
             for (0..px.cells) |c| g.px[i].reinforce[c] += k;
+        }
+    }
+
+    /// RULE 23: which channels a pattern selects (0 weak, 1 EM, 2 strong), by charge:
+    /// neutrino (0 filled) weak; quarks (1, 2) all three; electron (3) EM + weak.
+    pub fn select(pattern: u3) [3]bool {
+        return switch (@popCount(pattern)) {
+            0 => .{ true, false, false },
+            1, 2 => .{ true, true, true },
+            else => .{ true, true, false },
+        };
+    }
+
+    /// RULE 23: rule 5 spreading, per channel.
+    pub fn spread3(g: *Grid3) void {
+        g.nxt3 = @splat(.{ 0, 0, 0 });
+        for (0..n) |i| for (0..3) |ch| {
+            const q = g.car3[i][ch];
+            if (q == 0) continue;
+            const share = q / 6.0;
+            const c = coords(i);
+            if (c[0] + 1 < side) g.nxt3[i + 1][ch] += share;
+            if (c[0] > 0) g.nxt3[i - 1][ch] += share;
+            if (c[1] + 1 < side) g.nxt3[i + side][ch] += share;
+            if (c[1] > 0) g.nxt3[i - side][ch] += share;
+            if (c[2] + 1 < side) g.nxt3[i + side * side][ch] += share;
+            if (c[2] > 0) g.nxt3[i - side * side][ch] += share;
+        };
+        g.car3 = g.nxt3;
+    }
+
+    /// RULE 23: rule 6 per channel, only where the pixel selects that channel.
+    pub fn absorb3(g: *Grid3) void {
+        const unit: f64 = px.cells;
+        for (0..n) |i| {
+            const s = select(g.px[i].pattern);
+            const kind = @popCount(g.px[i].pattern);
+            for (0..3) |ch| {
+                if (!s[ch] or g.car3[i][ch] < unit) continue;
+                const k: u32 = @intFromFloat(@floor(g.car3[i][ch] / unit));
+                g.car3[i][ch] -= @as(f64, @floatFromInt(k)) * unit;
+                for (0..px.cells) |c| g.px[i].reinforce[c] += k;
+                g.absorbed[kind][ch] += @floatFromInt(k);
+            }
+        }
+    }
+
+    /// RULE 22: a flash may not display a pattern any neighbour is showing.
+    /// A blocked pixel waits: no flash, pattern and memory kept.
+    /// RULE 24: a pixel that flashed this tick hops toward the neighbour with the most
+    /// carrier (if more than its own site), swapping whole state with a pixel that didn't flash.
+    pub fn move(g: *Grid3) void {
+        g.moved = @splat(false);
+        g.swaps = 0;
+        for (0..n) |i| {
+            if (!g.fired[i] or g.moved[i]) continue;
+            var best = i;
+            const q: f64 = @floatFromInt(px.chargeThirds(g.px[i].pattern));
+            if (g.em and q != 0) {
+                // RULE 25: toward the lowest q*phi
+                var bv = q * g.phi[i];
+                for (neighbors(i)) |j| if (q * g.phi[j] < bv) {
+                    best = j;
+                    bv = q * g.phi[j];
+                };
+            } else {
+                var bc = g.carrier[i];
+                for (neighbors(i)) |j| if (g.carrier[j] > bc) {
+                    best = j;
+                    bc = g.carrier[j];
+                };
+            }
+            if (best == i or g.fired[best] or g.moved[best]) continue;
+            std.mem.swap(px.Pixel, &g.px[i], &g.px[best]);
+            std.mem.swap(u32, &g.home[i], &g.home[best]);
+            std.mem.swap(bool, &g.fired[i], &g.fired[best]);
+            g.moved[i] = true;
+            g.moved[best] = true;
+            g.swaps += 1;
+        }
+    }
+
+    /// RULE 26: each whole pixel's worth of carrier (3 units) adds +1 memory to every cell.
+    pub fn exciteMemory(g: *Grid3) void {
+        for (0..n) |i| {
+            if (g.carrier[i] < 3) continue;
+            const k = @floor(g.carrier[i] / 3);
+            g.carrier[i] -= k * 3;
+            const ku: u32 = @intFromFloat(k);
+            for (0..3) |q| g.px[i].conserved[q] += ku;
+        }
+    }
+
+    /// RULE 25: every pixel adds its charge (thirds) to phi at its site; phi spreads like rule 5.
+    pub fn emField(g: *Grid3) void {
+        for (0..n) |i| g.phi[i] += @floatFromInt(px.chargeThirds(g.px[i].pattern));
+        g.phin = @splat(0);
+        for (0..n) |i| {
+            const q = g.phi[i];
+            if (q == 0) continue;
+            const share = q / 6.0;
+            const c = coords(i);
+            if (c[0] + 1 < side) g.phin[i + 1] += share;
+            if (c[0] > 0) g.phin[i - 1] += share;
+            if (c[1] + 1 < side) g.phin[i + side] += share;
+            if (c[1] > 0) g.phin[i - side] += share;
+            if (c[2] + 1 < side) g.phin[i + side * side] += share;
+            if (c[2] > 0) g.phin[i - side * side] += share;
+        }
+        g.phi = g.phin;
+    }
+
+    pub fn blocked(g: *const Grid3, i: usize) bool {
+        if (!g.exclusion) return false;
+        const next = g.px[i].nextPattern(g.cfg.display);
+        for (neighbors(i)) |j| if (g.px[j].pattern == next) return true;
+        return false;
+    }
+
+    /// RULE 21: each whole pixel's worth of carrier (3 units) at a site cancels
+    /// one conserved unit on each cell that holds one. One carrier unit is used
+    /// up per memory unit cancelled. The only number is the cell count.
+    pub fn cancelMemory(g: *Grid3) void {
+        const unit: f64 = px.cells;
+        for (0..n) |i| {
+            if (g.carrier[i] < unit) continue;
+            const k: u32 = @intFromFloat(@floor(g.carrier[i] / unit));
+            for (0..px.cells) |c| {
+                const m = @min(k, g.px[i].conserved[c]);
+                g.px[i].conserved[c] -= m;
+                g.carrier[i] -= @floatFromInt(m);
+            }
         }
     }
 
@@ -189,6 +541,145 @@ test "point source in 3D gives roughly 1/distance" {
     const a = avg[4] * 4;
     const b = avg[8] * 8;
     try std.testing.expect(b / a > 0.7 and b / a < 1.05);
+}
+
+test "rule 28: a flash puts its memory into the links of the fields it held" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{ .display = .hold });
+    g.links = true;
+    g.initLinks();
+    const i = index(5, 5, 5);
+    g.px[i].pattern = 0b000; // neutrino: holds weak only
+    g.px[i].conserved = .{ 2, 2, 2 };
+    g.flashL(i, 0);
+    var weak: i32 = 0;
+    for (0..6) |f| weak += g.lf[0][Grid3.linkOf(i, f).?];
+    try std.testing.expectEqual(@as(i32, 6), weak);
+    try std.testing.expectEqual(@as(i32, 0), g.lf[1][Grid3.linkOf(i, 0).?]);
+}
+
+test "rule 27: released memory is dealt to mismatched neighbours, none created" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{ .display = .hold });
+    g.conserve = true;
+    g.carrier = @splat(0);
+    const i = index(5, 5, 5);
+    const nb = neighbors(i);
+    g.px[i].pattern = 0b000;
+    g.px[i].conserved = .{ 3, 0, 1 };
+    for (nb) |j| {
+        g.px[j].pattern = 0b000;
+        g.px[j].conserved = .{ 0, 0, 0 };
+        g.px[j].reinforce = .{ 0, 0, 0 };
+    }
+    g.px[nb[2]].pattern = 0b001; // only this neighbour differs on cell 0
+    _ = g.fire(i, 0);
+    g.shout(i);
+    try std.testing.expectEqual(@as(u32, 3), g.px[nb[2]].conserved[0]);
+    try std.testing.expectEqual(@as(u32, 0), g.px[nb[0]].conserved[0]);
+    try std.testing.expectEqual(@as(u32, 1), g.px[nb[0]].reinforce[0]);
+    // cell 2: every neighbour matches, so its 1 unit becomes carrier here
+    try std.testing.expectApproxEqAbs(@as(f64, 1), g.carrier[i], 1e-12);
+}
+
+test "rule 26: carrier becomes memory, 3 units for 3" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{});
+    g.carrier = @splat(0);
+    g.px[0].conserved = .{ 0, 1, 0 };
+    g.carrier[0] = 7.5;
+    g.exciteMemory();
+    try std.testing.expectEqual([3]u32{ 2, 3, 2 }, g.px[0].conserved);
+    try std.testing.expectApproxEqAbs(@as(f64, 1.5), g.carrier[0], 1e-12);
+}
+
+test "rule 25: an electron moves toward positive phi, an up quark away" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{});
+    g.em = true;
+    g.carrier = @splat(0);
+    g.phi = @splat(0);
+    g.fired = @splat(false);
+    const i = index(5, 5, 5);
+    const j = neighbors(i)[0];
+    const k = neighbors(i)[1];
+    g.px[i].pattern = 0b111; // electron, q = -3
+    g.px[j].pattern = 0;
+    g.px[k].pattern = 0;
+    g.fired[i] = true;
+    g.phi[j] = 2;
+    g.phi[k] = -2;
+    g.move();
+    try std.testing.expectEqual(@as(u3, 0b111), g.px[j].pattern);
+    g.px[j].pattern = 0b011; // up, q = +2: now moves toward negative phi
+    g.fired = @splat(false);
+    g.fired[j] = true;
+    g.phi[i] = -5;
+    g.move();
+    try std.testing.expectEqual(@as(u3, 0b011), g.px[i].pattern);
+}
+
+test "rule 24: a flashed pixel swaps toward more carrier" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{});
+    g.carrier = @splat(0);
+    g.fired = @splat(false);
+    const i = index(5, 5, 5);
+    const j = neighbors(i)[2];
+    g.px[i].pattern = 0b111;
+    g.px[j].pattern = 0b000;
+    g.fired[i] = true;
+    g.carrier[j] = 2;
+    g.move();
+    try std.testing.expectEqual(@as(u3, 0b111), g.px[j].pattern);
+    try std.testing.expectEqual(@as(u3, 0b000), g.px[i].pattern);
+    try std.testing.expectEqual(@as(u32, @intCast(i)), g.home[j]);
+    try std.testing.expectEqual(@as(f64, 2), g.carrier[j]); // carrier stays
+    try std.testing.expectEqual(@as(u32, 1), g.swaps);
+}
+
+test "rule 23: neutrinos are invisible to EM and strong carrier" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{});
+    g.channels = true;
+    g.car3 = @splat(.{ 0, 0, 0 });
+    g.px[0].pattern = 0; // neutrino
+    g.px[0].reinforce = .{ 0, 0, 0 };
+    g.car3[0] = .{ 3, 3, 3 };
+    g.absorb3();
+    try std.testing.expectEqual([3]u32{ 1, 1, 1 }, g.px[0].reinforce); // weak only
+    try std.testing.expectEqual([3]f64{ 0, 3, 3 }, g.car3[0]);
+}
+
+test "rule 22: a flash into a neighbour's pattern waits" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{ .display = .hold, .update = .sync });
+    g.exclusion = true;
+    const i = index(5, 5, 5);
+    g.px[i].conserved = .{ 1, 1, 1 }; // ready
+    for (neighbors(i)) |j| g.px[j].pattern = g.px[i].pattern ^ 1;
+    try std.testing.expect(!g.blocked(i));
+    g.px[neighbors(i)[3]].pattern = g.px[i].pattern; // hold shows the same pattern
+    try std.testing.expect(g.blocked(i));
+}
+
+test "rule 21: carrier cancels memory one for one" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{});
+    g.carrier = @splat(0);
+    g.px[0].conserved = .{ 2, 0, 1 };
+    g.carrier[0] = 7.5; // two whole pixels' worth
+    g.cancelMemory();
+    try std.testing.expectEqual([3]u32{ 0, 0, 0 }, g.px[0].conserved);
+    try std.testing.expectApproxEqAbs(@as(f64, 4.5), g.carrier[0], 1e-12); // 3 units used
 }
 
 test "absorb turns whole pixels of carrier into reinforcement" {

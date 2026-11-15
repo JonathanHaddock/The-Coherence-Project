@@ -83,7 +83,8 @@ pub const Pixel = struct {
         return p.flashWith(tick, .fill_empty);
     }
 
-    pub fn flashWith(p: *Pixel, tick: i64, display: Display) u32 {
+    /// The pattern this pixel would display if it flashed now (no state change).
+    pub fn nextPattern(p: Pixel, display: Display) u3 {
         var next = p.pattern;
         switch (display) {
             .fill_empty => for (0..cells) |i| {
@@ -110,7 +111,11 @@ pub const Pixel = struct {
                 if (p.conserved[i] > p.reinforce[i]) next ^= @as(u3, 1) << @intCast(i);
             },
         }
-        p.pattern = next;
+        return next;
+    }
+
+    pub fn flashWith(p: *Pixel, tick: i64, display: Display) u32 {
+        p.pattern = p.nextPattern(display);
         const released = p.memoryTotal();
         p.reinforce = .{ 0, 0, 0 };
         p.conserved = .{ 0, 0, 0 };

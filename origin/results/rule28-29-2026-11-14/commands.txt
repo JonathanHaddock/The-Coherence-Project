@@ -1,0 +1,12 @@
+node run.js one_cell sync off 1 600
+node run.js one_cell sync off 2 600
+node run.js one_cell sync off 3 600
+node run.js one_cell sync on 1 600
+node run.js one_cell sync on 2 600
+node run.js one_cell sync on 3 600
+node run.js flip_all sweep off 1 600
+node run.js flip_all sweep off 2 600
+node run.js flip_all sweep off 3 600
+node run.js flip_all sweep on 1 600
+node run.js flip_all sweep on 2 600
+node run.js flip_all sweep on 3 600

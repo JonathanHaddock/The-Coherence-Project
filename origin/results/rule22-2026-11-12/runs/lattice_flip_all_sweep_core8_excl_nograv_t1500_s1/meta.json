@@ -1,0 +1,14 @@
+{
+  "name": "lattice_flip_all_sweep_core8_excl_nograv_t1500_s1",
+  "mode": "lattice",
+  "display": "flip_all",
+  "update": "sweep",
+  "core": 8,
+  "gravity": false,
+  "seed": 1,
+  "ticks": 1500,
+  "every": 10,
+  "lattice": "48^3, 6 neighbors",
+  "rules": "1-5; carrier lost at box edge, no feedback; + 22 (exclusion on the pattern)",
+  "files": ["series.csv", "shells.csv", "gaps.csv", "slice.csv"]
+}

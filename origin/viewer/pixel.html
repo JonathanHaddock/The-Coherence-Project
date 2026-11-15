@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pixel Engine Model</title>
+<style>
+:root{--bg:#0d0f12;--panel:#15181d;--ink:#eceef1;--dim:#8d94a0;--line:#262b33;--cell:#1d2229;
+--fill:#f5b942;--q:#ff6f61;--e:#4fc3f7;--nu:#b39dff;--ok:#5fd38d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:20px 16px 40px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+h1{font-size:20px;margin:0;font-weight:650}
+header p{margin:2px 0 0;color:var(--dim);font-size:13px}
+header a{color:var(--e);font-size:13px;text-decoration:none}
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 12px 6px}
+svg{display:block;width:100%;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:14px 0}
+button,select{font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer}
+button:hover:not(:disabled),select:hover{border-color:#3d4450}
+button:disabled{opacity:.35;cursor:default}
+button.primary{background:var(--q);border-color:var(--q);color:#160c0b;font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:8px 12px;background:transparent;color:var(--dim)}
+.seg button.on{background:#262b33;color:var(--ink)}
+.spacer{flex:1}
+.lab{color:var(--dim);font-size:13px}
+.ledger{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;font-size:18px;padding:10px 0 4px;font-variant-numeric:tabular-nums}
+.ledger .t{padding:4px 10px;border-radius:8px;background:var(--cell)}
+.ledger .op{color:var(--dim)}
+.ledger small{display:block;font-size:11px;color:var(--dim);text-align:center}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.card h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin:0 0 10px;font-weight:600}
+.log{max-height:260px;overflow:auto;font-size:13px}
+.log .turn{padding:8px 0;border-bottom:1px solid var(--line)}
+.log .turn:last-child{border:0}
+.chip{display:inline-block;padding:1px 7px;border-radius:5px;font-size:12px;margin-right:4px;color:#111}
+.ok{color:var(--ok)}
+ul{margin:0;padding-left:18px;color:var(--dim);font-size:13px}li{margin:3px 0}
+li b{color:var(--ink);font-weight:600}
+</style></head><body>
+<div class="wrap">
+<header>
+ <div><h1>One pixel engine</h1><p>Rule Spec v0 §2–4, §12 · one beta decay = quark, electron and neutrino flash across five nodes</p></div>
+ <a href="../results/porch.html">← Front porch</a>
+</header>
+
+<div class="stage">
+ <svg id="svg" viewBox="0 0 900 470" role="img" aria-label="One pixel engine"></svg>
+ <div class="ledger" id="ledger"></div>
+</div>
+
+<div class="bar">
+ <button class="primary" id="trig">⚡ Trigger beta decay</button>
+ <span class="lab">neutrino passes</span>
+ <div class="seg"><button id="n0">cell e</button><button id="n1">cell μ</button><button id="n2">cell τ</button></div>
+ <span class="spacer"></span>
+ <span class="lab">nodes</span>
+ <div class="seg" id="layoutSeg"><button data-v="row" class="on">row</button><button data-v="bipyramid">bipyramid</button></div>
+ <span class="lab">view</span>
+ <div class="seg" id="viewSeg"><button data-v="display" class="on">display</button><button data-v="engine">engine</button></div>
+</div>
+<div class="bar">
+ <span class="lab">start as</span>
+ <select id="start"><option value="1">down · 100</option><option value="2">down · 010</option><option value="4">down · 001</option><option value="3">up · 110</option><option value="0">neutrino · 000</option><option value="7">electron · 111</option></select>
+ <button id="reset">Reset</button>
+ <button id="copy">Copy CLI command</button>
+</div>
+
+<div class="grid">
+ <section class="card"><h2>Turns</h2><div class="log" id="log"></div></section>
+ <section class="card"><h2>Rules in this model</h2>
+  <ul>
+   <li><b>From the spec:</b> three cells on the lepton points; the scaffold at the south pole changes the pattern; the electron displays it; the neutrino keeps what isn't displayed. The trigger comes from outside, and only a down pixel turns.</li>
+   <li><b>P1</b> node layout is open in the spec, so it's a switch here</li>
+   <li><b>P2</b> the scaffold flips the empty cell holding the most ν memory</li>
+   <li><b>P3</b> ν flavor steps e → μ → τ per neutrino flash</li>
+   <li><b>P4</b> a passing ν adds memory but does not trigger</li>
+   <li><b>Open:</b> the reverse stroke (gravity winds up → down), how μ and τ fall back to the electron, π at one ninth</li>
+  </ul>
+ </section>
+</div>
+</div>
+<script>
+const KIND=["neutrino","down quark","up quark","electron"],Q=[0,-1,2,-3],FL=["e","μ","τ"];
+const pc=p=>(p&1)+((p>>1)&1)+((p>>2)&1),fmt=p=>[0,1,2].map(i=>(p>>i)&1).join("");
+const frac=n=>n===0?"0":n%3===0?(n>0?"+":"−")+Math.abs(n/3):(n>0?"+":"−")+Math.abs(n)+"/3";
+const $=id=>document.getElementById(id);
+const C={q:"#ff6f61",e:"#4fc3f7",nu:"#b39dff",fill:"#f5b942",cell:"#1d2229",edge:"#3a414c",dim:"#8d94a0",ink:"#eceef1"};
+const NAMES={row:["b0","b1","b2","b3","S"],bipyramid:["c₁","c₂","c₃","N","S"]};
+let layout="row",view="display",E,lit={},busy=false,cmd=[],emit=[],turns=[];
+const cellNodes=(l,i)=>l==="row"?[i,i+1]:[(i+2)%3,i];
+
+function geom(){
+  if(layout==="row"){
+    const W=170,H=120,x0=450-1.5*W,y=150;
+    return{nodes:[0,1,2,3].map(k=>[x0+k*W,y+H/2]).concat([[450,395]]),
+      cell:i=>({kind:"rect",x:x0+i*W,y,w:W,h:H,cx:x0+i*W+W/2,cy:y+H/2,lab:[x0+i*W+W/2,y-16]}),bounds:4};
+  }
+  const cx=450,cy=225,R=165,ang=[-90,30,150].map(a=>a*Math.PI/180);
+  const cor=ang.map(a=>[cx+R*Math.cos(a),cy+R*Math.sin(a)*0.62]);
+  return{nodes:[cor[0],cor[1],cor[2],[cx,cy-125],[cx,415]].map((p,k)=>k===3?[cx,52]:p),
+    cell:i=>{const [a,b]=cellNodes("bipyramid",i).map(k=>cor[k]);const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
+      const dx=mx-cx,dy=my-cy,d=Math.hypot(dx,dy)||1;return{kind:"seg",a,b,cx:mx,cy:my,lab:[mx+dx/d*46,my+dy/d*46+4]}},bounds:3};
+}
+function draw(t){
+  const G=geom(),N=NAMES[layout];let s=`<defs>
+   <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+   <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="${C.dim}"/></marker></defs>`;
+  // scaffold struts
+  const S=G.nodes[4];
+  for(let k=0;k<G.bounds;k++){const [x,y]=G.nodes[k];s+=`<path d="M${S[0]},${S[1]} Q${(S[0]+x)/2},${S[1]-10} ${x},${y}" fill="none" stroke="${lit[4]?C.q:C.edge}" stroke-opacity="${lit[4]?.8:1}" stroke-width="1.5" stroke-dasharray="5 5"/>`}
+  if(layout==="bipyramid"){const Nn=G.nodes[3];for(let k=0;k<3;k++){const [x,y]=G.nodes[k];s+=`<line x1="${Nn[0]}" y1="${Nn[1]}" x2="${x}" y2="${y}" stroke="${C.edge}" stroke-width="1.5" stroke-dasharray="2 5"/>`}}
+  // cells
+  for(let i=0;i<3;i++){
+    const c=G.cell(i),on=(E.pattern>>i)&1,flip=t&&t.cell===i&&t.phase>=0;
+    if(c.kind==="rect"){
+      s+=`<rect x="${c.x+6}" y="${c.y}" width="${c.w-12}" height="${c.h}" rx="14" fill="${on?C.fill:C.cell}" stroke="${flip?C.q:on?C.fill:C.edge}" stroke-width="${flip?4:2}" ${flip?'filter="url(#glow)"':''}/>`;
+      s+=`<text x="${c.cx}" y="${c.cy+8}" text-anchor="middle" font-size="26" font-weight="600" fill="${on?'#1a1206':C.dim}">${FL[i]}</text>`;
+      s+=`<text x="${c.lab[0]}" y="${c.lab[1]}" text-anchor="middle" font-size="13" fill="${C.dim}">cell ${i} · ${on?"filled":"empty"}</text>`;
+      for(let k=0;k<E.memory[i];k++)s+=`<circle cx="${c.cx-(E.memory[i]-1)*9+k*18}" cy="${c.y+c.h-18}" r="6" fill="${C.nu}"/>`;
+    }else{
+      s+=`<line x1="${c.a[0]}" y1="${c.a[1]}" x2="${c.b[0]}" y2="${c.b[1]}" stroke="${on?C.fill:C.cell}" stroke-width="26" stroke-linecap="round"/>`;
+      s+=`<line x1="${c.a[0]}" y1="${c.a[1]}" x2="${c.b[0]}" y2="${c.b[1]}" stroke="${flip?C.q:on?C.fill:C.edge}" stroke-width="${flip?4:2}" stroke-linecap="round" fill="none" ${flip?'filter="url(#glow)"':''} stroke-dasharray="${on?'':'0'}"/>`;
+      s+=`<text x="${c.cx}" y="${c.cy+7}" text-anchor="middle" font-size="20" font-weight="600" fill="${on?'#1a1206':C.dim}">${FL[i]}</text>`;
+      s+=`<text x="${c.lab[0]}" y="${c.lab[1]}" text-anchor="middle" font-size="13" fill="${C.dim}">cell ${i} · ${on?"filled":"empty"}</text>`;
+      for(let k=0;k<E.memory[i];k++)s+=`<circle cx="${c.lab[0]-(E.memory[i]-1)*8+k*16}" cy="${c.lab[1]+16}" r="5.5" fill="${C.nu}"/>`;
+    }
+  }
+  // nodes
+  G.nodes.forEach(([x,y],k)=>{
+    const col=lit[k]?C[lit[k]]:null,r=k===4?16:10;
+    if(col)s+=`<circle cx="${x}" cy="${y}" r="${r+12}" fill="${col}" opacity=".22"/>`;
+    s+=`<circle cx="${x}" cy="${y}" r="${r}" fill="${col||'#0d0f12'}" stroke="${col||C.dim}" stroke-width="2.5" ${col?'filter="url(#glow)"':''}/>`;
+    const below=k===4,lx=x,ly=below?y+40:(layout==="row"?y+34:(k===3?y-20:y+(k===0?-20:34)));
+    s+=`<text x="${lx}" y="${ly}" text-anchor="middle" font-size="13" fill="${col||C.dim}">${N[k]}</text>`;
+  });
+  s+=`<text x="${S[0]+30}" y="${S[1]+5}" font-size="13" fill="${lit[4]?C.q:C.dim}">scaffold · south pole</text>`;
+  // emitted particles
+  emit.forEach(p=>{s+=`<g transform="translate(${p.x},${p.y})"><circle r="20" fill="${p.col}" opacity=".18"/><circle r="12" fill="${p.col}" filter="url(#glow)"/><text y="5" text-anchor="middle" font-size="13" font-weight="700" fill="#0d0f12">${p.sym}</text><text y="38" text-anchor="middle" font-size="12" fill="${p.col}">${p.lab}</text></g>`});
+  // title and phase
+  s+=`<text x="24" y="38" font-size="22" font-weight="650" fill="${C.ink}">${KIND[pc(E.pattern)]}</text><text x="24" y="62" font-size="14" fill="${C.dim}">pattern ${fmt(E.pattern)} · charge ${frac(Q[pc(E.pattern)])}</text>`;
+  const ph=t?t.phase:-1,P=[["quark flash","scaffold flips a cell",C.q],["electron flash","display",C.e],["neutrino flash","conserve",C.nu]];
+  P.forEach(([a,b,col],k)=>{const on=ph===k||ph===3,y=375+k*28;s+=`<circle cx="700" cy="${y-5}" r="7" fill="${on?col:'none'}" stroke="${on?col:C.edge}" stroke-width="2"/><text x="716" y="${y}" font-size="14" fill="${on?col:C.dim}">${k+1}. ${a}</text>`});
+  $("svg").innerHTML=s;
+  // ledger
+  const em=E.emitted;$("ledger").innerHTML=turns.length?
+   `<span class="t">${frac(Q[pc(E.pattern)])}<small>pixel</small></span><span class="op">+</span><span class="t" style="color:${C.e}">${frac(em)}<small>${turns.length} e⁻ emitted</small></span><span class="op">+</span><span class="t" style="color:${C.nu}">0<small>${turns.length} ν̄ emitted</small></span><span class="op">=</span><span class="t ok">${frac(Q[pc(E.pattern)]+em)}<small>conserved ✓</small></span>`
+   :`<span class="t">${frac(Q[pc(E.pattern)])}<small>total charge</small></span>`;
+  $("trig").disabled=busy||pc(E.pattern)!==1;
+  ["n0","n1","n2"].forEach(id=>$(id).disabled=busy);
+}
+function reset(){E={pattern:+$("start").value,memory:[0,0,0],flavor:0,emitted:0};lit={};emit=[];cmd=[];turns=[];busy=false;renderLog();draw()}
+function renderLog(){const L=$("log");if(!turns.length){L.innerHTML=`<div class="lab">No turns yet. ${pc(E.pattern)===1?"Press Trigger beta decay.":"Only a down pixel can turn: pick a down start."}</div>`;return}
+  const N=NAMES[layout];L.innerHTML=turns.slice().reverse().map(t=>`<div class="turn"><b>Turn ${t.n}</b> · ${fmt(t.before)} down → ${fmt(t.after)} up · cell ${FL[t.cell]} flips<br>
+  <span class="chip" style="background:${C.q}">quark ${frac(t.qd)}</span><span class="chip" style="background:${C.e}">e⁻ −1</span><span class="chip" style="background:${C.nu}">ν̄<sub>${FL[t.flv]}</sub> 0</span>
+  <span class="lab">nodes ${t.nodes.map(k=>N[k]).join(" ")} (${t.nodes.length}/5)</span> · <span class="ok">balanced ✓</span></div>`).join("")}
+function anim(from,to,ms,fn,done){const t0=performance.now();const f=now=>{const k=Math.min(1,(now-t0)/ms);fn(k*(2-k));if(k<1)requestAnimationFrame(f);else done()};requestAnimationFrame(f)}
+function trigger(){
+  if(busy||pc(E.pattern)!==1)return;busy=true;cmd.push("t");
+  let c=-1;for(let i=0;i<3;i++){if((E.pattern>>i)&1)continue;if(c<0||E.memory[i]>E.memory[c])c=i}
+  const before=E.pattern,after=before|(1<<c),cn=cellNodes(layout,c),nuN=[0,1,2,3].filter(k=>!cn.includes(k)&&(layout==="bipyramid"||k<4)).filter(k=>layout==="bipyramid"||k<=3);
+  const nuNodes=layout==="row"?[0,1,2,3].filter(k=>!cn.includes(k)):[0,1,2,3].filter(k=>!cn.includes(k));
+  const flv=E.flavor,G=geom(),cell=G.cell(c),T={cell:c,phase:-1};emit=[];lit={};
+  const done=()=>{E.pattern=after;E.flavor=(E.flavor+1)%3;E.memory[c]=0;E.emitted-=3;
+    turns.push({n:turns.length+1,before,after,cell:c,flv,qd:Q[pc(after)]-Q[pc(before)],nodes:[4,...cn,...nuNodes]});busy=false;renderLog();draw(null)};
+  if(view==="engine"){lit={4:"q"};cn.forEach(k=>lit[k]="e");nuNodes.forEach(k=>lit[k]="nu");E.pattern=after;T.phase=3;
+    emit=[{x:cell.cx+150,y:70,col:C.e,sym:"e⁻",lab:"−1"},{x:cell.cx-150,y:70,col:C.nu,sym:"ν̄",lab:"ν̄"+FL[flv]}];draw(T);E.pattern=before;setTimeout(done,1400);return}
+  // 1 quark flash: pulse S -> cell, cell flips
+  T.phase=0;lit={4:"q"};
+  anim(0,1,700,k=>{emit=[{x:G.nodes[4][0]+(cell.cx-G.nodes[4][0])*k,y:G.nodes[4][1]+(cell.cy-G.nodes[4][1])*k,col:C.q,sym:"W",lab:""}];draw(T)},()=>{
+    E.pattern=after;emit=[];draw(T);
+    // 2 electron flash: bounding nodes, e- leaves
+    setTimeout(()=>{T.phase=1;cn.forEach(k=>lit[k]="e");
+      anim(0,1,800,k=>{emit=[{x:cell.cx+k*170,y:cell.cy-k*(cell.cy-70),col:C.e,sym:"e⁻",lab:"−1"}];draw(T)},()=>{
+        const eDone=emit[0];
+        // 3 neutrino flash: remaining nodes, anti-nu leaves
+        setTimeout(()=>{T.phase=2;nuNodes.forEach(k=>lit[k]="nu");
+          anim(0,1,800,k=>{emit=[eDone,{x:cell.cx-k*170,y:cell.cy-k*(cell.cy-70),col:C.nu,sym:"ν̄",lab:"ν̄"+FL[flv]}];draw(T)},()=>setTimeout(()=>{E.pattern=before;done()},700))},250)})},250)});
+}
+[0,1,2].forEach(i=>$("n"+i).onclick=()=>{if(busy)return;E.memory[i]++;cmd.push("n"+i);lit={};emit=[];draw()});
+function seg(id,set){$(id).querySelectorAll("button").forEach(b=>b.onclick=()=>{if(busy)return;$(id).querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));set(b.dataset.v);lit={};emit=[];renderLog();draw()})}
+seg("layoutSeg",v=>layout=v);seg("viewSeg",v=>view=v);
+$("trig").onclick=trigger;$("reset").onclick=reset;$("start").onchange=reset;
+$("copy").onclick=()=>{const c=`zig-out/bin/origin pixel ${fmt(+$("start").value)} ${layout} ${cmd.join(" ")}`;try{navigator.clipboard.writeText(c)}catch(e){}prompt("Same run in the terminal (from origin/):",c)};
+reset();
+</script>
+</body></html>

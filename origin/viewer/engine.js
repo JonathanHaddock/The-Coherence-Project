@@ -6,6 +6,7 @@ function radius(i) {
   const x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
   return Math.sqrt((x - H) ** 2 + (y - H) ** 2 + (z - H) ** 2);
 }
+const POPC = [0, 1, 1, 2, 1, 2, 2, 3], Q3 = [0, -1, 2, -3]; // filled count; charge in thirds
 const NB = new Int32Array(N * 6);
 const RAD = new Float64Array(N);
 for (let i = 0; i < N; i++) {
@@ -16,6 +17,18 @@ for (let i = 0; i < N; i++) {
   RAD[i] = radius(i);
 }
 
+// RULE 28: links. LK[i*6+f] = link id through face f of site i (-1 at the box edge).
+// Link id = site*3 + axis, owned by the lower site (+x, +y, +z).
+const LK = new Int32Array(N * 6);
+for (let i = 0; i < N; i++) {
+  const x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
+  LK.set([x + 1 < S ? i * 3 : -1, x > 0 ? (i - 1) * 3 : -1, y + 1 < S ? i * 3 + 1 : -1,
+          y > 0 ? (i - S) * 3 + 1 : -1, z + 1 < S ? i * 3 + 2 : -1, z > 0 ? (i - S * S) * 3 + 2 : -1], i * 6);
+}
+// rule 29 (c): Brannen-Koide mass ratios by kind (filled count) and generation
+const MASS = [[0, 0, 0], [1, 20, 884], [1, 721, 97300], [1, 207, 3477]];
+const SEL = [0, 1, 2, 3, 4, 5, 6, 7].map(p => { const c = (p & 1) + ((p >> 1) & 1) + ((p >> 2) & 1); return c === 0 ? [1, 0, 0] : c === 3 ? [1, 1, 0] : [1, 1, 1]; });
+
 class Engine {
   constructor(cfg) {
     this.cfg = Object.assign({ mode: "lattice", display: "one_cell", update: "sync", core: 8, gravity: false, seed: 20261110n }, cfg);
@@ -25,8 +38,11 @@ class Engine {
     this.fired = new Uint8Array(N);
     this.carrier = new Float64Array(N);
     this.next = new Float64Array(N);
+    this.car3 = new Float64Array(N * 3); this.nxt3 = new Float64Array(N * 3); this.absorbed = new Float64Array(12);
     this.car6 = new Float64Array(N * 6); this.nxt6 = new Float64Array(N * 6);
     this.t = 0; this.total = 0;
+    this.home = new Uint32Array(N).map((_, i) => i); this.moved = new Uint8Array(N); this.swaps = 0;
+    this.phi = new Float64Array(N); this.phin = new Float64Array(N);
     const M = (1n << 64n) - 1n;
     let s = BigInt(this.cfg.seed);
     for (let i = 0; i < N; i++) {
@@ -34,12 +50,35 @@ class Engine {
       this.pat[i] = Number(s & 7n);
       for (let k = 0; k < 3; k++) this.cs[i * 3 + k] = Number((s >> BigInt(8 + 2 * k)) % 2n);
     }
+    if (this.cfg.links) this.initLinks(s, M);
     if (this.cfg.core > 0) for (let i = 0; i < N; i++) if (RAD[i] <= this.cfg.core) {
       this.pat[i] = 7; this.cs[i * 3] = this.cs[i * 3 + 1] = this.cs[i * 3 + 2] = 1;
     }
     this.kick = (H * S + H) * S + H;
   }
   ready(i) { return this.cs[i * 3] + this.cs[i * 3 + 1] + this.cs[i * 3 + 2] >= 3; }
+  // pattern pixel i would display if it flashed now (no state change)
+  nextPat(i) {
+    const d = this.cfg.display, r = this.rf, c = this.cs, b = i * 3;
+    let p = this.pat[i];
+    if (d === "fill_empty") {
+      for (let k = 0; k < 3; k++) { if (r[b + k] > c[b + k]) p |= 1 << k; else if (r[b + k] < c[b + k]) p &= ~(1 << k); }
+    } else if (d === "one_cell") {
+      let best = -1, sur = 0;
+      for (let k = 0; k < 3; k++) if (c[b + k] > r[b + k] && c[b + k] - r[b + k] > sur) { sur = c[b + k] - r[b + k]; best = k; }
+      if (best >= 0) p ^= 1 << best;
+    } else if (d === "flip_all") {
+      for (let k = 0; k < 3; k++) if (c[b + k] > r[b + k]) p ^= 1 << k;
+    }
+    return p & 7;
+  }
+  // RULE 22: a flash may not display a pattern any neighbour is showing; blocked = wait.
+  blocked(i) {
+    if (!this.cfg.exclusion) return false;
+    const nx = this.nextPat(i);
+    for (let q = 0; q < 6; q++) if (this.pat[NB[i * 6 + q]] === nx) return true;
+    return false;
+  }
   flash(i) {
     const d = this.cfg.display, r = this.rf, c = this.cs, b = i * 3;
     let p = this.pat[i];
@@ -54,9 +93,30 @@ class Engine {
     }
     this.pat[i] = p & 7;
     const rel = c[b] + c[b + 1] + c[b + 2];
+    if (this.cfg.conserve) { if (!this.rel3) this.rel3 = new Uint32Array(N * 3); this.rel3[b] = c[b]; this.rel3[b + 1] = c[b + 1]; this.rel3[b + 2] = c[b + 2]; }
     r[b] = r[b + 1] = r[b + 2] = c[b] = c[b + 1] = c[b + 2] = 0;
-    this.carrier[i] += rel;
+    if (!this.cfg.conserve) this.deposit(i, rel);
     this.fired[i] = 1;
+  }
+  deposit(i, amt) {
+    if (this.cfg.channels) {
+      const sl = Engine.select(this.pat[i]); let k = 0; for (const on of sl) k += on ? 1 : 0;
+      const share = amt / k;
+      for (let ch = 0; ch < 3; ch++) if (sl[ch]) this.car3[i * 3 + ch] += share;
+    } else this.carrier[i] += amt;
+  }
+  // neighbours hear pixel i's flash. RULE 27: memory is dealt out, not created.
+  shout(i) {
+    const sh = this.pat[i];
+    if (!this.cfg.conserve) { for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh); return; }
+    const tg = [0, 0, 0, 0, 0, 0];
+    for (let k = 0; k < 3; k++) {
+      const bit = (sh >> k) & 1; let m = 0;
+      for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q]; if (((this.pat[j] >> k) & 1) === bit) this.rf[j * 3 + k]++; else tg[m++] = j; }
+      const units = this.rel3[i * 3 + k];
+      if (m === 0) { this.deposit(i, units); continue; }
+      for (let u = 0; u < units; u++) this.cs[tg[u % m] * 3 + k]++;
+    }
   }
   receive(j, shown) {
     const p = this.pat[j], b = j * 3;
@@ -196,25 +256,140 @@ class Engine {
     this.t++; this.total += count;
     return count;
   }
-  tickLattice() {
+  // ---------------- RULE 28: fields on links ----------------
+  initLinks(s, M) {
+    // rule 28 (b, as amended): EM, weak and strong start at rest (0) on every link
+    this.L = [new Int32Array(N * 3), new Int32Array(N * 3), new Int32Array(N * 3)];
+    // rule 29 (b): a generation per pixel, from the seed
+    this.gen = new Uint8Array(N);
+    for (let i = 0; i < N; i++) { s ^= (s << 13n) & M; s ^= s >> 7n; s ^= (s << 17n) & M; this.gen[i] = Number(s % 3n); }
+  }
+  // rule 29 (c): mass = generation coupling x background (1 unit everywhere)
+  mass(i) { return this.cfg.higgs ? MASS[POPC[this.pat[i]]][this.gen[i]] : 0; }
+  readyL(i) { const b = i * 3; return this.cs[b] + this.cs[b + 1] + this.cs[b + 2] >= 3 + this.mass(i); }
+  flashL(i) {
+    const sel = SEL[this.pat[i]], b = i * 3, c = this.cs;
+    const rel = c[b] + c[b + 1] + c[b + 2];
+    this.pat[i] = this.nextPat(i);
+    this.rf[b] = this.rf[b + 1] = this.rf[b + 2] = c[b] = c[b + 1] = c[b + 2] = 0;
+    this.fired[i] = 1;
+    const sl = []; // field by field: weak, EM, strong, weak, ... then the next link (face order)
+    for (let f = 0; f < 6; f++) { const l = LK[i * 6 + f]; if (l < 0) continue; for (let fl = 0; fl < 3; fl++) if (sel[fl]) sl.push(fl * N * 3 + l); }
+    for (let u = 0; u < rel; u++) { const x = sl[u % sl.length]; this.L[(x / (N * 3)) | 0][x % (N * 3)]++; }
+  }
+  flowLinks() {
+    for (let i = 0; i < N; i++) {
+      const si = SEL[this.pat[i]];
+      for (let fl = 0; fl < 3; fl++) {
+        const F = this.L[fl]; let mx = -1, mn = -1;
+        for (let f = 0; f < 6; f++) {
+          const l = LK[i * 6 + f]; if (l < 0) continue;
+          if (si[fl] && SEL[this.pat[NB[i * 6 + f]]][fl]) continue; // held
+          if (mx < 0 || F[l] > F[mx]) mx = l;
+          if (mn < 0 || F[l] < F[mn]) mn = l;
+        }
+        if (mx >= 0 && F[mx] - F[mn] >= 2) { F[mx]--; F[mn]++; }
+      }
+    }
+  }
+  expressLinks() {
+    const c = this.cs;
+    for (let i = 0; i < N; i++) {
+      const si = SEL[this.pat[i]];
+      for (let fl = 0; fl < 3; fl++) {
+        if (!si[fl]) continue;
+        const F = this.L[fl]; let mx = -1, mn = -1;
+        for (let f = 0; f < 6; f++) { const l = LK[i * 6 + f]; if (l < 0) continue;
+          if (mx < 0 || F[l] > F[mx]) mx = l; if (mn < 0 || F[l] < F[mn]) mn = l; }
+        if (F[mx] - F[mn] < 2) continue;
+        F[mx]--;
+        const b = i * 3; let k = 0; if (c[b + 1] < c[b + k]) k = 1; if (c[b + 2] < c[b + k]) k = 2;
+        c[b + k]++;
+      }
+    }
+  }
+  tickLinks() {
     const kick = this.t === 0 ? this.kick : -1;
     this.fired.fill(0);
     let count = 0;
     if (this.cfg.update === "sync") {
-      for (let i = 0; i < N; i++) this.fired[i] = (this.ready(i) || i === kick) ? 1 : 0;
+      const go = new Uint8Array(N);
+      for (let i = 0; i < N; i++) go[i] = ((this.readyL(i) || i === kick) && !this.blocked(i)) ? 1 : 0;
+      for (let i = 0; i < N; i++) if (go[i]) { this.flashL(i); count++; }
+    } else {
+      for (let i = 0; i < N; i++) if ((this.readyL(i) || i === kick) && !this.blocked(i)) { this.flashL(i); count++; }
+    }
+    this.flowLinks(); this.expressLinks();
+    this.t++; this.total += count;
+    return count;
+  }
+  tickLattice() {
+    if (this.cfg.links) return this.tickLinks();
+    const kick = this.t === 0 ? this.kick : -1;
+    this.fired.fill(0);
+    let count = 0;
+    if (this.cfg.update === "sync") {
+      for (let i = 0; i < N; i++) this.fired[i] = ((this.ready(i) || i === kick) && !this.blocked(i)) ? 1 : 0;
       for (let i = 0; i < N; i++) if (this.fired[i]) { this.flash(i); count++; }
-      for (let i = 0; i < N; i++) if (this.fired[i]) { const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh); }
+      for (let i = 0; i < N; i++) if (this.fired[i]) this.shout(i);
     } else {
       for (let i = 0; i < N; i++) {
         if (!(this.ready(i) || i === kick)) continue;
+        if (this.blocked(i)) continue;
         this.flash(i); count++;
-        const sh = this.pat[i]; for (let q = 0; q < 6; q++) this.receive(NB[i * 6 + q], sh);
+        this.shout(i);
       }
     }
-    this.spread();
-    if (this.cfg.gravity) this.absorb();
+    if (this.cfg.channels) {
+      this.spread3(); this.absorb3();
+      for (let i = 0; i < N; i++) this.carrier[i] = this.car3[i * 3] + this.car3[i * 3 + 1] + this.car3[i * 3 + 2];
+    } else {
+      this.spread();
+      if (this.cfg.gravity) this.absorb(); else if (this.cfg.cancel) this.cancelMemory(); else if (this.cfg.excite) this.exciteMemory();
+    }
+    if (this.cfg.em) this.emField();
+    if (this.cfg.motion) this.move();
     this.t++; this.total += count;
     return count;
+  }
+  // RULE 25: every pixel adds its charge (thirds) to phi at its site; phi spreads like rule 5.
+  emField() {
+    const ph = this.phi, nx = this.phin;
+    for (let i = 0; i < N; i++) ph[i] += Q3[POPC[this.pat[i]]];
+    nx.fill(0);
+    for (let i = 0; i < N; i++) {
+      const q = ph[i]; if (q === 0) continue;
+      const sh = q / 6, x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
+      if (x + 1 < S) nx[i + 1] += sh;
+      if (x > 0) nx[i - 1] += sh;
+      if (y + 1 < S) nx[i + S] += sh;
+      if (y > 0) nx[i - S] += sh;
+      if (z + 1 < S) nx[i + S * S] += sh;
+      if (z > 0) nx[i - S * S] += sh;
+    }
+    this.phi = nx; this.phin = ph;
+  }
+  // RULE 24: a pixel that flashed hops toward the neighbour with the most carrier (if more than
+  // its own site), swapping whole state with a pixel that didn't flash. Carrier stays.
+  move() {
+    const c = this.carrier, f = this.fired, m = this.moved; m.fill(0); this.swaps = 0;
+    const sw = (a, x, y) => { const t = a[x]; a[x] = a[y]; a[y] = t; };
+    for (let i = 0; i < N; i++) {
+      if (!f[i] || m[i]) continue;
+      let best = i;
+      const qc = Q3[POPC[this.pat[i]]];
+      if (this.cfg.em && qc !== 0) { // RULE 25: toward the lowest q*phi
+        const ph = this.phi; let bv = qc * ph[i];
+        for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q]; if (qc * ph[j] < bv) { best = j; bv = qc * ph[j]; } }
+      } else {
+        let bc = c[i];
+        for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q]; if (c[j] > bc) { best = j; bc = c[j]; } }
+      }
+      if (best === i || f[best] || m[best]) continue;
+      sw(this.pat, i, best); sw(this.home, i, best); sw(f, i, best);
+      for (let k = 0; k < 3; k++) { sw(this.rf, i * 3 + k, best * 3 + k); sw(this.cs, i * 3 + k, best * 3 + k); }
+      m[i] = m[best] = 1; this.swaps++;
+    }
   }
   spread() {
     const c = this.carrier, nx = this.next; nx.fill(0);
@@ -229,6 +404,53 @@ class Engine {
       if (z > 0) nx[i - S * S] += sh;
     }
     this.carrier = nx; this.next = c;
+  }
+  // RULE 23: channel selection (0 weak, 1 EM, 2 strong) by charge.
+  static select(p) { const c = (p & 1) + ((p >> 1) & 1) + ((p >> 2) & 1);
+    return c === 0 ? [true, false, false] : c === 3 ? [true, true, false] : [true, true, true]; }
+  spread3() {
+    const c = this.car3, nx = this.nxt3; nx.fill(0);
+    for (let i = 0; i < N; i++) for (let ch = 0; ch < 3; ch++) {
+      const q = c[i * 3 + ch]; if (q === 0) continue;
+      const sh = q / 6, x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
+      if (x + 1 < S) nx[(i + 1) * 3 + ch] += sh;
+      if (x > 0) nx[(i - 1) * 3 + ch] += sh;
+      if (y + 1 < S) nx[(i + S) * 3 + ch] += sh;
+      if (y > 0) nx[(i - S) * 3 + ch] += sh;
+      if (z + 1 < S) nx[(i + S * S) * 3 + ch] += sh;
+      if (z > 0) nx[(i - S * S) * 3 + ch] += sh;
+    }
+    this.car3 = nx; this.nxt3 = c;
+  }
+  absorb3() {
+    const c = this.car3, rf = this.rf;
+    for (let i = 0; i < N; i++) {
+      const sl = Engine.select(this.pat[i]), p = this.pat[i], kind = (p & 1) + ((p >> 1) & 1) + ((p >> 2) & 1);
+      for (let ch = 0; ch < 3; ch++) {
+        const v = c[i * 3 + ch]; if (!sl[ch] || v < 3) continue;
+        const k = Math.floor(v / 3); c[i * 3 + ch] = v - k * 3;
+        rf[i * 3] += k; rf[i * 3 + 1] += k; rf[i * 3 + 2] += k; this.absorbed[kind * 3 + ch] += k;
+      }
+    }
+  }
+  // RULE 21: each whole pixel's worth of carrier (3 units) cancels one conserved unit
+  // on each cell that holds one; one carrier unit used per memory unit cancelled.
+  cancelMemory() {
+    const c = this.carrier, cs = this.cs;
+    for (let i = 0; i < N; i++) {
+      if (c[i] < 3) continue;
+      const k = Math.floor(c[i] / 3);
+      for (let q = 0; q < 3; q++) { const m = Math.min(k, cs[i * 3 + q]); cs[i * 3 + q] -= m; c[i] -= m; }
+    }
+  }
+  // RULE 26: each whole pixel's worth of carrier (3 units) adds +1 memory to every cell.
+  exciteMemory() {
+    const c = this.carrier, cs = this.cs;
+    for (let i = 0; i < N; i++) {
+      if (c[i] < 3) continue;
+      const k = Math.floor(c[i] / 3); c[i] -= k * 3;
+      cs[i * 3] += k; cs[i * 3 + 1] += k; cs[i * 3 + 2] += k;
+    }
   }
   absorb() {
     const c = this.carrier;

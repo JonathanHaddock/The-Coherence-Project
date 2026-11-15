@@ -1,0 +1,13 @@
+display	update	condition	flashing	swaps_per_tick	opp_ratio	ee_ratio	opp_min	opp_max
+flip_all	sweep	move	0.0084	342	0.360	6.380	0.352	0.375
+flip_all	sweep	move_em	0.0261	1683	0.524	3.526	0.499	0.574
+flip_all	sweep	still	0.0771	0	0.269	6.948	0.263	0.275
+flip_all	sync	move	0.0970	5178	0.578	6.750	0.561	0.596
+flip_all	sync	move_em	0.0268	1935	0.636	1.474	0.622	0.648
+flip_all	sync	still	0.0616	0	0.560	5.724	0.557	0.563
+one_cell	sweep	move	0.0357	2504	0.584	4.868	0.578	0.592
+one_cell	sweep	move_em	0.0172	1132	0.666	1.553	0.660	0.673
+one_cell	sweep	still	0.0858	0	0.587	4.889	0.579	0.592
+one_cell	sync	move	0.0565	4654	0.580	5.197	0.561	0.590
+one_cell	sync	move_em	0.0267	1961	0.625	1.536	0.605	0.644
+one_cell	sync	still	0.0571	0	0.590	5.472	0.580	0.596
