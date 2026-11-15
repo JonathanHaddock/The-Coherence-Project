@@ -28,3 +28,15 @@ Measures, both compared with the same pixels placed at random:
 ## Reading
 
 The pass test was "opposite charges close distance, like charges separate". Rule 25 does that **relative to the world without it**, but the lattice still prefers like next to like. It isn't struck. Whether that counts as a pass is Jono's call. If pairs of opposite charges (atoms) are wanted, something will have to outweigh the pattern copying, which is the neighbour agreement rules 1–3 produce.
+
+## Longer runs (added 2026-11-14, found while watching the 3D viewer)
+
+The 600-tick runs above stop too early. one_cell · sync, core 0, default seed, 3,000 ticks, share of pixels flashing:
+
+| ticks | 500 | 1000 | 1500 | 2000 | 2500 | 3000 |
+|---|---|---|---|---|---|---|
+| rules 1–5 | 0.058 | 0.049 | 0.042 | 0.042 | 0.040 | 0.039 |
+| + motion (24) | 0.038 | 0.022 | 0.042 | 0.036 | 0.034 | 0.032 |
+| + motion + EM (24 + 25) | 0.048 | 0.015 | 0.005 | 0.002 | 0.0006 | **0** |
+
+**With EM on, the world goes completely dark by about tick 2,750.** Nothing flashes and nothing moves. Without EM it keeps flashing at 3–4%. EM moves each charged pixel to where it is most at ease, and once every pixel is there, nothing is left to drive a flash. One seed and one setting so far.

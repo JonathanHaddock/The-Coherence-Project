@@ -22,7 +22,7 @@ input[type=range]{accent-color:var(--acc)}
 .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 .note{color:var(--dim);font-size:12px;margin-top:8px}
 </style></head><body>
-<header><h1>PIXEL ENGINE · 3D LATTICE 48³</h1><span>JS port of grid3.zig. Matches Zig exactly in all modes (seed 20261110).</span></header>
+<header><h1>PIXEL ENGINE · 3D LATTICE 48³</h1><span>Lattice mode runs on copies of the one-pixel model (pixel-model.js) when "built from pixels" is on. Matches Zig exactly (seed 20261110).</span></header>
 <main>
 <section class="card">
  <div class="ctl">
@@ -598,7 +598,7 @@ $("copy").onclick=async()=>{const txt=stateText(),box=$("copybox");box.value=txt
   catch(e){box.style.display="block";box.select();$("copy").textContent="Select + copy below";}
   setTimeout(()=>$("copy").textContent="Copy state",2000);};
 $("gravity").onclick=()=>{const b=$("gravity");b.classList.toggle("on");b.textContent="gravity: "+(b.classList.contains("on")?"ON":"off");if(b.classList.contains("on")){$("cancel").classList.remove("on");$("cancel").textContent="cancel memory (21): off";}reset();};
-$("em").onclick=()=>{const b=$("em");b.classList.toggle("on");b.textContent="signed EM (25): "+(b.classList.contains("on")?"ON":"off");reset();};
+$("em").onclick=()=>{const b=$("em");b.classList.toggle("on");if(b.classList.contains("on")&&!$("motion").classList.contains("on")){$("motion").classList.add("on");$("motion").textContent="motion (24): ON";}b.textContent="signed EM (25): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("motion").onclick=()=>{const b=$("motion");b.classList.toggle("on");b.textContent="motion (24): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("pixels").onclick=()=>{const b=$("pixels");b.classList.toggle("on");b.textContent="built from pixels: "+(b.classList.contains("on")?"ON":"off");reset();};
 $("ch3").onclick=()=>{const b=$("ch3");b.classList.toggle("on");b.textContent="3 carriers (23): "+(b.classList.contains("on")?"ON":"off");reset();};
