@@ -154,3 +154,27 @@ node layer2.js g=1.414 w0=1 U=4 Nmax=8
 
 - 3×3 is tiny: a pair larger than the box can't show its true size, so "large" here means "as large as the box allows". The next step is a 4×4 lattice (needs a lower phonon cutoff or a smarter basis).
 - Pair mass isn't computed yet. That's what decides whether a bound pair can actually move (twisted boundary conditions would give it).
+
+## Layer 2, part 2: pair mass, box size, lattice type (2026-11-15)
+
+Exact Holstein–Hubbard solutions (layer2.js, complex Lanczos). Pair mass is taken from a twisted boundary:
+`pair_mass_ratio` = M_pair / (2 m_band), where 1 means the pair moves as freely as two free electrons.
+λ = g²/(ω0 · half-bandwidth), with ω0 = 1. Commands are in `results/layer2-commands.txt`.
+
+**A. Pair mass, 3×3 square, Nmax 8** (`results/layer2-mass/runs.tsv`)
+- U = 0: bound at every λ, but the pair gets heavy fast: mass 1.26 at λ 0.5, then 3.5 at λ 0.75 and 10.7 at λ 1.5. That is the on-site bipolaron forming.
+- U = 4: the pair is unbound below λ ≈ 0.4. From λ 0.5 to 1.0 it is bound and spread out (on-site share under 20%), with mass 1.13–1.54. It only gets heavy (3.4) at λ 1.5.
+- So repulsion does not just weaken pairing. It keeps the pair large and light. That is the window that matters for superconductivity.
+
+**B. 4×4 vs 3×3, Nmax 5** (`results/layer2-size/runs.tsv`)
+- On the bigger box, binding is weaker and pairs are bigger: at U = 4 the pair size is about 1.5–1.7 against about 1.1. The 3×3 box was squeezing the pair.
+- At U = 4, pairs are still bound on 4×4 for λ ≥ 0.5, so the bound-and-light window survives the bigger box.
+- Caveat: Nmax 5 is under-converged at strong coupling. Square 3×3, λ 1, U 0 gives Eb −1.33 at Nmax 5 against −2.84 at Nmax 8. Read B as a comparison at weak to moderate λ only.
+
+**C. Lattice type, U = 0 and 4** (`results/layer2-lattices/runs.tsv`)
+- **Triangular 3×3 (Nmax 8) gives the widest window.** At U = 4 the pair is bound from λ 0.5, stays spread out, and keeps mass 1.06–1.18 up to λ 1.0 and 1.70 at λ 1.5. Even at U = 0 it stays light up to λ 0.75 (mass 1.19).
+- Square comes second.
+- **Honeycomb 2×3 (Nmax 6) is the worst.** At U = 4 it binds only from about λ 0.75, and at U = 0 the pair is the heaviest (mass 16 at λ 1.5). Low coordination (z = 3) means fewer paths for the pair to move.
+- This matches the literature on "superlight" bipolarons on triangular lattices (Hague, Kornilovitch, Samson & Alexandrov, PRL 98, 037002, 2007). On a triangular lattice a pair can hop without breaking: one electron moves to a site that is still a neighbour of the other.
+
+**Caveats:** these are small clusters with finite phonon cutoffs. The honeycomb runs use only 6 sites. Treat the trends as trustworthy and the exact numbers as not.
