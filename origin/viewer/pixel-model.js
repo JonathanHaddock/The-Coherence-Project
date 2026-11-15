@@ -8,13 +8,15 @@
 // Field must give exactly the same results as engine.js (the reference) for the same seed.
 //
 // Rules carried by the Pixel: 1-3 (display, trigger, no memory), 5 (carrier), 6 (gravity),
-// 21 (cancel), 22 (exclusion), 23 (three carriers), 24 (motion), 25 (signed EM), 26 (carrier excites), 27 (hearing conserves).
+// 21 (cancel), 22 (exclusion), 23 (three carriers), 24 (motion), 25 (signed EM), 26 (carrier excites), 27 (hearing conserves), 28 (fields on links), 29 (Higgs-like mass).
 (function (root) {
   const POPC = [0, 1, 1, 2, 1, 2, 2, 3];
   const CHARGE3 = [0, -1, 2, -3];           // thirds: neutrino, down, up, electron
   const KIND = ["neutrino", "down", "up", "electron"];
   const FACES = ["+x", "-x", "+y", "-y", "+z", "-z"];
   const OPP = [1, 0, 3, 2, 5, 4];
+  // rule 29 (c): Brannen-Koide mass ratios by kind (filled count) and generation
+  const MASS = [[0, 0, 0], [1, 20, 884], [1, 721, 97300], [1, 207, 3477]];
 
   class Pixel {
     constructor(pattern = 0, memory = [0, 0, 0]) {
@@ -26,6 +28,7 @@
       this.phi = 0;                          // rule 25: signed EM field held here
       this.fired = false;
       this.home = -1;                        // measurement only: where this pixel started
+      this.gen = 0;                          // rule 29: generation 0, 1, 2 (kept through flashes)
       this.flashes = 0;
     }
     // --- what the pixel is (read from its own pattern) ---
@@ -42,6 +45,11 @@
 
     // --- rule 2: trigger ---
     ready() { return this.memory >= 3; }
+    // --- rule 29: mass from the Higgs-like background (1 unit) x generation coupling; mass resists change ---
+    mass(higgs) { return higgs ? MASS[this.filled][this.gen] : 0; }
+    readyL(higgs) { return this.memory >= 3 + this.mass(higgs); }
+    // --- rule 28 (e): one unit of field expressed into the emptiest cell ---
+    express() { let k = 0; if (this.cs[1] < this.cs[k]) k = 1; if (this.cs[2] < this.cs[k]) k = 2; this.cs[k]++; }
 
     // --- rule 1: what it would show if it flashed now ---
     wouldShow(display) {
@@ -130,8 +138,8 @@
       return best;
     }
     // The pixel's own state (what travels when it moves). Fields held at a site stay put.
-    takeBody() { return { pattern: this.pattern, rf: this.rf, cs: this.cs, fired: this.fired, home: this.home, flashes: this.flashes }; }
-    putBody(b) { this.pattern = b.pattern; this.rf = b.rf; this.cs = b.cs; this.fired = b.fired; this.home = b.home; this.flashes = b.flashes; }
+    takeBody() { return { pattern: this.pattern, rf: this.rf, cs: this.cs, fired: this.fired, home: this.home, flashes: this.flashes, gen: this.gen }; }
+    putBody(b) { this.pattern = b.pattern; this.rf = b.rf; this.cs = b.cs; this.fired = b.fired; this.home = b.home; this.flashes = b.flashes; this.gen = b.gen; }
   }
 
   class Field {
@@ -153,6 +161,18 @@
         const r = Math.sqrt((x - H) ** 2 + (y - H) ** 2 + (z - H) ** 2);
         if (this.cfg.core > 0 && r <= this.cfg.core) { p.pattern = 7; p.cs = [1, 1, 1]; }
         this.px[i] = p;
+      }
+      if (this.cfg.links) {
+        // rule 28: fields on links. lk[i*6+f] = link through face f (-1 at the box edge); id = site*3 + axis.
+        // (b, as amended) EM, weak, strong start at rest (0). Rule 29 (b): generation per pixel from the seed.
+        this.lk = new Int32Array(N * 6);
+        for (let i = 0; i < N; i++) {
+          const x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
+          this.lk.set([x + 1 < S ? i * 3 : -1, x > 0 ? (i - 1) * 3 : -1, y + 1 < S ? i * 3 + 1 : -1,
+                       y > 0 ? (i - S) * 3 + 1 : -1, z + 1 < S ? i * 3 + 2 : -1, z > 0 ? (i - S * S) * 3 + 2 : -1], i * 6);
+        }
+        this.L = [new Int32Array(N * 3), new Int32Array(N * 3), new Int32Array(N * 3)];
+        for (let i = 0; i < N; i++) { s ^= (s << 13n) & M; s ^= s >> 7n; s ^= (s << 17n) & M; this.px[i].gen = Number(s % 3n); }
       }
       this.kick = (H * S + H) * S + H; this.t = 0; this.total = 0; this.swaps = 0;
       // Outside conditions (experiments only, not rules): sites forced to flash every tick,
@@ -184,7 +204,60 @@
       for (let i = 0; i < N; i++) set(this.px[i], inbox[i]);
       return lost;
     }
+    // ---------------- rule 28: fields on links (+ rule 29 mass) ----------------
+    linksOf(i) { const o = []; for (let f = 0; f < 6; f++) { const l = this.lk[i * 6 + f]; if (l >= 0) o.push([f, l]); } return o; }
+    flashLinks(i) {
+      const p = this.px[i], sel = Pixel.select(p.pattern);       // fields it held before changing
+      p.flash(this.cfg.display, false, true);                    // matter changes; memory kept aside in p.released
+      const rel = p.released[0] + p.released[1] + p.released[2], slots = [];
+      for (const [, l] of this.linksOf(i)) for (let fl = 0; fl < 3; fl++) if (sel[fl]) slots.push([fl, l]); // field by field, then next link
+      for (let u = 0; u < rel; u++) { const [fl, l] = slots[u % slots.length]; this.L[fl][l]++; }
+    }
+    flowLinks() {
+      const N = this.N, px = this.px;
+      for (let i = 0; i < N; i++) {
+        const si = Pixel.select(px[i].pattern);
+        for (let fl = 0; fl < 3; fl++) {
+          const F = this.L[fl]; let mx = -1, mn = -1;
+          for (let f = 0; f < 6; f++) {
+            const l = this.lk[i * 6 + f]; if (l < 0) continue;
+            if (si[fl] && Pixel.select(px[this.nb[i * 6 + f]].pattern)[fl]) continue;   // held by both ends
+            if (mx < 0 || F[l] > F[mx]) mx = l;
+            if (mn < 0 || F[l] < F[mn]) mn = l;
+          }
+          if (mx >= 0 && F[mx] - F[mn] >= 2) { F[mx]--; F[mn]++; }
+        }
+      }
+    }
+    expressLinks() {
+      const N = this.N, px = this.px;
+      for (let i = 0; i < N; i++) {
+        const p = px[i], si = Pixel.select(p.pattern);
+        for (let fl = 0; fl < 3; fl++) {
+          if (!si[fl]) continue;
+          const F = this.L[fl]; let mx = -1, mn = -1;
+          for (let f = 0; f < 6; f++) { const l = this.lk[i * 6 + f]; if (l < 0) continue;
+            if (mx < 0 || F[l] > F[mx]) mx = l; if (mn < 0 || F[l] < F[mn]) mn = l; }
+          if (F[mx] - F[mn] < 2) continue;
+          F[mx]--; p.express();
+        }
+      }
+    }
+    tickLinks() {
+      const c = this.cfg, N = this.N, px = this.px, kick = this.t === 0 ? this.kick : -1;
+      let count = 0;
+      for (const p of px) p.fired = false;
+      const may = i => (px[i].readyL(c.higgs) || i === kick || this.forced[i] === 1) && !(c.exclusion && px[i].blocked(c.display, this.neighbourPatterns(i)));
+      if (c.update === "sync") {
+        const go = new Uint8Array(N); for (let i = 0; i < N; i++) go[i] = may(i) ? 1 : 0;
+        for (let i = 0; i < N; i++) if (go[i]) { this.flashLinks(i); count++; }
+      } else for (let i = 0; i < N; i++) if (may(i)) { this.flashLinks(i); count++; }
+      this.flowLinks(); this.expressLinks();
+      this.t++; this.total += count;
+      return count;
+    }
     tick() {
+      if (this.cfg.links) return this.tickLinks();
       const c = this.cfg, N = this.N, px = this.px, kick = this.t === 0 ? this.kick : -1;
       let count = 0;
       for (const p of px) p.fired = false;
@@ -220,6 +293,6 @@
       }
     }
   }
-  const api = { Pixel, Field, FACES, OPP, KIND, CHARGE3, POPC };
+  const api = { Pixel, Field, FACES, OPP, KIND, CHARGE3, POPC, MASS };
   if (typeof module !== "undefined") module.exports = api; else root.OriginPixel = api;
 })(this);

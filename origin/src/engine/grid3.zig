@@ -80,6 +80,13 @@ pub const Grid3 = struct {
     /// RULE 27: hearing conserves (a flash hands out its released memory).
     conserve: bool,
     rel3: [n][3]u32,
+    /// RULE 28: fields on links (weak, EM, strong). Link id = site*3 + axis.
+    links: bool,
+    lf: [3][n * 3]i32,
+    /// RULE 29: Higgs-like background (1 unit everywhere) and generation mass.
+    higgs: bool,
+    gen: [n]u8,
+    seed_after: u64,
     phi: [n]f64,
     phin: [n]f64,
 
@@ -93,6 +100,8 @@ pub const Grid3 = struct {
         g.em = false;
         g.excite = false;
         g.conserve = false;
+        g.links = false;
+        g.higgs = false;
         g.phi = @splat(0);
         g.swaps = 0;
         for (&g.home, 0..) |*h, i| h.* = @intCast(i);
@@ -108,6 +117,7 @@ pub const Grid3 = struct {
             p.* = .{ .pattern = @truncate(s) };
             for (0..px.cells) |k| p.conserved[k] = @intCast((s >> @intCast(8 + 2 * k)) % 2);
         }
+        g.seed_after = s;
         switch (cfg.start) {
             .random => {},
             .core => |r| for (&g.px, 0..) |*p, i| {
@@ -167,7 +177,129 @@ pub const Grid3 = struct {
         }
     }
 
+    /// RULE 28/29 start: call after init and after setting g.links. Fields at rest (0);
+    /// one generation per pixel from the seed (continuing the same xorshift as init).
+    pub fn initLinks(g: *Grid3) void {
+        g.lf = @splat(@splat(0));
+        var s = g.seed_after;
+        for (&g.gen) |*x| {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            x.* = @intCast(s % 3);
+        }
+    }
+
+    /// Link through face f of site i, or null at the box edge.
+    pub fn linkOf(i: usize, f: usize) ?usize {
+        const c = coords(i);
+        return switch (f) {
+            0 => if (c[0] + 1 < side) i * 3 else null,
+            1 => if (c[0] > 0) (i - 1) * 3 else null,
+            2 => if (c[1] + 1 < side) i * 3 + 1 else null,
+            3 => if (c[1] > 0) (i - side) * 3 + 1 else null,
+            4 => if (c[2] + 1 < side) i * 3 + 2 else null,
+            else => if (c[2] > 0) (i - side * side) * 3 + 2 else null,
+        };
+    }
+
+    const MASS = [4][3]u32{ .{ 0, 0, 0 }, .{ 1, 20, 884 }, .{ 1, 721, 97300 }, .{ 1, 207, 3477 } };
+
+    pub fn mass(g: *const Grid3, i: usize) u32 {
+        return if (g.higgs) MASS[@popCount(g.px[i].pattern)][g.gen[i]] else 0;
+    }
+
+    fn readyL(g: *const Grid3, i: usize) bool {
+        return g.px[i].memoryTotal() >= 3 + g.mass(i);
+    }
+
+    fn flashL(g: *Grid3, i: usize, t: i64) void {
+        const sel = select(g.px[i].pattern);
+        const rel = g.px[i].flashWith(t, g.cfg.display);
+        g.fired[i] = true;
+        var slots: [18][2]usize = undefined;
+        var m: usize = 0;
+        // field by field (weak, EM, strong), then the next link in face order
+        for (0..6) |f| if (linkOf(i, f)) |l| {
+            for (0..3) |fl| if (sel[fl]) {
+                slots[m] = .{ fl, l };
+                m += 1;
+            };
+        };
+        var u: usize = 0;
+        while (u < rel) : (u += 1) {
+            const sl = slots[u % m];
+            g.lf[sl[0]][sl[1]] += 1;
+        }
+    }
+
+    fn flowLinks(g: *Grid3) void {
+        for (0..n) |i| {
+            const si = select(g.px[i].pattern);
+            const nb = neighbors(i);
+            for (0..3) |fl| {
+                var mx: ?usize = null;
+                var mn: ?usize = null;
+                for (0..6) |f| if (linkOf(i, f)) |l| {
+                    if (si[fl] and select(g.px[nb[f]].pattern)[fl]) continue; // held
+                    if (mx == null or g.lf[fl][l] > g.lf[fl][mx.?]) mx = l;
+                    if (mn == null or g.lf[fl][l] < g.lf[fl][mn.?]) mn = l;
+                };
+                if (mx) |a| if (g.lf[fl][a] - g.lf[fl][mn.?] >= 2) {
+                    g.lf[fl][a] -= 1;
+                    g.lf[fl][mn.?] += 1;
+                };
+            }
+        }
+    }
+
+    fn expressLinks(g: *Grid3) void {
+        for (0..n) |i| {
+            const si = select(g.px[i].pattern);
+            for (0..3) |fl| {
+                if (!si[fl]) continue;
+                var mx: ?usize = null;
+                var mn: ?usize = null;
+                for (0..6) |f| if (linkOf(i, f)) |l| {
+                    if (mx == null or g.lf[fl][l] > g.lf[fl][mx.?]) mx = l;
+                    if (mn == null or g.lf[fl][l] < g.lf[fl][mn.?]) mn = l;
+                };
+                if (g.lf[fl][mx.?] - g.lf[fl][mn.?] < 2) continue;
+                g.lf[fl][mx.?] -= 1;
+                const cs = &g.px[i].conserved;
+                var k: usize = 0;
+                if (cs[1] < cs[k]) k = 1;
+                if (cs[2] < cs[k]) k = 2;
+                cs[k] += 1;
+            }
+        }
+    }
+
+    fn tickLinks(g: *Grid3, t: i64, kick: ?usize) u32 {
+        var count: u32 = 0;
+        g.fired = @splat(false);
+        switch (g.cfg.update) {
+            .sync => {
+                for (0..n) |i| g.fired[i] = (g.readyL(i) or kick == i) and !g.blocked(i);
+                for (0..n) |i| if (g.fired[i]) {
+                    g.flashL(i, t);
+                    count += 1;
+                };
+            },
+            .sweep => for (0..n) |i| {
+                if (!(g.readyL(i) or kick == i)) continue;
+                if (g.blocked(i)) continue;
+                g.flashL(i, t);
+                count += 1;
+            },
+        }
+        g.flowLinks();
+        g.expressLinks();
+        return count;
+    }
+
     pub fn tick(g: *Grid3, t: i64, kick: ?usize) u32 {
+        if (g.links) return g.tickLinks(t, kick);
         var count: u32 = 0;
         g.fired = @splat(false);
         switch (g.cfg.update) {
@@ -409,6 +541,22 @@ test "point source in 3D gives roughly 1/distance" {
     const a = avg[4] * 4;
     const b = avg[8] * 8;
     try std.testing.expect(b / a > 0.7 and b / a < 1.05);
+}
+
+test "rule 28: a flash puts its memory into the links of the fields it held" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{ .display = .hold });
+    g.links = true;
+    g.initLinks();
+    const i = index(5, 5, 5);
+    g.px[i].pattern = 0b000; // neutrino: holds weak only
+    g.px[i].conserved = .{ 2, 2, 2 };
+    g.flashL(i, 0);
+    var weak: i32 = 0;
+    for (0..6) |f| weak += g.lf[0][Grid3.linkOf(i, f).?];
+    try std.testing.expectEqual(@as(i32, 6), weak);
+    try std.testing.expectEqual(@as(i32, 0), g.lf[1][Grid3.linkOf(i, 0).?]);
 }
 
 test "rule 27: released memory is dealt to mismatched neighbours, none created" {

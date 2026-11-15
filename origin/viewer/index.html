@@ -125,6 +125,18 @@ for (let i = 0; i < N; i++) {
   RAD[i] = radius(i);
 }
 
+// RULE 28: links. LK[i*6+f] = link id through face f of site i (-1 at the box edge).
+// Link id = site*3 + axis, owned by the lower site (+x, +y, +z).
+const LK = new Int32Array(N * 6);
+for (let i = 0; i < N; i++) {
+  const x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
+  LK.set([x + 1 < S ? i * 3 : -1, x > 0 ? (i - 1) * 3 : -1, y + 1 < S ? i * 3 + 1 : -1,
+          y > 0 ? (i - S) * 3 + 1 : -1, z + 1 < S ? i * 3 + 2 : -1, z > 0 ? (i - S * S) * 3 + 2 : -1], i * 6);
+}
+// rule 29 (c): Brannen-Koide mass ratios by kind (filled count) and generation
+const MASS = [[0, 0, 0], [1, 20, 884], [1, 721, 97300], [1, 207, 3477]];
+const SEL = [0, 1, 2, 3, 4, 5, 6, 7].map(p => { const c = (p & 1) + ((p >> 1) & 1) + ((p >> 2) & 1); return c === 0 ? [1, 0, 0] : c === 3 ? [1, 1, 0] : [1, 1, 1]; });
+
 class Engine {
   constructor(cfg) {
     this.cfg = Object.assign({ mode: "lattice", display: "one_cell", update: "sync", core: 8, gravity: false, seed: 20261110n }, cfg);
@@ -146,6 +158,7 @@ class Engine {
       this.pat[i] = Number(s & 7n);
       for (let k = 0; k < 3; k++) this.cs[i * 3 + k] = Number((s >> BigInt(8 + 2 * k)) % 2n);
     }
+    if (this.cfg.links) this.initLinks(s, M);
     if (this.cfg.core > 0) for (let i = 0; i < N; i++) if (RAD[i] <= this.cfg.core) {
       this.pat[i] = 7; this.cs[i * 3] = this.cs[i * 3 + 1] = this.cs[i * 3 + 2] = 1;
     }
@@ -351,7 +364,75 @@ class Engine {
     this.t++; this.total += count;
     return count;
   }
+  // ---------------- RULE 28: fields on links ----------------
+  initLinks(s, M) {
+    // rule 28 (b, as amended): EM, weak and strong start at rest (0) on every link
+    this.L = [new Int32Array(N * 3), new Int32Array(N * 3), new Int32Array(N * 3)];
+    // rule 29 (b): a generation per pixel, from the seed
+    this.gen = new Uint8Array(N);
+    for (let i = 0; i < N; i++) { s ^= (s << 13n) & M; s ^= s >> 7n; s ^= (s << 17n) & M; this.gen[i] = Number(s % 3n); }
+  }
+  // rule 29 (c): mass = generation coupling x background (1 unit everywhere)
+  mass(i) { return this.cfg.higgs ? MASS[POPC[this.pat[i]]][this.gen[i]] : 0; }
+  readyL(i) { const b = i * 3; return this.cs[b] + this.cs[b + 1] + this.cs[b + 2] >= 3 + this.mass(i); }
+  flashL(i) {
+    const sel = SEL[this.pat[i]], b = i * 3, c = this.cs;
+    const rel = c[b] + c[b + 1] + c[b + 2];
+    this.pat[i] = this.nextPat(i);
+    this.rf[b] = this.rf[b + 1] = this.rf[b + 2] = c[b] = c[b + 1] = c[b + 2] = 0;
+    this.fired[i] = 1;
+    const sl = []; // field by field: weak, EM, strong, weak, ... then the next link (face order)
+    for (let f = 0; f < 6; f++) { const l = LK[i * 6 + f]; if (l < 0) continue; for (let fl = 0; fl < 3; fl++) if (sel[fl]) sl.push(fl * N * 3 + l); }
+    for (let u = 0; u < rel; u++) { const x = sl[u % sl.length]; this.L[(x / (N * 3)) | 0][x % (N * 3)]++; }
+  }
+  flowLinks() {
+    for (let i = 0; i < N; i++) {
+      const si = SEL[this.pat[i]];
+      for (let fl = 0; fl < 3; fl++) {
+        const F = this.L[fl]; let mx = -1, mn = -1;
+        for (let f = 0; f < 6; f++) {
+          const l = LK[i * 6 + f]; if (l < 0) continue;
+          if (si[fl] && SEL[this.pat[NB[i * 6 + f]]][fl]) continue; // held
+          if (mx < 0 || F[l] > F[mx]) mx = l;
+          if (mn < 0 || F[l] < F[mn]) mn = l;
+        }
+        if (mx >= 0 && F[mx] - F[mn] >= 2) { F[mx]--; F[mn]++; }
+      }
+    }
+  }
+  expressLinks() {
+    const c = this.cs;
+    for (let i = 0; i < N; i++) {
+      const si = SEL[this.pat[i]];
+      for (let fl = 0; fl < 3; fl++) {
+        if (!si[fl]) continue;
+        const F = this.L[fl]; let mx = -1, mn = -1;
+        for (let f = 0; f < 6; f++) { const l = LK[i * 6 + f]; if (l < 0) continue;
+          if (mx < 0 || F[l] > F[mx]) mx = l; if (mn < 0 || F[l] < F[mn]) mn = l; }
+        if (F[mx] - F[mn] < 2) continue;
+        F[mx]--;
+        const b = i * 3; let k = 0; if (c[b + 1] < c[b + k]) k = 1; if (c[b + 2] < c[b + k]) k = 2;
+        c[b + k]++;
+      }
+    }
+  }
+  tickLinks() {
+    const kick = this.t === 0 ? this.kick : -1;
+    this.fired.fill(0);
+    let count = 0;
+    if (this.cfg.update === "sync") {
+      const go = new Uint8Array(N);
+      for (let i = 0; i < N; i++) go[i] = ((this.readyL(i) || i === kick) && !this.blocked(i)) ? 1 : 0;
+      for (let i = 0; i < N; i++) if (go[i]) { this.flashL(i); count++; }
+    } else {
+      for (let i = 0; i < N; i++) if ((this.readyL(i) || i === kick) && !this.blocked(i)) { this.flashL(i); count++; }
+    }
+    this.flowLinks(); this.expressLinks();
+    this.t++; this.total += count;
+    return count;
+  }
   tickLattice() {
+    if (this.cfg.links) return this.tickLinks();
     const kick = this.t === 0 ? this.kick : -1;
     this.fired.fill(0);
     let count = 0;

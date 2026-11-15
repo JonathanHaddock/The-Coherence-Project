@@ -15,6 +15,9 @@ const cases = [
   ["one_cell sync conserve (27)", { display: "one_cell", update: "sync", conserve: true }],
   ["one_cell sync excite+conserve (26,27)", { display: "one_cell", update: "sync", excite: true, conserve: true }],
   ["flip_all sweep all 23-27", { display: "flip_all", update: "sweep", channels: true, motion: true, em: true, conserve: true }],
+  ["one_cell sync links (28)", { display: "one_cell", update: "sync", links: true }],
+  ["flip_all sweep links (28)", { display: "flip_all", update: "sweep", links: true }],
+  ["one_cell sync links+higgs (28,29)", { display: "one_cell", update: "sync", links: true, higgs: true }],
   ["flip_all sweep excite+motion+em (24-26)", { display: "flip_all", update: "sweep", excite: true, motion: true, em: true }],
 ];
 const T = +(process.argv[2] || 40);
