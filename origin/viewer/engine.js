@@ -247,7 +247,7 @@ class Engine {
       for (let i = 0; i < N; i++) this.carrier[i] = this.car3[i * 3] + this.car3[i * 3 + 1] + this.car3[i * 3 + 2];
     } else {
       this.spread();
-      if (this.cfg.gravity) this.absorb(); else if (this.cfg.cancel) this.cancelMemory();
+      if (this.cfg.gravity) this.absorb(); else if (this.cfg.cancel) this.cancelMemory(); else if (this.cfg.excite) this.exciteMemory();
     }
     if (this.cfg.em) this.emField();
     if (this.cfg.motion) this.move();
@@ -343,6 +343,15 @@ class Engine {
       if (c[i] < 3) continue;
       const k = Math.floor(c[i] / 3);
       for (let q = 0; q < 3; q++) { const m = Math.min(k, cs[i * 3 + q]); cs[i * 3 + q] -= m; c[i] -= m; }
+    }
+  }
+  // RULE 26: each whole pixel's worth of carrier (3 units) adds +1 memory to every cell.
+  exciteMemory() {
+    const c = this.carrier, cs = this.cs;
+    for (let i = 0; i < N; i++) {
+      if (c[i] < 3) continue;
+      const k = Math.floor(c[i] / 3); c[i] -= k * 3;
+      cs[i * 3] += k; cs[i * 3 + 1] += k; cs[i * 3 + 2] += k;
     }
   }
   absorb() {

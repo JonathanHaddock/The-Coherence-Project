@@ -44,3 +44,7 @@ All three seeds agree. With EM on and the sun on, 0.0001 is about 7 pixels: the 
 Of the two readings (the world needs a source, or rule 25 itself is wrong), this points to **rule 25**. Feeding the world doesn't wake it, because once EM has put every charge where it is most settled, nothing in the rules turns incoming carrier into a flash.
 
 Not tested yet: a sun whose carrier can act on pixels (sun + rule 6 or rule 23 on), and a sun of neutrinos (photograph mode, rules 14–16).
+
+## With rule 26 on (carrier excites), added 2026-11-14
+
+Same 24 runs with `excite` on (6th argument `on`). **Every run flashes 100% of pixels from about tick 10 to the end**, whatever the sun, edge and EM settings. The world no longer goes dark; it runs away instead. See `origin/results/rule26-2026-11-14/SUMMARY.md`.

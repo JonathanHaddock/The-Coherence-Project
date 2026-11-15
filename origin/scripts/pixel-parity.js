@@ -11,6 +11,8 @@ const cases = [
   ["flip_all sweep channels (23)", { display: "flip_all", update: "sweep", channels: true }],
   ["one_cell sync motion (24)", { display: "one_cell", update: "sync", motion: true }],
   ["one_cell sweep motion+em (24,25)", { display: "one_cell", update: "sweep", motion: true, em: true }],
+  ["one_cell sync excite (26)", { display: "one_cell", update: "sync", excite: true }],
+  ["flip_all sweep excite+motion+em (24-26)", { display: "flip_all", update: "sweep", excite: true, motion: true, em: true }],
 ];
 const T = +(process.argv[2] || 40);
 let bad = 0;

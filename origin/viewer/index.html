@@ -38,6 +38,7 @@ input[type=range]{accent-color:var(--acc)}
   <button id="cancel">cancel memory (21): off</button>
   <button id="excl">exclusion (22): off</button>
   <button id="ch3">3 carriers (23): off</button>
+  <button id="excite" class="on" title="Rule 26: carrier adds memory (always on by Jono's choice; off = old runs)">carrier excites (26): ON</button>
   <button id="pixels" class="on" title="Lattice mode runs on copies of the one-pixel model (pixel-model.js). Off = the array engine. Both give identical results.">built from pixels: ON</button>
   <button id="motion">motion (24): off</button>
   <button id="em">signed EM (25): off</button>
@@ -353,7 +354,7 @@ class Engine {
       for (let i = 0; i < N; i++) this.carrier[i] = this.car3[i * 3] + this.car3[i * 3 + 1] + this.car3[i * 3 + 2];
     } else {
       this.spread();
-      if (this.cfg.gravity) this.absorb(); else if (this.cfg.cancel) this.cancelMemory();
+      if (this.cfg.gravity) this.absorb(); else if (this.cfg.cancel) this.cancelMemory(); else if (this.cfg.excite) this.exciteMemory();
     }
     if (this.cfg.em) this.emField();
     if (this.cfg.motion) this.move();
@@ -451,6 +452,15 @@ class Engine {
       for (let q = 0; q < 3; q++) { const m = Math.min(k, cs[i * 3 + q]); cs[i * 3 + q] -= m; c[i] -= m; }
     }
   }
+  // RULE 26: each whole pixel's worth of carrier (3 units) adds +1 memory to every cell.
+  exciteMemory() {
+    const c = this.carrier, cs = this.cs;
+    for (let i = 0; i < N; i++) {
+      if (c[i] < 3) continue;
+      const k = Math.floor(c[i] / 3); c[i] -= k * 3;
+      cs[i * 3] += k; cs[i * 3 + 1] += k; cs[i * 3 + 2] += k;
+    }
+  }
   absorb() {
     const c = this.carrier;
     for (let i = 0; i < N; i++) {
@@ -472,7 +482,7 @@ let eng, running=false, recent=new Float32Array(N), hist=[];
 const BINS=H; let rate=new Float64Array(BINS), agr=new Float64Array(BINS), seen=false;
 const binOf=new Int16Array(N), cnt=new Float64Array(BINS);
 for(let i=0;i<N;i++){const b=Math.floor(RAD[i]);binOf[i]=b<BINS?b:-1;if(b<BINS)cnt[b]++;}
-function cfg(){const dv=$("deliver").value;return{deliver:(dv==="weak"||dv==="weakhand")?"unreal":dv,weak:dv==="weak"||dv==="weakhand",hand:dv==="weakhand",weight:$("weight").value,p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on"),exclusion:$("excl").classList.contains("on"),channels:$("ch3").classList.contains("on"),motion:$("motion").classList.contains("on"),em:$("em").classList.contains("on"),cancel:!$("gravity").classList.contains("on")&&$("cancel").classList.contains("on")};}
+function cfg(){const dv=$("deliver").value;return{deliver:(dv==="weak"||dv==="weakhand")?"unreal":dv,weak:dv==="weak"||dv==="weakhand",hand:dv==="weakhand",weight:$("weight").value,p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on"),exclusion:$("excl").classList.contains("on"),channels:$("ch3").classList.contains("on"),motion:$("motion").classList.contains("on"),excite:$("excite").classList.contains("on"),em:$("em").classList.contains("on"),cancel:!$("gravity").classList.contains("on")&&$("cancel").classList.contains("on")};}
 const KG=24;let lastF=new Int32Array(N),gapH=new Float64Array(KG+1),flashSum=0,tickSum=0;
 // The lattice made of copies of the one-pixel model (pixel-model.js). It exposes the same
 // arrays the page reads (pat, cs, fired, carrier), copied from the pixels after every tick.
@@ -600,6 +610,7 @@ $("copy").onclick=async()=>{const txt=stateText(),box=$("copybox");box.value=txt
 $("gravity").onclick=()=>{const b=$("gravity");b.classList.toggle("on");b.textContent="gravity: "+(b.classList.contains("on")?"ON":"off");if(b.classList.contains("on")){$("cancel").classList.remove("on");$("cancel").textContent="cancel memory (21): off";}reset();};
 $("em").onclick=()=>{const b=$("em");b.classList.toggle("on");if(b.classList.contains("on")&&!$("motion").classList.contains("on")){$("motion").classList.add("on");$("motion").textContent="motion (24): ON";}b.textContent="signed EM (25): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("motion").onclick=()=>{const b=$("motion");b.classList.toggle("on");b.textContent="motion (24): "+(b.classList.contains("on")?"ON":"off");reset();};
+$("excite").onclick=()=>{const b=$("excite");b.classList.toggle("on");b.textContent="carrier excites (26): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("pixels").onclick=()=>{const b=$("pixels");b.classList.toggle("on");b.textContent="built from pixels: "+(b.classList.contains("on")?"ON":"off");reset();};
 $("ch3").onclick=()=>{const b=$("ch3");b.classList.toggle("on");b.textContent="3 carriers (23): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("excl").onclick=()=>{const b=$("excl");b.classList.toggle("on");b.textContent="exclusion (22): "+(b.classList.contains("on")?"ON":"off");reset();};

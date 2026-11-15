@@ -8,7 +8,7 @@
 // Field must give exactly the same results as engine.js (the reference) for the same seed.
 //
 // Rules carried by the Pixel: 1-3 (display, trigger, no memory), 5 (carrier), 6 (gravity),
-// 21 (cancel), 22 (exclusion), 23 (three carriers), 24 (motion), 25 (signed EM).
+// 21 (cancel), 22 (exclusion), 23 (three carriers), 24 (motion), 25 (signed EM), 26 (carrier excites).
 (function (root) {
   const POPC = [0, 1, 1, 2, 1, 2, 2, 3];
   const CHARGE3 = [0, -1, 2, -3];           // thirds: neutrino, down, up, electron
@@ -90,6 +90,12 @@
     cancel() {
       const k = Math.floor(this.carrier / 3);
       for (let q = 0; q < 3; q++) { const m = Math.min(k, this.cs[q]); this.cs[q] -= m; this.carrier -= m; }
+    }
+    // --- rule 26: whole pixels of carrier become memory, +1 per cell ---
+    excite() {
+      if (this.carrier < 3) return;
+      const k = Math.floor(this.carrier / 3); this.carrier -= k * 3;
+      this.cs[0] += k; this.cs[1] += k; this.cs[2] += k;
     }
     // --- rule 23: which channels this pixel takes part in, and absorbing them ---
     static select(p) { const c = POPC[p]; return c === 0 ? [true, false, false] : c === 3 ? [true, true, false] : [true, true, true]; }
@@ -177,7 +183,7 @@
         for (const p of px) { p.absorb3(); p.carrier = p.car3[0] + p.car3[1] + p.car3[2]; }
       } else {
         this.passOn(p => p.carrier, (p, v) => { p.carrier = v; });
-        if (c.gravity) for (const p of px) p.absorb(); else if (c.cancel) for (const p of px) p.cancel();
+        if (c.gravity) for (const p of px) p.absorb(); else if (c.cancel) for (const p of px) p.cancel(); else if (c.excite) for (const p of px) p.excite();
       }
       if (c.em) { for (const p of px) p.emitCharge(); this.passOn(p => p.phi, (p, v) => { p.phi = v; }); }
       if (c.motion) this.move();

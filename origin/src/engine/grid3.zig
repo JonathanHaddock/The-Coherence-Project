@@ -75,6 +75,8 @@ pub const Grid3 = struct {
     swaps: u32,
     /// RULE 25: signed EM field (PLAN-fields F-1).
     em: bool,
+    /// RULE 26: carrier excites (adds memory).
+    excite: bool,
     phi: [n]f64,
     phin: [n]f64,
 
@@ -86,6 +88,7 @@ pub const Grid3 = struct {
         g.channels = false;
         g.motion = false;
         g.em = false;
+        g.excite = false;
         g.phi = @splat(0);
         g.swaps = 0;
         for (&g.home, 0..) |*h, i| h.* = @intCast(i);
@@ -154,7 +157,7 @@ pub const Grid3 = struct {
             for (0..n) |i| g.carrier[i] = g.car3[i][0] + g.car3[i][1] + g.car3[i][2];
         } else {
             g.spread();
-            if (g.gravity) g.absorb() else if (g.cancel) g.cancelMemory();
+            if (g.gravity) g.absorb() else if (g.cancel) g.cancelMemory() else if (g.excite) g.exciteMemory();
         }
         if (g.em) g.emField();
         if (g.motion) g.move();
@@ -251,6 +254,17 @@ pub const Grid3 = struct {
             g.moved[i] = true;
             g.moved[best] = true;
             g.swaps += 1;
+        }
+    }
+
+    /// RULE 26: each whole pixel's worth of carrier (3 units) adds +1 memory to every cell.
+    pub fn exciteMemory(g: *Grid3) void {
+        for (0..n) |i| {
+            if (g.carrier[i] < 3) continue;
+            const k = @floor(g.carrier[i] / 3);
+            g.carrier[i] -= k * 3;
+            const ku: u32 = @intFromFloat(k);
+            for (0..3) |q| g.px[i].conserved[q] += ku;
         }
     }
 
@@ -358,6 +372,18 @@ test "point source in 3D gives roughly 1/distance" {
     const a = avg[4] * 4;
     const b = avg[8] * 8;
     try std.testing.expect(b / a > 0.7 and b / a < 1.05);
+}
+
+test "rule 26: carrier becomes memory, 3 units for 3" {
+    const g = try std.testing.allocator.create(Grid3);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{});
+    g.carrier = @splat(0);
+    g.px[0].conserved = .{ 0, 1, 0 };
+    g.carrier[0] = 7.5;
+    g.exciteMemory();
+    try std.testing.expectEqual([3]u32{ 2, 3, 2 }, g.px[0].conserved);
+    try std.testing.expectApproxEqAbs(@as(f64, 1.5), g.carrier[0], 1e-12);
 }
 
 test "rule 25: an electron moves toward positive phi, an up quark away" {

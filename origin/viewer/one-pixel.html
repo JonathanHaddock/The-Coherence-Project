@@ -25,7 +25,7 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
     <label>outer world <select id="world"><option value="rand">random flashes</option><option value="quiet">silent</option><option value="same">all show 111</option></select></label>
     <label>seed <select id="seed"><option>1</option><option>2</option><option>3</option></select></label>
     <div style="margin-top:6px">
-      <button data-r="gravity">gravity (6)</button> <button data-r="cancel">cancel (21)</button> <button data-r="exclusion">exclusion (22)</button>
+      <button data-r="excite" class="on">carrier excites (26)</button> <button data-r="gravity">gravity (6)</button> <button data-r="cancel">cancel (21)</button> <button data-r="exclusion">exclusion (22)</button>
       <button data-r="channels">3 carriers (23)</button> <button data-r="motion">motion (24)</button> <button data-r="em">signed EM (25)</button>
     </div>
     <div style="margin-top:6px"><button id="reset">reset</button> <button id="run">run</button> <button id="step">step</button>
@@ -44,7 +44,7 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
 <script>
 const { Pixel, KIND, FACES } = OriginPixel;
 const $ = id => document.getElementById(id);
-const rules = { gravity: false, cancel: false, exclusion: false, channels: false, motion: false, em: false };
+const rules = { excite: true, gravity: false, cancel: false, exclusion: false, channels: false, motion: false, em: false };
 let P, NB, t, rng, running = false, timer, events, lastWant = -1, heardFrom = [], sentTo = false;
 const OPPF = [1, 0, 3, 2, 5, 4];
 function xs() { let x = rng; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; rng = x >>> 0; return rng; }
@@ -76,7 +76,7 @@ function tick() {
   // carrier: each pixel sends 1/6 out of each face; centre <-> neighbours, neighbours' outer faces lose it
   const pass = (get, set) => { const inC = NB.reduce((a, q) => a + get(q) / 6, 0), inN = get(P) / 6; set(P, inC); NB.forEach(q => set(q, inN)); };
   if (rules.channels) { for (let ch = 0; ch < 3; ch++) pass(p => p.car3[ch], (p, v) => { p.car3[ch] = v; }); all.forEach(p => { p.absorb3(); p.carrier = p.car3[0] + p.car3[1] + p.car3[2]; }); }
-  else { pass(p => p.carrier, (p, v) => { p.carrier = v; }); if (rules.gravity) all.forEach(p => p.absorb()); else if (rules.cancel) all.forEach(p => p.cancel()); }
+  else { pass(p => p.carrier, (p, v) => { p.carrier = v; }); if (rules.gravity) all.forEach(p => p.absorb()); else if (rules.cancel) all.forEach(p => p.cancel()); else if (rules.excite) all.forEach(p => p.excite()); }
   if (rules.em) { all.forEach(p => p.emitCharge()); pass(p => p.phi, (p, v) => { p.phi = v; }); }
   lastWant = -1;
   if (rules.motion && P.fired) { lastWant = P.wantMove(rules.em, NB); if (lastWant >= 0) {
