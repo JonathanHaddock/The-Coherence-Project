@@ -14,16 +14,19 @@ Units: lattice spacing a = 1.
 
 ## Run it
 
-- **Watch:** open `index.html` in a browser. Presets: *confined* (6⁴, β 5.7) and *hot plasma* (6³ × 2, β 6.0).
+- **Watch:** open `index.html` in a browser. Presets: *confined* (8⁴, β 5.7), *hot plasma* (8³ × 2, β 6.0) and *big box* (12⁴, β 5.7; slow in a browser, about 4 sweeps a second).
 - **Check:** `node check.js` (about 5 s).
-- **Experiment:** `node run.js Ns=8 Nt=8 beta=5.7 therm=500 meas=200 every=5 loops=3 header=1` prints one TSV row: plaquette, Polyakov loop, Wilson loops W(R,T), Creutz ratios, each with a standard error. `results/commands.txt` has the commands behind every file in `results/`.
+- **Experiment:** `node run.js Ns=8 Nt=8 beta=5.7 therm=500 meas=200 every=5 loops=3 header=1` prints one TSV row: plaquette, Polyakov loop, Wilson loops W(R,T), Creutz ratios, each with a standard error. - **Potential:** `node potential.js Ns=12 Nt=12 beta=6.0 therm=300 meas=40 every=10 smear=20 alpha=0.5 Rmax=6 Tmax=6 Rmin=2 out=file.json` measures the static potential with smoothing (about 9 minutes at 12⁴).
+
+`results/commands.txt` has the commands behind every file in `results/`.
 
 | File | What it is |
 |---|---|
 | `su3.js` | SU(3) matrices, the lattice, Metropolis update, all measurements (browser and node) |
 | `check.js` | Unitarity, gauge invariance, strong- and weak-coupling limits, cold/hot start agreement |
 | `run.js` | Command-line runner, one TSV row per run |
-| `index.html` | Live page: action density slice, plaquette history, Polyakov loop cloud, Wilson loop area plot |
+| `potential.js` | Static potential V(R) from APE-smoothed Wilson loops, Cornell and Lüscher fits, jackknife errors |
+| `index.html` | Live page: action density slice (raw or smoothed), plaquette history, Polyakov loop cloud, potential V(R) with fits |
 
 ## What it measures
 
@@ -34,6 +37,16 @@ Units: lattice spacing a = 1.
 | Creutz ratio χ(R) = −ln[W(R,R) W(R−1,R−1) / W(R,R−1)²] | Cancels the perimeter and constant parts of −ln W. Approaches the string tension σa² from above as R grows |
 | Polyakov loop ⟨L⟩ | Tr of the time links all the way round the box, /3. It measures the free energy of one isolated quark. ⟨L⟩ = 0: confined. ⟨L⟩ ≠ 0, pointing along one of three Z₃ directions: deconfined (gluon plasma) |
 
+## Smoothing (APE)
+
+Raw Wilson loops are dominated by short-distance jitter, so at large R the signal dies in noise before it says anything about confinement. APE smoothing fixes that for measurements:
+
+- Each step replaces every link by (1 − α) × itself + α/(2(d−1)) × the sum of the 2(d−1) "staples" (the three-link detours around it), then projects the result back onto SU(3).
+- Projection: the unitary part of the polar decomposition (Newton iteration X → (X + X^−†)/2), then the phase of the determinant divided out.
+- For the potential, only spatial links are smoothed (α 0.5, 20 steps); time links stay raw, so T still measures true time evolution and V(R) = ln[W(R,T)/W(R,T+1)] is still the energy.
+- Smoothing acts on a copy. The simulation itself is never smoothed.
+- Smoothing changes which states the loop overlaps with, not the energies. With it, V(R) reaches its plateau by T ≈ 2 instead of needing large T.
+
 ## Checks passed (2026-11-18)
 
 `node check.js`:
@@ -42,6 +55,9 @@ Units: lattice spacing a = 1.
 - **Gauge invariance:** a random SU(3) rotation at every site changes the plaquette, W(2,2), a spatial W(1,2) and |⟨L⟩| by at most 5.6 × 10⁻¹⁷. This is the central symmetry of QCD; a wrong link direction or a wrong order of multiplication breaks it.
 - **Strong coupling** (β small, where ⟨P⟩ ≈ β/18 + β²/216): β 0.5 gives 0.0277 vs 0.0289; β 1.0 gives 0.0592 vs 0.0602.
 - **Weak coupling** (β large, where ⟨P⟩ ≈ 1 − 2/β): β 30 gives 0.9322 vs 0.9333; β 60 gives 0.9663 vs 0.9667.
+- **SU(3) projection:** 200 random matrices land on SU(3) to 8.9 × 10⁻¹⁶; a matrix already in SU(3) is returned unchanged to 3.3 × 10⁻¹⁶.
+- **Fast loops = direct loops:** the line-built W(R,T) used for the potential equals the step-by-step loop to 3.3 × 10⁻¹⁶.
+- **Smoothed loops are gauge invariant:** included in the gauge-invariance check above (APE-smeared W(2,2)).
 - **Cold and hot starts agree** at β 5.5 after 400 sweeps: 0.5084 and 0.5021. (After only 80 sweeps they didn't: 0.5109 vs 0.5003. Metropolis is slow near β 5.5, so runs use 400+ thermalization sweeps.)
 
 ## Results (2026-11-18)
@@ -61,7 +77,29 @@ Errors are about 0.0003. The values commonly quoted for large lattices are about
 | 5.7 | 0.54968 | 0.32557 | 0.13312 | 0.05811 | 0.02014 | 0.371 | 0.231 |
 | 6.0 | 0.59437 | 0.38504 | 0.19222 | 0.10363 | 0.04898 | 0.261 | 0.132 |
 
-−ln W rises with the area of the loop. The Creutz ratios fall as R grows, as they should, towards the string tension, but at R = 3 they still include short-distance (Coulomb) parts. The literature value of σa² is roughly 0.16 at β 5.7 and 0.05 at β 6.0 (from the Sommer scale r₀; not yet checked against the source here). Getting there takes larger loops, a bigger box and smoothing of the links, none of which is built.
+−ln W rises with the area of the loop. The Creutz ratios fall as R grows, as they should, towards the string tension, but at R = 3 they still include short-distance (Coulomb) parts, so they overshoot. The smoothed potential below is the better measurement.
+
+### Static potential, 12⁴ with smoothing (`results/potential-b5.7.json`, `potential-b6.0.json`)
+
+APE α 0.5, 20 steps on spatial links; 300 thermalization sweeps, then 40 measurements 10 sweeps apart; jackknife errors.
+
+aV(R) from T 2 → 3:
+
+| β | R = 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|
+| 5.7 | 0.505(1) | 0.806(2) | 1.012(4) | 1.188(8) | 1.346(12) | 1.480(22) |
+| 6.0 | 0.410(1) | 0.591(1) | 0.688(2) | 0.757(3) | 0.815(3) | 0.866(5) |
+
+V keeps rising with R, close to a straight line at large R, which is confinement. V(R) barely changes between T 1 → 2 and T 3 → 4, which shows the smoothing works. At large T and R the signal runs out (at β 5.7, T ≥ 4 for R ≥ 5).
+
+| β | plaquette | σa², e fixed at π/12 | σa², Cornell (e free) | literature (approx.) |
+|---|---|---|---|---|
+| 5.7 | 0.54933 | **0.172 ± 0.018** | 0.164 ± 0.050 (T 3, e 0.36) | ≈ 0.16 |
+| 6.0 | 0.59395 | **0.041 ± 0.007** | 0.022 ± 0.021 (T 5, e 0.50) | ≈ 0.05 |
+
+Fits use R 2 to 6. The two-parameter fit (Coulomb coefficient fixed at π/12, the Lüscher term of a vibrating string) lands within about 1σ of the approximate literature values at both couplings. The free three-parameter Cornell fit is much less certain with only five points, and at β 6.0 the automatic choice of T (the largest with every V(R) to 10%) picked a noisy T = 5. The literature values are approximate (from the Sommer scale r₀ at these β) and still need checking against a primary source.
+
+Limits of this measurement: R = 6 is half the box, where the loop starts to feel its own periodic image; 40 measurements 10 sweeps apart may be correlated; the errors don't include the choice of T or of fit range.
 
 ### Deconfinement: Polyakov loop, 8³ × 4 (`results/deconfinement.tsv`)
 
@@ -76,7 +114,7 @@ Below β_c, |⟨L⟩| is not exactly zero on a finite box: it's noise of size ab
 ## Limits
 
 - Pure gauge: no dynamical quarks, so no pions, no chiral symmetry breaking, no real hadron masses.
-- Toy volumes (up to 8⁴) and a simple Metropolis update. Real studies use heat-bath plus over-relaxation, volumes of 32⁴–96⁴ and more, and many independent configurations.
+- Small volumes (up to 12⁴) and a simple Metropolis update. Real studies use heat-bath plus over-relaxation, volumes of 32⁴–96⁴ and more, and many independent configurations.
 - Errors treat measurements `every` sweeps apart as independent; autocorrelations aren't measured.
 
 ## Why it's in origin
