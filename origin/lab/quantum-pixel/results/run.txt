@@ -1,0 +1,46 @@
+PASS  Lanczos ground state = dense diagonalisation  L 3, N 3 (84 states): -3.4641772078 vs -3.4641772078
+
+RESULT 1: every arrangement of kinds on up to 4 pixels; count the colour-singlet states and their electric charge.
+  FUREY table: colour-neutral objects come with charge 1 (10 states, e.g. positron);  2 (40 states, e.g. positron + positron);  3 (19 states, e.g. positron + positron + positron);  4 (1 states, e.g. positron + positron + positron + positron)
+PASS  Furey table: every colour-neutral object has whole-number charge  as in nature: no free fractional charge has ever been seen
+  ORIGIN table: colour-neutral objects come with charge -4 (1 states, e.g. electron + electron + electron + electron);  -3 (3 states, e.g. electron + electron + electron);  -2 (7 states, e.g. electron + electron);  -5/3 (12 states, e.g. down + up + electron + electron);  -1 (4 states, e.g. electron);  -2/3 (18 states, e.g. down + up + electron);  1/3 (6 states, e.g. down + up);  2/3 (12 states, e.g. down + down + up + up);  1 (4 states, e.g. up + up + up + electron);  2 (3 states, e.g. up + up + up)
+PASS  origin table: colour-neutral objects with fractional charge exist  e.g. -5/3: down + up + electron + electron; -2/3: down + up + electron; 1/3: down + up; 2/3: down + down + up + up
+
+RESULT 2: energy of the colour field, g2 = 1, no motion. Theory for flux of a triplet: (g2/2)(4/3) = 2/3 per link.
+  quark + antiquark r apart: r 1: 0.6667  r 2: 1.3333  r 3: 2.0000  r 4: 2.6667  r 5: 3.3333  r 6: 4.0000
+PASS  quark-antiquark energy rises linearly: 2/3 per link (a string)  exactly (g2/2) C2(triplet) x distance
+  one quark alone in a box of L pixels (its flux runs out to infinity): L 2: 1.3333  L 3: 2.0000  L 4: 2.6667  L 5: 3.3333  L 6: 4.0000
+PASS  a lone quark costs energy growing with the size of the world  unbounded as L grows: a free quark cannot exist
+  three quarks r apart (a baryon): r 1: 1.3333  r 2: 2.6667  r 3: 4.0000
+PASS  three quarks bind into a colour singlet with linear strings  two string segments of length r, 2/3 per link each
+
+RESULT 3: three filled cells on 6 pixels, t = 1, e2 = 0.1. Ground-state composition by kinds present.
+  cells  move, furey  table, g2 0  : E0 -5.2568, total colour C2 -0.000  | up+anti-down 49%, anti-down+anti-down+anti-down 46%, positron 5%
+  cells  move, furey  table, g2 0.5: E0 -4.6358, total colour C2 0.000  | up+anti-down 57%, anti-down+anti-down+anti-down 34%, positron 10%
+  cells  move, furey  table, g2 2  : E0 -3.3743, total colour C2 0.000  | up+anti-down 61%, positron 25%, anti-down+anti-down+anti-down 14%
+  cells  move, furey  table, g2 8  : E0 -1.2074, total colour C2 -0.000  | positron 75%, up+anti-down 24%, anti-down+anti-down+anti-down 1%
+  cells  move, origin table, g2 0  : E0 -5.3139, total colour C2 -0.000  | up+down 50%, down+down+down 45%, electron 5%
+  cells  move, origin table, g2 0.5: E0 -4.7047, total colour C2 0.000  | up+down 58%, down+down+down 33%, electron 10%
+  cells  move, origin table, g2 2  : E0 -3.4499, total colour C2 0.000  | up+down 62%, electron 24%, down+down+down 14%
+  cells  move, origin table, g2 8  : E0 -1.2341, total colour C2 0.000  | electron 74%, up+down 25%, down+down+down 1%
+  pixels move, furey  table, g2 0  : E0 -3.3627, total colour C2 5.007  | anti-down+anti-down+anti-down 100%
+  pixels move, furey  table, g2 0.5: E0 -2.1098, total colour C2 0.000  | anti-down+anti-down+anti-down 100%
+  pixels move, furey  table, g2 2  : E0 -1.6340, total colour C2 0.000  | positron 100%
+  pixels move, furey  table, g2 8  : E0 -1.6340, total colour C2 0.000  | positron 100%
+  pixels move, origin table, g2 0  : E0 -3.3627, total colour C2 5.007  | down+down+down 100%
+  pixels move, origin table, g2 0.5: E0 -2.2061, total colour C2 -0.000  | up+down 100%
+  pixels move, origin table, g2 2  : E0 -1.6340, total colour C2 0.000  | electron 100%
+  pixels move, origin table, g2 8  : E0 -1.6340, total colour C2 0.000  | electron 100%
+
+all checks passed
+
+RESULT 4: cells move, origin table, 6 pixels, t = 1: share of the ground state that is NOT a single electron pixel.
+  g2 8   : not-an-electron share 2.553e-1
+  g2 16  : not-an-electron share 6.410e-2
+  g2 32  : not-an-electron share 1.402e-2
+  g2 64  : not-an-electron share 3.334e-3
+  g2 128 : not-an-electron share 4.160e-4
+  falls as g2^-2.54 (from g2 32 to 128)
+PASS  quark content of the electron falls as the colour force grows, but never reaches zero  at g2 128 still 4.16e-4
+
+all checks passed (result 4)

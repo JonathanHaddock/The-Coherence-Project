@@ -11,6 +11,7 @@ Each idea from the literature was built as a separate lab in `origin/lab/`, with
 | `causal-set` | Random, not regular (Sorkin et al.) | **Works, with a cost.** Random points look the same to every observer; a lattice breaks apart when boosted. Price: nearest neighbours grow without limit (~ln N) |
 | `graphity` | Geometry from cooling (Konopka, Markopoulou & Smolin) | **Fails as tested.** Loop rewards prefer clusters to space; even with a fix, cooling freezes into disorder |
 | `quantum-link` | Gauge theory on qubits (Chandrasekharan & Wiese) | **Works.** One bit per link carries a real gauge theory: Gauss law, winding sectors, confined phases, exact RK point |
+| `quantum-pixel` | Origin's own 3-cell pixel, made quantum, with SU(3) colour and U(1) charge (added later the same day) | **Works, with two fixes.** Colour and confinement fall out of the pixel; origin's charge table lets +⅓ objects roam free (fix: n = 2 is anti-up, −⅔); cells must move as whole pixels or electrons leak into quarks |
 
 ## What was checked
 

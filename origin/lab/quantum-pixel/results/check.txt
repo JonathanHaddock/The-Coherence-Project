@@ -1,0 +1,9 @@
+PASS  fermion algebra: {c_i, c+_j} = delta_ij, hop = c+_i c_j  all 64 states of 6 modes
+PASS  SU(3) algebra: [T1, T2] = i T3 on a pixel  largest deviation 0.0e+0
+PASS  colour Casimir (Fierz form) = sum_a Q^a Q^a  all 64 states of 2 pixels, largest deviation 6.7e-16
+PASS  one pixel: C2 = 0, 4/3, 4/3, 0 for n = 0..3 (singlet, triplet, antitriplet, singlet)  0.0000, 1.3333, 1.3333, 0.0000
+PASS  H (cells move, furey table) is Hermitian and colour-symmetric  asymmetry 0.0e+0, [H, Q^a] 1.3e-15
+PASS  H (cells move, origin table) is Hermitian and colour-symmetric  asymmetry 0.0e+0, [H, Q^a] 8.9e-16
+PASS  H (pixels move, furey table) is Hermitian and colour-symmetric  asymmetry 0.0e+0, [H, Q^a] 8.9e-16
+PASS  H (pixels move, origin table) is Hermitian and colour-symmetric  asymmetry 0.0e+0, [H, Q^a] 8.9e-16
+all checks passed
