@@ -1,0 +1,3 @@
+Ns	Nt	beta	start	seed	therm	meas	every	acceptance	plaquette	plaquette_err	polyakov_abs	polyakov_abs_err	polyakov_re	polyakov_im	loops	W1x1	W1x1_err	W2x1	W2x1_err	W2x2	W2x2_err	W3x2	W3x2_err	W3x3	W3x3_err	chi2	chi3	seconds
+8	8	5.70000	cold	1	500	200	5	0.29342	0.54963	1.954e-4	0.01522	5.428e-4	3.886e-4	-2.157e-4	time	0.54968	2.227e-4	0.32557	3.043e-4	0.13312	3.429e-4	0.05811	2.902e-4	0.02014	2.089e-4	0.37054	0.23089	125.63100
+8	8	6	cold	1	500	200	5	0.26381	0.59447	1.296e-4	0.03327	0.00124	0.01617	0.00841	time	0.59437	1.675e-4	0.38504	2.380e-4	0.19222	2.855e-4	0.10363	2.551e-4	0.04898	2.191e-4	0.26055	0.13156	117.28800

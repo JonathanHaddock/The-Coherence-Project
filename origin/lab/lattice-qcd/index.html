@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lattice QCD Lab</title>
+<style>
+:root{--bg:#f6f7f9;--card:#ffffff;--ink:#16181d;--dim:#5d6473;--line:#dde1e8;--acc:#c77d12;--blue:#2f6fd6;--red:#d24a3a;--grid:#e9ecf1;--btn:#eef1f5;--on:#dce6fa}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d0f14;--card:#161a22;--ink:#e6e8ee;--dim:#8a91a3;--line:#262c38;--acc:#f5b942;--blue:#5c9bff;--red:#ff6b5a;--grid:#1d2230;--btn:#202634;--on:#2d3b5a}}
+:root[data-theme="dark"]{--bg:#0d0f14;--card:#161a22;--ink:#e6e8ee;--dim:#8a91a3;--line:#262c38;--acc:#f5b942;--blue:#5c9bff;--red:#ff6b5a;--grid:#1d2230;--btn:#202634;--on:#2d3b5a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,sans-serif}
+header{padding:14px 16px;border-bottom:1px solid var(--line)}h1{font-size:17px;margin:0}
+header p{margin:6px 0 0;color:var(--dim);font-size:13px;max-width:980px}
+main{display:grid;grid-template-columns:300px minmax(0,1fr) 330px;gap:12px;padding:12px 16px}
+@media(max-width:1150px){main{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:12px}
+h2{font-size:12px;margin:0 0 8px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.row{display:grid;grid-template-columns:96px minmax(0,1fr) 52px;gap:6px;align-items:center;margin:4px 0;font-size:13px}
+.row output{text-align:right;font-variant-numeric:tabular-nums;color:var(--dim)}
+input[type=range]{width:100%;accent-color:var(--acc)}
+select,button{background:var(--btn);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:4px 9px;font:inherit;cursor:pointer}
+button.on{background:var(--on)}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+canvas{display:block;width:100%}
+.big{font-size:40px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}td{padding:3px 4px;border-bottom:1px solid var(--line)}td.r{text-align:right}
+.note{font-size:12px;color:var(--dim);margin:6px 0 0}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.state{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--line)}
+</style></head><body>
+<header><h1>Origin lab · lattice QCD (pure gauge SU(3))</h1>
+<p>The gluon field on a 4D grid of space and time. Every link between neighbouring points holds a 3×3 matrix (an SU(3) colour rotation). The grid is updated by Monte Carlo with the Wilson action, the same method used in real lattice QCD, at toy size. Watch for two things: Wilson loops shrinking with <b>area</b> (quarks are confined), and the Polyakov loop leaving zero when the box is short in time and β is large (the gluon plasma).</p></header>
+<main>
+<aside>
+  <div class="card"><h2>Lattice</h2>
+    <div class="row"><span>space Ns</span><select id="Ns"><option>4</option><option selected>6</option><option>8</option></select><span></span></div>
+    <div class="row"><span>time Nt</span><select id="Nt"><option>2</option><option>3</option><option>4</option><option selected>6</option><option>8</option></select><span></span></div>
+    <div class="row"><span>β = 6/g²</span><input id="beta" type="range" min="4.5" max="7" step="0.05" value="5.7"><output id="betao">5.70</output></div>
+    <div class="row"><span>start</span><select id="start"><option value="cold">cold (all links = 1)</option><option value="hot">hot (random links)</option></select><span></span></div>
+    <div class="row"><span>sweeps / frame</span><input id="speed" type="range" min="1" max="10" step="1" value="2"><output id="speedo">2</output></div>
+    <div class="btns"><button id="run" class="on">pause</button><button id="reset">reset</button><button id="preset1" title="Ns 6, Nt 6, β 5.7">confined</button><button id="preset2" title="Ns 6, Nt 2, β 6.0">hot plasma</button></div>
+    <p class="note">β changes take effect live. Changing size or start rebuilds the lattice. Deconfinement for Nt = 4 happens at β ≈ 5.69; for Nt = 6 at ≈ 5.89.</p>
+  </div>
+  <div class="card"><h2>Measured</h2><table id="meas"></table></div>
+</aside>
+<section>
+  <div class="card"><h2>Action density, slice x–y (where the gluon field is excited)</h2>
+    <div class="row"><span>slice z</span><input id="z" type="range" min="0" max="5" value="0"><output id="zo">0</output></div>
+    <div class="row"><span>slice t</span><input id="t" type="range" min="0" max="3" value="0"><output id="to">0</output></div>
+    <canvas id="slice" width="600" height="600" style="max-width:520px;margin:0 auto;border-radius:6px"></canvas>
+    <p class="note">Each square is one lattice site; brightness is the action at that site, summed over the six planes through it (1 − Re Tr P/3). Pale = calm field, deep colour = strongly excited. The numbers are the per-plane average. Raise β and the field calms everywhere; lower it and it gets rough.</p></div>
+  <div class="card"><h2>Plaquette over sweeps</h2><canvas id="hist" height="150"></canvas>
+    <p class="note">Orange = ⟨Re Tr P/3⟩ each sweep. Dashed lines: strong-coupling β/18 + β²/216 (good for β ≲ 2) and weak-coupling 1 − 2/β (good for large β). Real QCD sits between them, near β 5.7–6.5.</p></div>
+</section>
+<aside>
+  <div class="card"><h2>Polyakov loop</h2>
+    <div class="pills"><span id="phase" class="state">–</span></div>
+    <canvas id="poly" width="300" height="300" style="max-width:300px;margin:0 auto"></canvas>
+    <p class="note">One dot per spatial site: Tr of the time links all the way round the box, /3. The cloud's centre is ⟨L⟩. Confined: the cloud sits on 0 (a lone quark costs infinite energy). Deconfined: it moves out along one of the three marked Z₃ directions.</p></div>
+  <div class="card"><h2>Wilson loops (area law)</h2><canvas id="wl" height="190"></canvas>
+    <table id="wtab" style="margin-top:6px"></table>
+    <p class="note">−ln W(R,T) against area R·T. A straight line = area law = confinement; its slope approaches the string tension σa². Creutz ratios χ(R) cancel the perimeter part and estimate σa² from above. Loops use time if Nt ≥ 6, else two space directions. Spatial loops keep an area law even in the hot plasma: that is real physics (the magnetic sector stays confining), not a bug. Updated every 10 sweeps, averaged since the last change.</p></div>
+</aside>
+</main>
+<script src="su3.js"></script>
+<script>
+const { Lattice, creutz, strongCoupling, weakCoupling } = SU3Lab, $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let lat, running = true, hist = [], wacc = {}, wn = 0, sinceChange = 0, last = {};
+const LOOPS = [[1,1],[2,1],[2,2],[3,2],[3,3]];
+function build() {
+  const Ns = +$("Ns").value, Nt = +$("Nt").value;
+  lat = new Lattice({ Ns, Nt, beta: +$("beta").value, start: $("start").value, seed: (Math.random() * 1e9) | 0 });
+  hist = []; resetAcc();
+  $("z").max = Ns - 1; $("t").max = Nt - 1; if (+$("z").value > Ns - 1) $("z").value = 0; if (+$("t").value > Nt - 1) $("t").value = 0;
+  $("zo").textContent = $("z").value; $("to").textContent = $("t").value;
+}
+function resetAcc() { wacc = {}; wn = 0; sinceChange = 0; }
+$("beta").oninput = () => { lat.p.beta = +$("beta").value; $("betao").textContent = (+$("beta").value).toFixed(2); resetAcc(); };
+$("speed").oninput = () => $("speedo").textContent = $("speed").value;
+for (const id of ["Ns", "Nt", "start"]) $(id).onchange = build;
+$("reset").onclick = build;
+$("z").oninput = () => { $("zo").textContent = $("z").value; drawSlice(); };
+$("t").oninput = () => { $("to").textContent = $("t").value; drawSlice(); };
+$("run").onclick = () => { running = !running; $("run").textContent = running ? "pause" : "run"; $("run").classList.toggle("on", running); };
+function preset(Ns, Nt, b) { $("Ns").value = Ns; $("Nt").value = Nt; $("beta").value = b; $("betao").textContent = b.toFixed(2); build(); }
+$("preset1").onclick = () => preset(6, 6, 5.7); $("preset2").onclick = () => preset(6, 2, 6.0);
+
+function measureLoops() {
+  const timeLike = lat.p.Nt >= 6, maxR = Math.floor(Math.min(lat.p.Ns, timeLike ? lat.p.Nt : lat.p.Ns) / 2);
+  for (const [r, t] of LOOPS) { if (r > maxR) continue; const k = r + "," + t; wacc[k] = (wacc[k] || 0) + (timeLike ? lat.wilson(r, t) : lat.wilsonSpatial(r, t)); }
+  wn++;
+}
+function drawSlice() {
+  const c = $("slice"), g = c.getContext("2d"), Ns = lat.p.Ns, W = c.width, s = W / Ns, z = +$("z").value, t = +$("t").value;
+  const dark = css("--card") !== "#ffffff";
+  for (let y = 0; y < Ns; y++) for (let x = 0; x < Ns; x++) {
+    const i = lat.index([x, y, z, t]);
+    let a = 0; for (let mu = 0; mu < 4; mu++) for (let nu = mu + 1; nu < 4; nu++) a += 1 - lat.plaq(i, mu, nu);
+    const u = Math.max(0, Math.min(1, a / 6 / 0.75));
+    const r = dark ? 20 + 235 * u : 250 - 30 * u, gg = dark ? 22 + 160 * u * u : 248 - 140 * u, b = dark ? 30 + 40 * u * u * u : 245 - 225 * u;
+    g.fillStyle = `rgb(${r|0},${gg|0},${b|0})`; g.fillRect(x * s + 1, (Ns - 1 - y) * s + 1, s - 2, s - 2);
+    g.fillStyle = u > 0.55 ? (dark ? "#111" : "#fff") : css("--dim"); g.font = `${Math.max(10, s * 0.16)}px system-ui`; g.textAlign = "center";
+    g.fillText((a / 6).toFixed(2), x * s + s / 2, (Ns - 1 - y) * s + s / 2 + 4);
+  }
+}
+function drawHist() {
+  const c = $("hist"), w = c.width = c.clientWidth * devicePixelRatio, h = c.height = 150 * devicePixelRatio, g = c.getContext("2d");
+  g.clearRect(0, 0, w, h); const P = 30 * devicePixelRatio, y = v => h - 8 * devicePixelRatio - v * (h - 16 * devicePixelRatio);
+  g.strokeStyle = css("--grid"); g.lineWidth = 1; g.fillStyle = css("--dim"); g.font = `${11 * devicePixelRatio}px system-ui`;
+  for (const v of [0, .25, .5, .75, 1]) { g.beginPath(); g.moveTo(P, y(v)); g.lineTo(w, y(v)); g.stroke(); g.fillText(v.toFixed(2), 2, y(v) + 4); }
+  const b = lat.p.beta; g.setLineDash([5, 4]); g.strokeStyle = css("--dim");
+  for (const ref of [strongCoupling(b), weakCoupling(b)]) if (ref > 0 && ref < 1) { g.beginPath(); g.moveTo(P, y(ref)); g.lineTo(w, y(ref)); g.stroke(); }
+  g.setLineDash([]);
+  if (hist.length < 2) return;
+  g.strokeStyle = css("--acc"); g.lineWidth = 2 * devicePixelRatio; g.beginPath();
+  hist.forEach((v, k) => { const x = P + k / (hist.length - 1) * (w - P); k ? g.lineTo(x, y(v)) : g.moveTo(x, y(v)); }); g.stroke();
+}
+function drawPoly() {
+  const pl = lat.polyakov(true), c = $("poly"), g = c.getContext("2d"), W = c.width, C = W / 2, S = W * 0.42;
+  g.clearRect(0, 0, W, W);
+  g.strokeStyle = css("--grid"); g.lineWidth = 1; g.beginPath(); g.arc(C, C, S, 0, 7); g.stroke();
+  g.beginPath(); g.moveTo(C - S, C); g.lineTo(C + S, C); g.moveTo(C, C - S); g.lineTo(C, C + S); g.stroke();
+  g.strokeStyle = css("--dim"); g.setLineDash([4, 4]);
+  for (const a of [0, 2 * Math.PI / 3, -2 * Math.PI / 3]) { g.beginPath(); g.moveTo(C, C); g.lineTo(C + S * Math.cos(a), C - S * Math.sin(a)); g.stroke(); }
+  g.setLineDash([]); g.fillStyle = css("--blue"); g.globalAlpha = .55;
+  for (const [r, m] of pl.sites) { g.beginPath(); g.arc(C + S * r, C - S * m, 2.6, 0, 7); g.fill(); }
+  g.globalAlpha = 1; g.fillStyle = css("--red"); g.beginPath(); g.arc(C + S * pl.re, C - S * pl.im, 6, 0, 7); g.fill();
+  g.fillStyle = css("--dim"); g.font = "11px system-ui"; g.fillText("Re", W - 22, C - 4); g.fillText("Im", C + 4, 12);
+  const mag = Math.hypot(pl.re, pl.im), Nsp = lat.p.Ns ** 3, noise = 0.6 / Math.sqrt(Nsp);
+  const el = $("phase"); const dec = mag > 3 * noise && mag > 0.06;
+  el.textContent = dec ? "deconfined (|⟨L⟩| well above noise)" : "confined (⟨L⟩ ≈ 0)"; el.style.color = dec ? css("--red") : css("--blue");
+  last.poly = mag;
+}
+function drawLoops() {
+  const keys = LOOPS.filter(([r, t]) => wacc[r + "," + t] !== undefined), c = $("wl");
+  const w = c.width = c.clientWidth * devicePixelRatio, h = c.height = 190 * devicePixelRatio, g = c.getContext("2d"), dp = devicePixelRatio;
+  g.clearRect(0, 0, w, h);
+  const pts = keys.map(([r, t]) => { const W = wacc[r + "," + t] / wn; return [r * t, W > 0 ? -Math.log(W) : NaN, r, t, W]; }).filter(p => isFinite(p[1]));
+  const L = 34 * dp, B = 22 * dp, ymax = Math.max(1, ...pts.map(p => p[1])) * 1.1, xmax = 10.8;
+  const X = a => L + a / xmax * (w - L - 8 * dp), Y = v => h - B - v / ymax * (h - B - 8 * dp);
+  g.strokeStyle = css("--grid"); g.fillStyle = css("--dim"); g.font = `${11 * dp}px system-ui`; g.lineWidth = 1;
+  for (let a = 0; a <= 9; a += 3) { g.beginPath(); g.moveTo(X(a), 8 * dp); g.lineTo(X(a), h - B); g.stroke(); g.textAlign = "center"; g.fillText(a, X(a), h - 6 * dp); }
+  for (let k = 0; k <= 3; k++) { const v = ymax * k / 3; g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(w, Y(v)); g.stroke(); g.textAlign = "right"; g.fillText(v.toFixed(1), L - 4 * dp, Y(v) + 4 * dp); }
+  g.textAlign = "left"; g.fillText("−ln W", L + 4 * dp, 18 * dp); g.textAlign = "right"; g.fillText("area R·T", w - 4 * dp, h - B - 6 * dp);
+  if (pts.length > 1) { g.strokeStyle = css("--acc"); g.lineWidth = 2 * dp; g.beginPath(); pts.forEach((p, k) => k ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.stroke(); }
+  g.fillStyle = css("--acc"); for (const p of pts) { g.beginPath(); g.arc(X(p[0]), Y(p[1]), 4 * dp, 0, 7); g.fill(); g.fillStyle = css("--dim"); g.textAlign = "left"; g.fillText(`${p[2]}×${p[3]}`, X(p[0]) + 6 * dp, Y(p[1]) + 4 * dp); g.fillStyle = css("--acc"); }
+  const Wt = {}; for (const [a, , r, t, W] of pts) { Wt[r + "," + t] = W; Wt[t + "," + r] = W; }
+  const rows = pts.map(p => `<tr><td>W(${p[2]},${p[3]})</td><td class="r">${p[4].toExponential(3)}</td></tr>`);
+  for (const r of [2, 3]) { const x = creutz(Wt, r); if (isFinite(x)) rows.push(`<tr><td>Creutz χ(${r}) ≈ σa²</td><td class="r"><b>${x.toFixed(3)}</b></td></tr>`); }
+  rows.push(`<tr><td>samples averaged</td><td class="r">${wn}</td></tr>`);
+  $("wtab").innerHTML = rows.join("");
+}
+function panel() {
+  const p = hist.length ? hist[hist.length - 1] : lat.plaquette();
+  $("meas").innerHTML = [["sweeps", lat.sweeps], ["lattice", `${lat.p.Ns}³ × ${lat.p.Nt} = ${lat.V.toLocaleString()} sites`], ["links (SU(3) matrices)", (lat.V * 4).toLocaleString()],
+    ["plaquette", `<b>${p.toFixed(4)}</b>`], ["|⟨Polyakov⟩|", last.poly !== undefined ? last.poly.toFixed(4) : "–"], ["acceptance", lat.acceptance().toFixed(2)],
+    ["temperature", `T = 1/(${lat.p.Nt} a)`]].map(([a, b]) => `<tr><td>${a}</td><td class="r">${b}</td></tr>`).join("");
+}
+let frame = 0;
+function loop() {
+  if (running) {
+    const n = +$("speed").value;
+    for (let k = 0; k < n; k++) { lat.sweep(); sinceChange++; hist.push(lat.plaquette()); if (hist.length > 400) hist.shift(); if (sinceChange > 20 && sinceChange % 10 === 0) measureLoops(); }
+  }
+  if (frame++ % 3 === 0) { drawSlice(); drawHist(); drawPoly(); drawLoops(); panel(); }
+  requestAnimationFrame(loop);
+}
+build(); loop();
+</script></body></html>
