@@ -43,12 +43,14 @@ input[type=range]{accent-color:var(--acc)}
   <button id="pixels" class="on" title="Lattice mode runs on copies of the one-pixel model (pixel-model.js). Off = the array engine. Both give identical results.">built from pixels: ON</button>
   <button id="motion">motion (24): off</button>
   <button id="em">signed EM (25): off</button>
+  <button id="five" title="Rule 30: cells r, g, b, u, d; charge = 3u - (r+g+b) in thirds">five-cell pixel (30): off</button>
+  <button id="colour" title="Rule 31: flashes are exchanges; colour flux on links with a Gauss law (needs rule 30)">colour (31): off</button>
   <label>neutrino delivery <select id="deliver"><option value="none">none (rule 14)</option><option value="same">same information (15)</option><option value="unreal">unrealized information (15)</option><option value="weak">weak events only (17-19)</option><option value="weakhand">weak events + handedness (20)</option></select></label>
   <label>neutrino weighting <select id="weight"><option value="all7">all 7 unrealized</option><option value="next">3 next-step</option></select></label>
   <label>control p <input id="p" type="number" min="0.01" max="0.99" step="0.01" value="0.20" style="width:64px"></label>
  </div>
  <div class="ctl">
-  <label>view <select id="view"><option value="pattern">pattern</option><option value="flash">flashes (recent)</option><option value="agree">agreement</option><option value="carrier">carrier</option><option value="memory">memory (conserved)</option><option value="nufield">neutrino field (photograph mode)</option></select></label>
+  <label>view <select id="view"><option value="pattern">pattern</option><option value="flash">flashes (recent)</option><option value="agree">agreement</option><option value="carrier">carrier</option><option value="memory">memory (conserved)</option><option value="nufield">neutrino field (photograph mode)</option><option value="flux">colour strings (rule 31)</option></select></label>
   <label>slice z <input id="z" type="range" min="0" max="47" value="24"> <b id="zv">24</b></label>
  </div>
  <div style="position:relative"><canvas id="globe" width="900" height="900" style="cursor:grab;background:#07080a"></canvas>
@@ -163,6 +165,7 @@ class Engine {
       this.pat[i] = 7; this.cs[i * 3] = this.cs[i * 3 + 1] = this.cs[i * 3 + 2] = 1;
     }
     this.kick = (H * S + H) * S + H;
+    if (this.cfg.five) this.initFive();
   }
   ready(i) { return this.cs[i * 3] + this.cs[i * 3 + 1] + this.cs[i * 3 + 2] >= 3; }
   // pattern pixel i would display if it flashed now (no state change)
@@ -231,6 +234,7 @@ class Engine {
     for (let k = 0; k < 3; k++) { if (((p >> k) & 1) === ((shown >> k) & 1)) this.rf[b + k]++; else this.cs[b + k]++; }
   }
   tick() {
+    if (this.cfg.five) return this.tickFive();
     if (this.cfg.mode === "control") return this.tickControl();
     if (this.cfg.mode === "photo") return this.tickPhoto();
     return this.cfg.mode === "lattice" ? this.tickLattice() : this.tickLepton(this.cfg.mode === "signed");
@@ -569,7 +573,155 @@ class Engine {
       this.rf[i * 3] += k; this.rf[i * 3 + 1] += k; this.rf[i * 3 + 2] += k;
     }
   }
+  // ================= RULE 30: five-cell pixel (r, g, b, u, d) =================
+  // Cells 0-2 = colour r, g, b; 3 = u; 4 = d. Charge (thirds) = 3u - (r+g+b). Colour charge = filled colour cells
+  // (counted modulo r+g+b). RULE 31: flashes are conserving exchanges with a neighbour; colour flux on links obeys
+  // a Gauss law; strings relax and pull. See RULES.md.
+  static q5(p) { return 3 * ((p >> 3) & 1) - ((p & 1) + ((p >> 1) & 1) + ((p >> 2) & 1)); }
+  static ncol(p) { return (p & 1) + ((p >> 1) & 1) + ((p >> 2) & 1); }
+  initFive() {
+    // fresh stream from the seed (independent of the 3-cell start), same generator as the constructor
+    const M = (1n << 64n) - 1n; let s = BigInt(this.cfg.seed) ^ 0x5f5f5f5fn;
+    this.p5 = new Uint8Array(N); this.cs5 = new Uint32Array(N * 5); this.rf5 = new Uint32Array(N * 5);
+    for (let i = 0; i < N; i++) {
+      s ^= (s << 13n) & M; s ^= s >> 7n; s ^= (s << 17n) & M;
+      this.p5[i] = Number(s & 31n);
+      for (let k = 0; k < 5; k++) this.cs5[i * 5 + k] = Number((s >> BigInt(8 + 2 * k)) % 2n);
+    }
+    if (this.cfg.core > 0) for (let i = 0; i < N; i++) if (RAD[i] <= this.cfg.core) { this.p5[i] = 7; for (let k = 0; k < 5; k++) this.cs5[i * 5 + k] = 1; }
+    this.taken = new Uint8Array(N); this.exchanges = 0; this.blocked5 = 0; this.relaxed = 0;
+    // RULE 31 (b): colour flux on links (3 counts per link; link id = site*3 + axis, as rule 28) and out of the +x edge
+    this.fx = new Int32Array(N * 9); this.edge = new Int32Array(N * 3);
+    for (let z = 0; z < S; z++) for (let y = 0; y < S; y++) { let r = 0, g = 0, b = 0;
+      for (let x = 0; x < S; x++) { const i = (z * S + y) * S + x, p = this.p5[i]; r += p & 1; g += (p >> 1) & 1; b += (p >> 2) & 1;
+        const o = x + 1 < S ? (i * 3 + 0) * 3 : i * 3, arr = x + 1 < S ? this.fx : this.edge; arr[o] = r; arr[o + 1] = g; arr[o + 2] = b; } }
+  }
+  // flux energy of one link: |f|^2 - (sum f)^2 / 3, times 3 to stay in whole numbers
+  static fE(a, b, c) { return 3 * (a * a + b * b + c * c) - (a + b + c) * (a + b + c); }
+  // add colour vector v (3 ints) to the link between site i and its neighbour through face f, oriented so that
+  // site i's out-flux grows by v
+  addFlux(i, f, v) { const l = LK[i * 6 + f], sg = (f & 1) ? -1 : 1; for (let c = 0; c < 3; c++) this.fx[l * 3 + c] += sg * v[c]; }
+  surplus5(i, k) { return this.cs5[i * 5 + k] - this.rf5[i * 5 + k]; }
+  // rule 1 one_cell over 5 cells (the only display rule built for five cells): the cell with the largest positive surplus
+  pick5(i) { let best = -1, sur = 0; for (let k = 0; k < 5; k++) { const v = this.surplus5(i, k); if (v > sur) { sur = v; best = k; } } return best; }
+  // the change a flash makes: returns [newPattern, partnerTest(p) -> partner's new pattern or -1, colourDelta] or null (can't)
+  plan5(i) {
+    const p = this.p5[i], k = this.pick5(i); if (k < 0) return { np: p, part: null, dv: null };
+    if (k < 3) {
+      const filled = (p >> k) & 1; let j = -1, best = 0;
+      for (let c = 0; c < 3; c++) { if (c === k || ((p >> c) & 1) !== (filled ^ 1)) continue; // the other colour cell must be in the opposite state
+        const v = this.surplus5(i, c); if (j < 0 || (filled ? v > best : v < best)) { j = c; best = v; } }
+      if (j < 0) return null;
+      const np = p ^ (1 << k) ^ (1 << j), dv = [0, 0, 0]; dv[k] += filled ? -1 : 1; dv[j] += filled ? 1 : -1;
+      return { np, dv, part: q => (((q >> k) & 1) === (filled ^ 1) && ((q >> j) & 1) === filled) ? (q ^ (1 << k) ^ (1 << j)) : -1 };
+    }
+    const u = (p >> 3) & 1, d = (p >> 4) & 1; if (u === d) return null;
+    return { np: p ^ 24, dv: null, part: q => (((q >> 3) & 1) === d && ((q >> 4) & 1) === u) ? (q ^ 24) : -1 };
+  }
+  excluded5(i, np) { if (!this.cfg.exclusion) return false; for (let q = 0; q < 6; q++) if (this.p5[NB[i * 6 + q]] === np) return true; return false; }
+  // rule 27 with five cells: the flash hands out its released memory, cell by cell, to mismatched neighbours
+  shout5(i, rel) {
+    const sh = this.p5[i];
+    if (!this.cfg.conserve) { for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q]; for (let k = 0; k < 5; k++) { if (((this.p5[j] >> k) & 1) === ((sh >> k) & 1)) this.rf5[j * 5 + k]++; else this.cs5[j * 5 + k]++; } } this.carrier[i] += rel.reduce((a, b) => a + b, 0); return; }
+    const tg = [0, 0, 0, 0, 0, 0];
+    for (let k = 0; k < 5; k++) { const bit = (sh >> k) & 1; let m = 0;
+      for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q]; if (((this.p5[j] >> k) & 1) === bit) this.rf5[j * 5 + k]++; else tg[m++] = j; }
+      if (m === 0) { this.carrier[i] += rel[k]; continue; }
+      for (let u = 0; u < rel[k]; u++) this.cs5[tg[u % m] * 5 + k]++; }
+  }
+  tickFive() {
+    const kick = this.t === 0 ? this.kick : -1, colour = this.cfg.colour;
+    this.fired.fill(0); this.taken.fill(0); this.exchanges = 0; this.blocked5 = 0;
+    const ready = []; for (let i = 0; i < N; i++) { let m = 0; for (let k = 0; k < 5; k++) m += this.cs5[i * 5 + k]; if (m >= 5 || i === kick) ready.push(i); }
+    let count = 0; const shouts = [];
+    for (const i of ready) {
+      if (this.taken[i]) { this.blocked5++; continue; }
+      const pl = this.plan5(i); if (!pl) { this.blocked5++; continue; }
+      let partner = -1, pnew = -1, face = -1;
+      if (pl.part) { for (let f = 0; f < 6; f++) { if (LK[i * 6 + f] < 0) continue; const j = NB[i * 6 + f]; if (this.taken[j]) continue; const r = pl.part(this.p5[j]); if (r >= 0) { partner = j; pnew = r; face = f; break; } }
+        if (partner < 0) { this.blocked5++; continue; } }
+      if (this.excluded5(i, pl.np)) { this.blocked5++; continue; }
+      // the flash: x changes, the partner takes the opposite change; colour flux moves with it (Gauss law)
+      this.p5[i] = pl.np; if (partner >= 0) { this.p5[partner] = pnew; this.taken[partner] = 1; this.exchanges++; if (colour && pl.dv) this.addFlux(i, face, pl.dv); }
+      this.taken[i] = 1; this.fired[i] = 1; count++;
+      const rel = []; for (let k = 0; k < 5; k++) { rel.push(this.cs5[i * 5 + k]); this.cs5[i * 5 + k] = 0; this.rf5[i * 5 + k] = 0; }
+      shouts.push([i, rel]);
+    }
+    for (const [i, rel] of shouts) this.shout5(i, rel);
+    // carrier (rule 5) and its response, with 5 units per whole pixel and 5 cells
+    this.spread();
+    const c = this.carrier;
+    if (this.cfg.gravity || this.cfg.cancel || this.cfg.excite) for (let i = 0; i < N; i++) { if (c[i] < 5) continue; const k = Math.floor(c[i] / 5);
+      if (this.cfg.gravity) { c[i] -= k * 5; for (let q = 0; q < 5; q++) this.rf5[i * 5 + q] += k; }
+      else if (this.cfg.cancel) { for (let q = 0; q < 5; q++) { const m = Math.min(k, this.cs5[i * 5 + q]); this.cs5[i * 5 + q] -= m; c[i] -= m; } }
+      else { c[i] -= k * 5; for (let q = 0; q < 5; q++) this.cs5[i * 5 + q] += k; } }
+    if (this.cfg.em) { const ph = this.phi, nx = this.phin; for (let i = 0; i < N; i++) ph[i] += Engine.q5(this.p5[i]); nx.fill(0);
+      for (let i = 0; i < N; i++) { const q = ph[i]; if (q === 0) continue; const sh = q / 6, x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
+        if (x + 1 < S) nx[i + 1] += sh; if (x > 0) nx[i - 1] += sh; if (y + 1 < S) nx[i + S] += sh; if (y > 0) nx[i - S] += sh; if (z + 1 < S) nx[i + S * S] += sh; if (z > 0) nx[i - S * S] += sh; }
+      this.phi = nx; this.phin = ph; }
+    if (colour) this.relax5();
+    if (this.cfg.motion) this.move5();
+    this.t++; this.total += count;
+    return count;
+  }
+  // RULE 31 (c): one pass of plaquette moves, each lowering the flux energy if it can
+  relax5() {
+    const fx = this.fx; let moves = 0;
+    const opts = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+    for (let i = 0; i < N; i++) for (let mu = 0; mu < 3; mu++) for (let nu = mu + 1; nu < 3; nu++) {
+      const a = LK[i * 6 + 2 * mu], d = LK[i * 6 + 2 * nu]; if (a < 0 || d < 0) continue;
+      const iu = NB[i * 6 + 2 * mu], iv = NB[i * 6 + 2 * nu], b = LK[iu * 6 + 2 * nu], c2 = LK[iv * 6 + 2 * mu]; if (b < 0 || c2 < 0) continue;
+      const L = [a, b, c2, d], sg = [1, 1, -1, -1];
+      let E0 = 0; for (const l of L) E0 += Engine.fE(fx[l * 3], fx[l * 3 + 1], fx[l * 3 + 2]);
+      let best = -1, bestE = E0;
+      for (let o = 0; o < 6; o++) { let E = 0; for (let k = 0; k < 4; k++) { const l = L[k], v = opts[o]; E += Engine.fE(fx[l * 3] + sg[k] * v[0], fx[l * 3 + 1] + sg[k] * v[1], fx[l * 3 + 2] + sg[k] * v[2]); } if (E < bestE) { bestE = E; best = o; } }
+      if (best >= 0) { for (let k = 0; k < 4; k++) { const l = L[k], v = opts[best]; for (let cc = 0; cc < 3; cc++) fx[l * 3 + cc] += sg[k] * v[cc]; } moves++; }
+    }
+    this.relaxed = moves;
+  }
+  // RULE 24 with five cells, RULE 31 (d): strings pull colour-charged pixels
+  move5() {
+    const f = this.fired, m = this.moved; m.fill(0); this.swaps = 0;
+    const sw = (a, x, y) => { const t = a[x]; a[x] = a[y]; a[y] = t; };
+    const col = p => [p & 1, (p >> 1) & 1, (p >> 2) & 1];
+    for (let i = 0; i < N; i++) {
+      if (!f[i] || m[i]) continue;
+      let best = -1, bestFace = -1;
+      const n3 = Engine.ncol(this.p5[i]);
+      if (this.cfg.colour && n3 % 3 !== 0) { // colour-charged: the move that most lowers the flux energy of the link it moves along
+        let bestD = 0; const ri = col(this.p5[i]);
+        for (let q = 0; q < 6; q++) { const l = LK[i * 6 + q]; if (l < 0) continue; const j = NB[i * 6 + q]; if (f[j] || m[j]) continue;
+          const rj = col(this.p5[j]), sg = (q & 1) ? -1 : 1, F = [this.fx[l * 3], this.fx[l * 3 + 1], this.fx[l * 3 + 2]];
+          const Fn = F.map((v, cc) => v + sg * (rj[cc] - ri[cc])), d = Engine.fE(...Fn) - Engine.fE(...F);
+          if (d < bestD) { bestD = d; best = j; bestFace = q; } }
+      }
+      if (best < 0) { // rule 24 / 25 targets, inside the box only (no move crosses the edge)
+        const qc = Engine.q5(this.p5[i]);
+        if (this.cfg.em && qc !== 0) { const ph = this.phi; let bv = qc * ph[i]; for (let q = 0; q < 6; q++) { if (LK[i * 6 + q] < 0) continue; const j = NB[i * 6 + q]; if (qc * ph[j] < bv) { best = j; bestFace = q; bv = qc * ph[j]; } } }
+        else { const c = this.carrier; let bc = c[i]; for (let q = 0; q < 6; q++) { if (LK[i * 6 + q] < 0) continue; const j = NB[i * 6 + q]; if (c[j] > bc) { best = j; bestFace = q; bc = c[j]; } } }
+      }
+      if (best < 0 || f[best] || m[best]) continue;
+      if (this.cfg.colour) { const ri = col(this.p5[i]), rj = col(this.p5[best]); this.addFlux(i, bestFace, [rj[0] - ri[0], rj[1] - ri[1], rj[2] - ri[2]]); }
+      sw(this.p5, i, best); sw(this.home, i, best); sw(f, i, best);
+      for (let k = 0; k < 5; k++) { sw(this.rf5, i * 5 + k, best * 5 + k); sw(this.cs5, i * 5 + k, best * 5 + k); }
+      m[i] = m[best] = 1; this.swaps++;
+    }
+  }
+  // measurements for rules 30-31
+  stats5() {
+    let Q = 0, R = 0, G = 0, B = 0, quarks = 0, leptons = 0, gauss = 0, fluxE = 0, strings = 0;
+    for (let i = 0; i < N; i++) { const p = this.p5[i]; Q += Engine.q5(p); R += p & 1; G += (p >> 1) & 1; B += (p >> 2) & 1; if (Engine.ncol(p) % 3) quarks++; else leptons++; }
+    if (this.cfg.colour) {
+      for (let l = 0; l < N * 3; l++) { const e = Engine.fE(this.fx[l * 3], this.fx[l * 3 + 1], this.fx[l * 3 + 2]); fluxE += e; if (e) strings++; }
+      for (let i = 0; i < N; i++) { const d = [0, 0, 0], p = this.p5[i];
+        for (let q = 0; q < 6; q++) { const l = LK[i * 6 + q]; if (l < 0) continue; const sg = (q & 1) ? -1 : 1; for (let c = 0; c < 3; c++) d[c] += sg * this.fx[l * 3 + c]; }
+        if (i % S === S - 1) for (let c = 0; c < 3; c++) d[c] += this.edge[i * 3 + c];
+        const r = [d[0] - (p & 1), d[1] - ((p >> 1) & 1), d[2] - ((p >> 2) & 1)]; gauss = Math.max(gauss, Math.abs(r[0] - r[1]), Math.abs(r[1] - r[2])); }
+    }
+    return { charge3: Q, colour: [R - B, G - B], quarks, leptons, gauss, fluxE: fluxE / 3, strings, exchanges: this.exchanges, blocked: this.blocked5, relaxed: this.relaxed, swaps: this.swaps };
+  }
   agreement(i) {
+    if (this.cfg.five) { let m = 0; const p = this.p5[i]; for (let q = 0; q < 6; q++) { const x = p ^ this.p5[NB[i * 6 + q]]; let d = 0; for (let k = 0; k < 5; k++) d += (x >> k) & 1; m += 5 - d; } return m / 30; }
     let m = 0; const p = this.pat[i];
     for (let q = 0; q < 6; q++) { const x = p ^ this.pat[NB[i * 6 + q]]; m += 3 - ((x & 1) + ((x >> 1) & 1) + ((x >> 2) & 1)); }
     return m / 18;
@@ -581,7 +733,7 @@ let eng, running=false, recent=new Float32Array(N), hist=[];
 const BINS=H; let rate=new Float64Array(BINS), agr=new Float64Array(BINS), seen=false;
 const binOf=new Int16Array(N), cnt=new Float64Array(BINS);
 for(let i=0;i<N;i++){const b=Math.floor(RAD[i]);binOf[i]=b<BINS?b:-1;if(b<BINS)cnt[b]++;}
-function cfg(){const dv=$("deliver").value;return{deliver:(dv==="weak"||dv==="weakhand")?"unreal":dv,weak:dv==="weak"||dv==="weakhand",hand:dv==="weakhand",weight:$("weight").value,p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on"),exclusion:$("excl").classList.contains("on"),channels:$("ch3").classList.contains("on"),motion:$("motion").classList.contains("on"),excite:$("excite").classList.contains("on"),conserve:$("conserve").classList.contains("on"),em:$("em").classList.contains("on"),cancel:!$("gravity").classList.contains("on")&&$("cancel").classList.contains("on")};}
+function cfg(){const dv=$("deliver").value;return{deliver:(dv==="weak"||dv==="weakhand")?"unreal":dv,weak:dv==="weak"||dv==="weakhand",hand:dv==="weakhand",weight:$("weight").value,p:Math.max(0.01,Math.min(0.99,+$("p").value||0.2)),mode:$("mode").value,display:$("display").value,update:$("update").value,core:Math.max(0,Math.min(20,+$("core").value|0)),gravity:$("gravity").classList.contains("on"),exclusion:$("excl").classList.contains("on"),channels:$("ch3").classList.contains("on"),motion:$("motion").classList.contains("on"),excite:$("excite").classList.contains("on"),conserve:$("conserve").classList.contains("on"),em:$("em").classList.contains("on"),cancel:!$("gravity").classList.contains("on")&&$("cancel").classList.contains("on"),five:$("five").classList.contains("on"),colour:$("five").classList.contains("on")&&$("colour").classList.contains("on")};}
 const KG=24;let lastF=new Int32Array(N),gapH=new Float64Array(KG+1),flashSum=0,tickSum=0;
 // The lattice made of copies of the one-pixel model (pixel-model.js). It exposes the same
 // arrays the page reads (pat, cs, fired, carrier), copied from the pixels after every tick.
@@ -597,7 +749,7 @@ class PixelEngine {
     for (let q = 0; q < 6; q++) { const x = p ^ this.pat[NB[i * 6 + q]]; m += 3 - ((x & 1) + ((x >> 1) & 1) + ((x >> 2) & 1)); } return m / 18; }
   fieldD() { return 0; }
 }
-function reset(){lastF.fill(-1);gapH.fill(0);flashSum=0;tickSum=0;{const c=cfg();eng=(c.mode==="lattice"&&$("pixels").classList.contains("on"))?new PixelEngine(c):new Engine(c);}recent.fill(0);hist=[];rate.fill(0);agr.fill(0);seen=false;measure(0);draw();}
+function reset(){lastF.fill(-1);gapH.fill(0);flashSum=0;tickSum=0;{const c=cfg();eng=(c.mode==="lattice"&&$("pixels").classList.contains("on")&&!c.five)?new PixelEngine(c):new Engine(c);}recent.fill(0);hist=[];rate.fill(0);agr.fill(0);seen=false;measure(0);draw();}
 function measure(alpha){
   const r=new Float64Array(BINS),a=new Float64Array(BINS);
   for(let i=0;i<N;i++){const b=binOf[i];if(b<0)continue;if(eng.fired[i])r[b]++;a[b]+=eng.agreement(i);}
@@ -611,23 +763,31 @@ function step(){const c=eng.tick();const tt=eng.t-1;
 const sctx=$("slice").getContext("2d"),img=sctx.createImageData(S,S);
 function hex(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
 const PCR=PC.map(hex);
+// rule 30 palette: neutrinos grey, electron yellow, positron green, down blue, up red, anti-down light blue, anti-up pink
+const FIVE=p=>{const c=(p&1)+((p>>1)&1)+((p>>2)&1),q=3*((p>>3)&1)-c+(((p>>4)&1)?0:0),Q=Engine.q5(p);
+  if(c===0||c===3){return Q===0?[120,128,140]:Q<0?[232,163,61]:[92,184,92];}
+  if(c===1)return Q===-1?[74,144,226]:[217,83,79];  // down (-1/3) or up (+2/3)
+  return Q===-2?[240,150,200]:[150,200,255];};       // anti-up (-2/3) or anti-down (+1/3)
+const fluxAt=i=>{let e=0;for(let q=0;q<6;q++){const l=LK[i*6+q];if(l<0)continue;e+=Engine.fE(eng.fx[l*3],eng.fx[l*3+1],eng.fx[l*3+2]);}return e/3;};
 let draw=function(){
   const z=+$("z").value,v=$("view").value,d=img.data;$("zv").textContent=z;
   let cmax=1e-9;if(v==="carrier")for(let y=0;y<S;y++)for(let x=0;x<S;x++)cmax=Math.max(cmax,eng.carrier[(z*S+y)*S+x]);
   for(let y=0;y<S;y++)for(let x=0;x<S;x++){
     const i=(z*S+y)*S+x,o=(y*S+x)*4;let c;
-    if(v==="pattern"){c=PCR[eng.pat[i]].slice();if(eng.fired[i])c=c.map(q=>Math.min(255,q+90));}
+    if(v==="pattern"){c=(eng.cfg.five?FIVE(eng.p5[i]):PCR[eng.pat[i]]).slice();if(eng.fired[i])c=c.map(q=>Math.min(255,q+90));}
+    else if(v==="flux"){const u=eng.cfg.colour?Math.min(1,Math.sqrt(fluxAt(i)/8)):0;c=[25+215*u,25+70*u,40+200*u];}
     else if(v==="flash"){const f=recent[i];c=[20+235*f,20+165*f,25+40*f];}
     else if(v==="agree"){const a=eng.agreement(i),u=Math.max(0,(a-0.5)*2);c=[20+72*u,25+175*u,35+220*u];}
     else if(v==="carrier"){const u=Math.sqrt(eng.carrier[i]/cmax);c=[30+200*u,30+120*u,60+60*u];}
     else if(v==="nufield"){const u=Math.min(1,Math.sqrt(eng.fieldD(i)/0.0625));c=[30+190*u,60+150*u,90+40*u];}
-    else{const m=eng.cs[i*3]+eng.cs[i*3+1]+eng.cs[i*3+2],u=Math.min(1,m/3);c=[25+220*u,25+80*u,40+40*u];}
+    else{const m=eng.cfg.five?eng.cs5[i*5]+eng.cs5[i*5+1]+eng.cs5[i*5+2]+eng.cs5[i*5+3]+eng.cs5[i*5+4]:eng.cs[i*3]+eng.cs[i*3+1]+eng.cs[i*3+2],u=Math.min(1,m/(eng.cfg.five?5:3));c=[25+220*u,25+80*u,40+40*u];}
     d[o]=c[0];d[o+1]=c[1];d[o+2]=c[2];d[o+3]=255;}
   sctx.putImageData(img,0,0);
   const cr=eng.cfg.core;if(cr>0&&Math.abs(z-H)<=cr){const rr=Math.sqrt(cr*cr-(z-H)**2);sctx.strokeStyle="rgba(255,255,255,.35)";sctx.lineWidth=.15;sctx.beginPath();sctx.arc(H+.5,H+.5,rr,0,7);sctx.stroke();}
   const last=hist.length?hist[hist.length-1]:0;
   $("st-t").textContent=eng.t;$("st-f").textContent=last.toLocaleString();$("st-p").textContent=(100*last/N).toFixed(1)+"%";$("st-tot").textContent=eng.total.toLocaleString();
   drawProf();drawTs();drawHaz();drawPhoto();
+  if(eng.cfg.five){const s=eng.stats5(),el=$("five-stats");if(el)el.textContent=` · charge ${s.charge3}/3 · quarks ${s.quarks} · exchanges ${s.exchanges} · blocked ${s.blocked}`+(eng.cfg.colour?` · Gauss violations ${s.gauss} · string energy ${s.fluxE.toFixed(0)}`:"");}
 };
 function drawProf(){
   const c=$("prof"),x=c.getContext("2d"),W=c.width,Hh=c.height,L=44,R=44,T=12,B=28;x.clearRect(0,0,W,Hh);
@@ -693,9 +853,9 @@ $("step").onclick=()=>{step();draw();};
 $("reset").onclick=reset;
 function stateText(){
   const c=eng.cfg, lat=c.mode==="lattice";
-  let a=0,mem=0;const fill=[0,0,0];for(let i=0;i<N;i++){a+=eng.agreement(i);mem+=eng.cs[i*3]+eng.cs[i*3+1]+eng.cs[i*3+2];for(let k=0;k<3;k++)fill[k]+=(eng.pat[i]>>k)&1;}
+  let a=0,mem=0;const five=eng.cfg.five,nc=five?5:3,fill=new Array(nc).fill(0);for(let i=0;i<N;i++){a+=eng.agreement(i);for(let k=0;k<nc;k++){mem+=five?eng.cs5[i*5+k]:eng.cs[i*3+k];fill[k]+=((five?eng.p5[i]:eng.pat[i])>>k)&1;}}
   const last=hist.length?hist[hist.length-1]:0;
-  const cmd="origin record mode="+c.mode+" core="+c.core+" ticks="+eng.t+(lat?" display="+c.display+" update="+c.update+(c.gravity?" gravity=on":c.cancel?" feedback=cancel":"")+(c.exclusion?" exclusion=on":"")+(c.channels?" channels=on":""):"")+" every=10";
+  const cmd="origin record mode="+c.mode+" core="+c.core+" ticks="+eng.t+(lat?" display="+c.display+" update="+c.update+(c.gravity?" gravity=on":c.cancel?" feedback=cancel":"")+(c.exclusion?" exclusion=on":"")+(c.channels?" channels=on":""):"")+" every=10"+(c.five?"  [five-cell: origin five ticks="+eng.t+(c.colour?"":" colour=off")+(c.motion?" motion=on":"")+(c.em?" em=on":"")+" core="+c.core+"]":"");
   const s={record:cmd,mode:c.mode,display:lat?c.display:"one_cell",update:lat?c.update:"sync",core:c.core,gravity:lat?c.gravity:false,seed:"20261110",
     tick:eng.t,total_flashes:eng.total,flashes_this_tick:last,flashing:+(last/N).toFixed(4),agreement:+(a/N).toFixed(4),memory:mem,
     filled:fill.map(v=>+(v/N).toFixed(4)),view:$("view").value,slice_z:+$("z").value,
@@ -707,6 +867,8 @@ $("copy").onclick=async()=>{const txt=stateText(),box=$("copybox");box.value=txt
   catch(e){box.style.display="block";box.select();$("copy").textContent="Select + copy below";}
   setTimeout(()=>$("copy").textContent="Copy state",2000);};
 $("gravity").onclick=()=>{const b=$("gravity");b.classList.toggle("on");b.textContent="gravity: "+(b.classList.contains("on")?"ON":"off");if(b.classList.contains("on")){$("cancel").classList.remove("on");$("cancel").textContent="cancel memory (21): off";}reset();};
+$("five").onclick=()=>{const b=$("five");b.classList.toggle("on");b.textContent="five-cell pixel (30): "+(b.classList.contains("on")?"ON":"off");if(b.classList.contains("on"))$("mode").value="lattice";reset();legend();};
+$("colour").onclick=()=>{const b=$("colour");b.classList.toggle("on");b.textContent="colour (31): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("em").onclick=()=>{const b=$("em");b.classList.toggle("on");if(b.classList.contains("on")&&!$("motion").classList.contains("on")){$("motion").classList.add("on");$("motion").textContent="motion (24): ON";}b.textContent="signed EM (25): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("motion").onclick=()=>{const b=$("motion");b.classList.toggle("on");b.textContent="motion (24): "+(b.classList.contains("on")?"ON":"off");reset();};
 $("conserve").onclick=()=>{const b=$("conserve");b.classList.toggle("on");b.textContent="hearing conserves (27): "+(b.classList.contains("on")?"ON":"off");reset();};
@@ -718,7 +880,9 @@ $("cancel").onclick=()=>{const b=$("cancel");b.classList.toggle("on");b.textCont
 for(const id of["mode","display","update","core","p","weight","deliver"])$(id).onchange=reset;
 $("z").oninput=draw;$("view").onchange=()=>{legend();draw();};
 function legend(){const v=$("view").value,L=$("legend");
-  if(v==="pattern")L.innerHTML=PC.map((c,k)=>`<span><span class="sw" style="background:${c}"></span>${k.toString(2).padStart(3,"0")}</span>`).join("")+"<span>bright = flashed this tick · circle = core edge</span>";
+  if(v==="pattern"&&eng&&eng.cfg.five)L.innerHTML=[["neutrino",[120,128,140]],["electron",[232,163,61]],["positron",[92,184,92]],["down",[74,144,226]],["up",[217,83,79]],["anti-up",[240,150,200]],["anti-down",[150,200,255]]].map(([n,c])=>`<span><span class="sw" style="background:rgb(${c})"></span>${n}</span>`).join("")+'<span id="five-stats"></span>';
+  else if(v==="flux")L.innerHTML="brightness = colour-string energy on the pixel's links (rule 31)"+'<span id="five-stats"></span>';
+  else if(v==="pattern")L.innerHTML=PC.map((c,k)=>`<span><span class="sw" style="background:${c}"></span>${k.toString(2).padStart(3,"0")}</span>`).join("")+"<span>bright = flashed this tick · circle = core edge</span>";
   else L.innerHTML={nufield:"brightness = D of the accumulated neutrino field (photograph mode); dark = identity",flash:"bright = flashed recently, fades over a few ticks",agree:"dark = 0.5 (random) → bright = 1.0 (all 6 neighbors match)",carrier:"brightness = carrier at site (sqrt scale, max in slice)",memory:"brightness = conserved share (3 = about to flash)"}[v];}
 // ---------- 3D globe ----------
 const R3=23, gIdx=[];for(let i=0;i<N;i++)if(RAD[i]<=R3)gIdx.push(i);
@@ -750,12 +914,13 @@ function drawGlobe(){
     let r=0,g=0,b=0,on=1;
     if(cut){const x=pos[k*3],y=pos[k*3+1],z=pos[k*3+2];const z1=-x*sy+z*cy;const z2=y*sx+z1*cx;if(z2>0)on=0;}
     if(on){
-      if(v==="pattern"){const c=PCR[eng.pat[i]];const f=eng.fired[i]?1:0.45;r=c[0]/255*f;g=c[1]/255*f;b=c[2]/255*f;if(act&&!eng.fired[i]&&recent[i]<0.3){r=g=b=0;}}
+      if(v==="flux"){const u=eng.cfg.colour?Math.min(1,Math.sqrt(fluxAt(i)/8)):0;r=0.85*u;g=0.3*u;b=0.8*u;if(act&&u<0.15)r=g=b=0;}
+      else if(v==="pattern"){const c=eng.cfg.five?FIVE(eng.p5[i]):PCR[eng.pat[i]];const f=eng.fired[i]?1:0.45;r=c[0]/255*f;g=c[1]/255*f;b=c[2]/255*f;if(act&&!eng.fired[i]&&recent[i]<0.3){r=g=b=0;}}
       else if(v==="flash"){const f=recent[i];r=f;g=0.7*f;b=0.2*f;if(!act){r+=0.04;g+=0.05;b+=0.07;}}
       else if(v==="agree"){const u=Math.max(0,(eng.agreement(i)-0.5)*2);r=0.1+0.3*u;g=0.15+0.65*u;b=0.2+0.8*u;if(act&&u<0.6)r=g=b=0;}
       else if(v==="carrier"){const u=Math.sqrt(eng.carrier[i]/cmax);r=0.8*u;g=0.5*u;b=0.3*u;}
       else if(v==="nufield"){const u=Math.min(1,Math.sqrt(eng.fieldD(i)/0.0625));r=0.15+0.7*u;g=0.3+0.6*u;b=0.45+0.3*u;if(act&&u<0.2)r=g=b=0;}
-      else{const m=eng.cs[i*3]+eng.cs[i*3+1]+eng.cs[i*3+2],u=Math.min(1,m/3);r=0.9*u;g=0.35*u;b=0.15*u;if(!act){r+=0.03;g+=0.04;b+=0.06;}}
+      else{const m=eng.cfg.five?eng.cs5[i*5]+eng.cs5[i*5+1]+eng.cs5[i*5+2]+eng.cs5[i*5+3]+eng.cs5[i*5+4]:eng.cs[i*3]+eng.cs[i*3+1]+eng.cs[i*3+2],u=Math.min(1,m/(eng.cfg.five?5:3));r=0.9*u;g=0.35*u;b=0.15*u;if(!act){r+=0.03;g+=0.04;b+=0.06;}}
     }
     col[k*3]=r;col[k*3+1]=g;col[k*3+2]=b;}
   geo.attributes.color.needsUpdate=true;

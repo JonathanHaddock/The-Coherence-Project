@@ -1,0 +1,14 @@
+after 100 ticks (no motion): 3228 pixels ready (memory >= 5); memory per pixel 2.50
+   1031  wants a colour change but has 0 colour cells (needs 1 or 2)
+    937  wants a colour change but has 3 colour cells (needs 1 or 2)
+    552  colour change possible, but no neighbour can take the opposite change
+    350  wants u<->d but has u=1, d=1
+    307  wants u<->d but has u=0, d=0
+     51  u<->d possible, but no neighbour can take the opposite change
+after 100 ticks (motion on): 3806 pixels ready (memory >= 5); memory per pixel 2.50
+   1083  wants a colour change but has 0 colour cells (needs 1 or 2)
+   1012  wants a colour change but has 3 colour cells (needs 1 or 2)
+    813  colour change possible, but no neighbour can take the opposite change
+    423  wants u<->d but has u=1, d=1
+    375  wants u<->d but has u=0, d=0
+    100  u<->d possible, but no neighbour can take the opposite change

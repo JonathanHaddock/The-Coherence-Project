@@ -55,6 +55,7 @@ class Engine {
       this.pat[i] = 7; this.cs[i * 3] = this.cs[i * 3 + 1] = this.cs[i * 3 + 2] = 1;
     }
     this.kick = (H * S + H) * S + H;
+    if (this.cfg.five) this.initFive();
   }
   ready(i) { return this.cs[i * 3] + this.cs[i * 3 + 1] + this.cs[i * 3 + 2] >= 3; }
   // pattern pixel i would display if it flashed now (no state change)
@@ -123,6 +124,7 @@ class Engine {
     for (let k = 0; k < 3; k++) { if (((p >> k) & 1) === ((shown >> k) & 1)) this.rf[b + k]++; else this.cs[b + k]++; }
   }
   tick() {
+    if (this.cfg.five) return this.tickFive();
     if (this.cfg.mode === "control") return this.tickControl();
     if (this.cfg.mode === "photo") return this.tickPhoto();
     return this.cfg.mode === "lattice" ? this.tickLattice() : this.tickLepton(this.cfg.mode === "signed");
@@ -461,7 +463,155 @@ class Engine {
       this.rf[i * 3] += k; this.rf[i * 3 + 1] += k; this.rf[i * 3 + 2] += k;
     }
   }
+  // ================= RULE 30: five-cell pixel (r, g, b, u, d) =================
+  // Cells 0-2 = colour r, g, b; 3 = u; 4 = d. Charge (thirds) = 3u - (r+g+b). Colour charge = filled colour cells
+  // (counted modulo r+g+b). RULE 31: flashes are conserving exchanges with a neighbour; colour flux on links obeys
+  // a Gauss law; strings relax and pull. See RULES.md.
+  static q5(p) { return 3 * ((p >> 3) & 1) - ((p & 1) + ((p >> 1) & 1) + ((p >> 2) & 1)); }
+  static ncol(p) { return (p & 1) + ((p >> 1) & 1) + ((p >> 2) & 1); }
+  initFive() {
+    // fresh stream from the seed (independent of the 3-cell start), same generator as the constructor
+    const M = (1n << 64n) - 1n; let s = BigInt(this.cfg.seed) ^ 0x5f5f5f5fn;
+    this.p5 = new Uint8Array(N); this.cs5 = new Uint32Array(N * 5); this.rf5 = new Uint32Array(N * 5);
+    for (let i = 0; i < N; i++) {
+      s ^= (s << 13n) & M; s ^= s >> 7n; s ^= (s << 17n) & M;
+      this.p5[i] = Number(s & 31n);
+      for (let k = 0; k < 5; k++) this.cs5[i * 5 + k] = Number((s >> BigInt(8 + 2 * k)) % 2n);
+    }
+    if (this.cfg.core > 0) for (let i = 0; i < N; i++) if (RAD[i] <= this.cfg.core) { this.p5[i] = 7; for (let k = 0; k < 5; k++) this.cs5[i * 5 + k] = 1; }
+    this.taken = new Uint8Array(N); this.exchanges = 0; this.blocked5 = 0; this.relaxed = 0;
+    // RULE 31 (b): colour flux on links (3 counts per link; link id = site*3 + axis, as rule 28) and out of the +x edge
+    this.fx = new Int32Array(N * 9); this.edge = new Int32Array(N * 3);
+    for (let z = 0; z < S; z++) for (let y = 0; y < S; y++) { let r = 0, g = 0, b = 0;
+      for (let x = 0; x < S; x++) { const i = (z * S + y) * S + x, p = this.p5[i]; r += p & 1; g += (p >> 1) & 1; b += (p >> 2) & 1;
+        const o = x + 1 < S ? (i * 3 + 0) * 3 : i * 3, arr = x + 1 < S ? this.fx : this.edge; arr[o] = r; arr[o + 1] = g; arr[o + 2] = b; } }
+  }
+  // flux energy of one link: |f|^2 - (sum f)^2 / 3, times 3 to stay in whole numbers
+  static fE(a, b, c) { return 3 * (a * a + b * b + c * c) - (a + b + c) * (a + b + c); }
+  // add colour vector v (3 ints) to the link between site i and its neighbour through face f, oriented so that
+  // site i's out-flux grows by v
+  addFlux(i, f, v) { const l = LK[i * 6 + f], sg = (f & 1) ? -1 : 1; for (let c = 0; c < 3; c++) this.fx[l * 3 + c] += sg * v[c]; }
+  surplus5(i, k) { return this.cs5[i * 5 + k] - this.rf5[i * 5 + k]; }
+  // rule 1 one_cell over 5 cells (the only display rule built for five cells): the cell with the largest positive surplus
+  pick5(i) { let best = -1, sur = 0; for (let k = 0; k < 5; k++) { const v = this.surplus5(i, k); if (v > sur) { sur = v; best = k; } } return best; }
+  // the change a flash makes: returns [newPattern, partnerTest(p) -> partner's new pattern or -1, colourDelta] or null (can't)
+  plan5(i) {
+    const p = this.p5[i], k = this.pick5(i); if (k < 0) return { np: p, part: null, dv: null };
+    if (k < 3) {
+      const filled = (p >> k) & 1; let j = -1, best = 0;
+      for (let c = 0; c < 3; c++) { if (c === k || ((p >> c) & 1) !== (filled ^ 1)) continue; // the other colour cell must be in the opposite state
+        const v = this.surplus5(i, c); if (j < 0 || (filled ? v > best : v < best)) { j = c; best = v; } }
+      if (j < 0) return null;
+      const np = p ^ (1 << k) ^ (1 << j), dv = [0, 0, 0]; dv[k] += filled ? -1 : 1; dv[j] += filled ? 1 : -1;
+      return { np, dv, part: q => (((q >> k) & 1) === (filled ^ 1) && ((q >> j) & 1) === filled) ? (q ^ (1 << k) ^ (1 << j)) : -1 };
+    }
+    const u = (p >> 3) & 1, d = (p >> 4) & 1; if (u === d) return null;
+    return { np: p ^ 24, dv: null, part: q => (((q >> 3) & 1) === d && ((q >> 4) & 1) === u) ? (q ^ 24) : -1 };
+  }
+  excluded5(i, np) { if (!this.cfg.exclusion) return false; for (let q = 0; q < 6; q++) if (this.p5[NB[i * 6 + q]] === np) return true; return false; }
+  // rule 27 with five cells: the flash hands out its released memory, cell by cell, to mismatched neighbours
+  shout5(i, rel) {
+    const sh = this.p5[i];
+    if (!this.cfg.conserve) { for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q]; for (let k = 0; k < 5; k++) { if (((this.p5[j] >> k) & 1) === ((sh >> k) & 1)) this.rf5[j * 5 + k]++; else this.cs5[j * 5 + k]++; } } this.carrier[i] += rel.reduce((a, b) => a + b, 0); return; }
+    const tg = [0, 0, 0, 0, 0, 0];
+    for (let k = 0; k < 5; k++) { const bit = (sh >> k) & 1; let m = 0;
+      for (let q = 0; q < 6; q++) { const j = NB[i * 6 + q]; if (((this.p5[j] >> k) & 1) === bit) this.rf5[j * 5 + k]++; else tg[m++] = j; }
+      if (m === 0) { this.carrier[i] += rel[k]; continue; }
+      for (let u = 0; u < rel[k]; u++) this.cs5[tg[u % m] * 5 + k]++; }
+  }
+  tickFive() {
+    const kick = this.t === 0 ? this.kick : -1, colour = this.cfg.colour;
+    this.fired.fill(0); this.taken.fill(0); this.exchanges = 0; this.blocked5 = 0;
+    const ready = []; for (let i = 0; i < N; i++) { let m = 0; for (let k = 0; k < 5; k++) m += this.cs5[i * 5 + k]; if (m >= 5 || i === kick) ready.push(i); }
+    let count = 0; const shouts = [];
+    for (const i of ready) {
+      if (this.taken[i]) { this.blocked5++; continue; }
+      const pl = this.plan5(i); if (!pl) { this.blocked5++; continue; }
+      let partner = -1, pnew = -1, face = -1;
+      if (pl.part) { for (let f = 0; f < 6; f++) { if (LK[i * 6 + f] < 0) continue; const j = NB[i * 6 + f]; if (this.taken[j]) continue; const r = pl.part(this.p5[j]); if (r >= 0) { partner = j; pnew = r; face = f; break; } }
+        if (partner < 0) { this.blocked5++; continue; } }
+      if (this.excluded5(i, pl.np)) { this.blocked5++; continue; }
+      // the flash: x changes, the partner takes the opposite change; colour flux moves with it (Gauss law)
+      this.p5[i] = pl.np; if (partner >= 0) { this.p5[partner] = pnew; this.taken[partner] = 1; this.exchanges++; if (colour && pl.dv) this.addFlux(i, face, pl.dv); }
+      this.taken[i] = 1; this.fired[i] = 1; count++;
+      const rel = []; for (let k = 0; k < 5; k++) { rel.push(this.cs5[i * 5 + k]); this.cs5[i * 5 + k] = 0; this.rf5[i * 5 + k] = 0; }
+      shouts.push([i, rel]);
+    }
+    for (const [i, rel] of shouts) this.shout5(i, rel);
+    // carrier (rule 5) and its response, with 5 units per whole pixel and 5 cells
+    this.spread();
+    const c = this.carrier;
+    if (this.cfg.gravity || this.cfg.cancel || this.cfg.excite) for (let i = 0; i < N; i++) { if (c[i] < 5) continue; const k = Math.floor(c[i] / 5);
+      if (this.cfg.gravity) { c[i] -= k * 5; for (let q = 0; q < 5; q++) this.rf5[i * 5 + q] += k; }
+      else if (this.cfg.cancel) { for (let q = 0; q < 5; q++) { const m = Math.min(k, this.cs5[i * 5 + q]); this.cs5[i * 5 + q] -= m; c[i] -= m; } }
+      else { c[i] -= k * 5; for (let q = 0; q < 5; q++) this.cs5[i * 5 + q] += k; } }
+    if (this.cfg.em) { const ph = this.phi, nx = this.phin; for (let i = 0; i < N; i++) ph[i] += Engine.q5(this.p5[i]); nx.fill(0);
+      for (let i = 0; i < N; i++) { const q = ph[i]; if (q === 0) continue; const sh = q / 6, x = i % S, y = ((i / S) | 0) % S, z = (i / (S * S)) | 0;
+        if (x + 1 < S) nx[i + 1] += sh; if (x > 0) nx[i - 1] += sh; if (y + 1 < S) nx[i + S] += sh; if (y > 0) nx[i - S] += sh; if (z + 1 < S) nx[i + S * S] += sh; if (z > 0) nx[i - S * S] += sh; }
+      this.phi = nx; this.phin = ph; }
+    if (colour) this.relax5();
+    if (this.cfg.motion) this.move5();
+    this.t++; this.total += count;
+    return count;
+  }
+  // RULE 31 (c): one pass of plaquette moves, each lowering the flux energy if it can
+  relax5() {
+    const fx = this.fx; let moves = 0;
+    const opts = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+    for (let i = 0; i < N; i++) for (let mu = 0; mu < 3; mu++) for (let nu = mu + 1; nu < 3; nu++) {
+      const a = LK[i * 6 + 2 * mu], d = LK[i * 6 + 2 * nu]; if (a < 0 || d < 0) continue;
+      const iu = NB[i * 6 + 2 * mu], iv = NB[i * 6 + 2 * nu], b = LK[iu * 6 + 2 * nu], c2 = LK[iv * 6 + 2 * mu]; if (b < 0 || c2 < 0) continue;
+      const L = [a, b, c2, d], sg = [1, 1, -1, -1];
+      let E0 = 0; for (const l of L) E0 += Engine.fE(fx[l * 3], fx[l * 3 + 1], fx[l * 3 + 2]);
+      let best = -1, bestE = E0;
+      for (let o = 0; o < 6; o++) { let E = 0; for (let k = 0; k < 4; k++) { const l = L[k], v = opts[o]; E += Engine.fE(fx[l * 3] + sg[k] * v[0], fx[l * 3 + 1] + sg[k] * v[1], fx[l * 3 + 2] + sg[k] * v[2]); } if (E < bestE) { bestE = E; best = o; } }
+      if (best >= 0) { for (let k = 0; k < 4; k++) { const l = L[k], v = opts[best]; for (let cc = 0; cc < 3; cc++) fx[l * 3 + cc] += sg[k] * v[cc]; } moves++; }
+    }
+    this.relaxed = moves;
+  }
+  // RULE 24 with five cells, RULE 31 (d): strings pull colour-charged pixels
+  move5() {
+    const f = this.fired, m = this.moved; m.fill(0); this.swaps = 0;
+    const sw = (a, x, y) => { const t = a[x]; a[x] = a[y]; a[y] = t; };
+    const col = p => [p & 1, (p >> 1) & 1, (p >> 2) & 1];
+    for (let i = 0; i < N; i++) {
+      if (!f[i] || m[i]) continue;
+      let best = -1, bestFace = -1;
+      const n3 = Engine.ncol(this.p5[i]);
+      if (this.cfg.colour && n3 % 3 !== 0) { // colour-charged: the move that most lowers the flux energy of the link it moves along
+        let bestD = 0; const ri = col(this.p5[i]);
+        for (let q = 0; q < 6; q++) { const l = LK[i * 6 + q]; if (l < 0) continue; const j = NB[i * 6 + q]; if (f[j] || m[j]) continue;
+          const rj = col(this.p5[j]), sg = (q & 1) ? -1 : 1, F = [this.fx[l * 3], this.fx[l * 3 + 1], this.fx[l * 3 + 2]];
+          const Fn = F.map((v, cc) => v + sg * (rj[cc] - ri[cc])), d = Engine.fE(...Fn) - Engine.fE(...F);
+          if (d < bestD) { bestD = d; best = j; bestFace = q; } }
+      }
+      if (best < 0) { // rule 24 / 25 targets, inside the box only (no move crosses the edge)
+        const qc = Engine.q5(this.p5[i]);
+        if (this.cfg.em && qc !== 0) { const ph = this.phi; let bv = qc * ph[i]; for (let q = 0; q < 6; q++) { if (LK[i * 6 + q] < 0) continue; const j = NB[i * 6 + q]; if (qc * ph[j] < bv) { best = j; bestFace = q; bv = qc * ph[j]; } } }
+        else { const c = this.carrier; let bc = c[i]; for (let q = 0; q < 6; q++) { if (LK[i * 6 + q] < 0) continue; const j = NB[i * 6 + q]; if (c[j] > bc) { best = j; bestFace = q; bc = c[j]; } } }
+      }
+      if (best < 0 || f[best] || m[best]) continue;
+      if (this.cfg.colour) { const ri = col(this.p5[i]), rj = col(this.p5[best]); this.addFlux(i, bestFace, [rj[0] - ri[0], rj[1] - ri[1], rj[2] - ri[2]]); }
+      sw(this.p5, i, best); sw(this.home, i, best); sw(f, i, best);
+      for (let k = 0; k < 5; k++) { sw(this.rf5, i * 5 + k, best * 5 + k); sw(this.cs5, i * 5 + k, best * 5 + k); }
+      m[i] = m[best] = 1; this.swaps++;
+    }
+  }
+  // measurements for rules 30-31
+  stats5() {
+    let Q = 0, R = 0, G = 0, B = 0, quarks = 0, leptons = 0, gauss = 0, fluxE = 0, strings = 0;
+    for (let i = 0; i < N; i++) { const p = this.p5[i]; Q += Engine.q5(p); R += p & 1; G += (p >> 1) & 1; B += (p >> 2) & 1; if (Engine.ncol(p) % 3) quarks++; else leptons++; }
+    if (this.cfg.colour) {
+      for (let l = 0; l < N * 3; l++) { const e = Engine.fE(this.fx[l * 3], this.fx[l * 3 + 1], this.fx[l * 3 + 2]); fluxE += e; if (e) strings++; }
+      for (let i = 0; i < N; i++) { const d = [0, 0, 0], p = this.p5[i];
+        for (let q = 0; q < 6; q++) { const l = LK[i * 6 + q]; if (l < 0) continue; const sg = (q & 1) ? -1 : 1; for (let c = 0; c < 3; c++) d[c] += sg * this.fx[l * 3 + c]; }
+        if (i % S === S - 1) for (let c = 0; c < 3; c++) d[c] += this.edge[i * 3 + c];
+        const r = [d[0] - (p & 1), d[1] - ((p >> 1) & 1), d[2] - ((p >> 2) & 1)]; gauss = Math.max(gauss, Math.abs(r[0] - r[1]), Math.abs(r[1] - r[2])); }
+    }
+    return { charge3: Q, colour: [R - B, G - B], quarks, leptons, gauss, fluxE: fluxE / 3, strings, exchanges: this.exchanges, blocked: this.blocked5, relaxed: this.relaxed, swaps: this.swaps };
+  }
   agreement(i) {
+    if (this.cfg.five) { let m = 0; const p = this.p5[i]; for (let q = 0; q < 6; q++) { const x = p ^ this.p5[NB[i * 6 + q]]; let d = 0; for (let k = 0; k < 5; k++) d += (x >> k) & 1; m += 5 - d; } return m / 30; }
     let m = 0; const p = this.pat[i];
     for (let q = 0; q < 6; q++) { const x = p ^ this.pat[NB[i * 6 + q]]; m += 3 - ((x & 1) + ((x >> 1) & 1) + ((x >> 2) & 1)); }
     return m / 18;

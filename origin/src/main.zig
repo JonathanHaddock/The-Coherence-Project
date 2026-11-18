@@ -29,6 +29,7 @@ const lepton = @import("engine/lepton.zig");
 const record = @import("engine/record.zig");
 const photo = @import("engine/photo.zig");
 const onepixel = @import("engine/onepixel.zig");
+const five = @import("engine/five.zig");
 
 test {
     _ = koide;
@@ -55,6 +56,7 @@ test {
     _ = record;
     _ = photo;
     _ = onepixel;
+    _ = five;
     _ = @import("visualization/labels.zig");
 }
 
@@ -1316,6 +1318,33 @@ fn clocksReport(args: anytype) void {
     std.debug.print("\n  r shown as raw/merged. n/a = no spread (all regions identical or silent).\n", .{});
 }
 
+var five_grid: five.Five = undefined;
+
+/// RULES 30-31: origin five [ticks] [key=on|off|number ...] (colour, conserve, excite, gravity, cancel, exclusion,
+/// motion, em, core, seed). Prints one line of totals per tick (the JS port prints the same; they must match).
+fn fiveRun(gpa: std.mem.Allocator, args: anytype) !void {
+    var cfg: five.Cfg = .{};
+    var ticks: i64 = 40;
+    while (args.next()) |a| {
+        const eq = std.mem.indexOfScalar(u8, a, '=') orelse {
+            ticks = std.fmt.parseInt(i64, a, 10) catch ticks;
+            continue;
+        };
+        const k = a[0..eq];
+        const v = a[eq + 1 ..];
+        const on = std.mem.eql(u8, v, "on");
+        if (std.mem.eql(u8, k, "colour")) cfg.colour = on else if (std.mem.eql(u8, k, "conserve")) cfg.conserve = on else if (std.mem.eql(u8, k, "excite")) cfg.excite = on else if (std.mem.eql(u8, k, "gravity")) cfg.gravity = on else if (std.mem.eql(u8, k, "cancel")) cfg.cancel = on else if (std.mem.eql(u8, k, "exclusion")) cfg.exclusion = on else if (std.mem.eql(u8, k, "motion")) cfg.motion = on else if (std.mem.eql(u8, k, "em")) cfg.em = on else if (std.mem.eql(u8, k, "core")) cfg.core = try std.fmt.parseInt(u32, v, 10) else if (std.mem.eql(u8, k, "seed")) cfg.seed = try std.fmt.parseInt(u64, v, 10);
+    }
+    five_grid.init(cfg);
+    std.debug.print("tick\tflashes\texchanges\tblocked\trelaxed\tswaps\tcharge3\tcolour_rb\tcolour_gb\tquarks\tgauss\tflux_e3\tstrings\tcarrier\tmemory\n", .{});
+    var t: i64 = 0;
+    while (t < ticks) : (t += 1) {
+        const f = try five_grid.tick(gpa);
+        const st = five_grid.stats(f);
+        std.debug.print("{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d:.6}\t{d}\n", .{ t, st.flashes, st.exchanges, st.blocked, st.relaxed, st.swaps, st.charge3, st.colour[0], st.colour[1], st.quarks, st.gauss, st.flux_e3, st.strings, st.carrier, st.memory });
+    }
+}
+
 var lattice: grid3.Grid3 = undefined;
 
 fn lattice3Report(args: anytype) void {
@@ -1732,6 +1761,8 @@ pub fn main(init: std.process.Init) void {
         onePixelReport(&args);
     } else if (std.mem.eql(u8, command, "porch")) {
         porch(init.io, init.gpa, &args) catch |err| fail(err);
+    } else if (std.mem.eql(u8, command, "five")) {
+        fiveRun(init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "lattice3")) {
         lattice3Report(&args);
     } else if (std.mem.eql(u8, command, "clocks")) {
