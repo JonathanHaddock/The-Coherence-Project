@@ -5,6 +5,8 @@
 // 3. Strong and weak coupling: the plaquette matches the leading expansions beta/18 + beta^2/216
 //    (small beta) and 1 - 2/beta (large beta).
 // 4. Cold and hot starts reach the same plaquette.
+// 5. Smoothing: projection lands exactly on SU(3); fast loops equal direct loops; APE-smeared loops are gauge
+//    invariant (checked inside 2).
 const { Lattice, strongCoupling, weakCoupling, _m } = require("./su3.js");
 const { mul, mulDag, dagMul, M3, setId } = _m;
 let fail = 0; const ok = (name, cond, detail) => { console.log(`${cond ? "PASS" : "FAIL"}  ${name}  ${detail}`); if (!cond) fail++; };
@@ -14,15 +16,15 @@ let fail = 0; const ok = (name, cond, detail) => { console.log(`${cond ? "PASS" 
   const L = new Lattice({ Ns: 4, Nt: 4, beta: 5.7, start: "hot", seed: 3 });
   for (let s = 0; s < 20; s++) L.sweep();
   ok("unitarity", L.unitarityError() < 1e-12, `max |U U^dag - 1| = ${L.unitarityError().toExponential(2)}`);
-  const before = { p: L.plaquette(), w: L.wilson(2, 2), ws: L.wilsonSpatial(1, 2), pl: Math.hypot(...L.polyakov()) };
+  const before = { p: L.plaquette(), w: L.wilson(2, 2), ws: L.wilsonSpatial(1, 2), pl: Math.hypot(...L.polyakov()), ape: L.loops(2, 2, 3, L.ape([0, 1, 2], 0.5, 5))["2,2"] };
   // random gauge transform g(x): U_mu(x) -> g(x) U_mu(x) g(x+mu)^dag
   const R = Math.random, g = [];
   for (let i = 0; i < L.V; i++) { const u = M3(); for (let k = 0; k < 18; k++) u[k] = R() - 0.5; _m.reunitarize(u); g.push(u); }
   const t = M3();
   for (let i = 0; i < L.V; i++) for (let mu = 0; mu < 4; mu++) { const u = L.link(i, mu); mul(g[i], u, t); mulDag(t, g[L.up[i * 4 + mu]], u); }
-  const after = { p: L.plaquette(), w: L.wilson(2, 2), ws: L.wilsonSpatial(1, 2), pl: Math.hypot(...L.polyakov()) };
+  const after = { p: L.plaquette(), w: L.wilson(2, 2), ws: L.wilsonSpatial(1, 2), pl: Math.hypot(...L.polyakov()), ape: L.loops(2, 2, 3, L.ape([0, 1, 2], 0.5, 5))["2,2"] };
   const d = Math.max(...Object.keys(before).map(k => Math.abs(before[k] - after[k])));
-  ok("gauge invariance", d < 1e-12, `largest change in plaquette, W(2,2), spatial W(1,2), |Polyakov| = ${d.toExponential(2)}`);
+  ok("gauge invariance", d < 1e-12, `largest change in plaquette, W(2,2), spatial W(1,2), |Polyakov|, APE-smeared W(2,2) = ${d.toExponential(2)}`);
 }
 // 3
 for (const [beta, ref, tol, name] of [[0.5, strongCoupling(0.5), 0.004, "strong coupling"], [1.0, strongCoupling(1.0), 0.006, "strong coupling"], [30, weakCoupling(30), 0.006, "weak coupling"], [60, weakCoupling(60), 0.003, "weak coupling"]]) {
@@ -41,6 +43,20 @@ for (const [beta, ref, tol, name] of [[0.5, strongCoupling(0.5), 0.004, "strong 
     let s = 0; for (let k = 0; k < 100; k++) { L.sweep(); s += L.plaquette(); } res.push(s / 100);
   }
   ok("cold and hot starts agree", Math.abs(res[0] - res[1]) < 0.01, `beta 5.5: cold ${res[0].toFixed(4)}, hot ${res[1].toFixed(4)}`);
+}
+// 5
+{
+  const { projectSU3, reunitarize } = _m; let worst = 0, fix = 0; const t = M3();
+  for (let n = 0; n < 200; n++) {
+    const m = M3(); for (let k = 0; k < 18; k++) m[k] = Math.random() - 0.5; projectSU3(m); mulDag(m, m, t);
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) worst = Math.max(worst, Math.hypot(t[(i * 3 + j) * 2] - (i === j ? 1 : 0), t[(i * 3 + j) * 2 + 1]));
+    const u = M3(); for (let k = 0; k < 18; k++) u[k] = Math.random() - 0.5; reunitarize(u); const c = Float64Array.from(u); projectSU3(c);
+    for (let k = 0; k < 18; k++) fix = Math.max(fix, Math.abs(c[k] - u[k]));
+  }
+  ok("SU(3) projection", worst < 1e-12 && fix < 1e-12, `random matrix -> unitarity error ${worst.toExponential(2)}; an SU(3) matrix is left unchanged to ${fix.toExponential(2)}`);
+  const L = new Lattice({ Ns: 4, Nt: 6, beta: 5.7, start: "hot", seed: 4 }); for (let s = 0; s < 20; s++) L.sweep();
+  const W = L.loops(2, 3, 3); let d = 0; for (let R = 1; R <= 2; R++) for (let T = 1; T <= 3; T++) d = Math.max(d, Math.abs(W[R + "," + T] - L.wilson(R, T)));
+  ok("fast loops = direct loops", d < 1e-12, `largest difference over R <= 2, T <= 3: ${d.toExponential(2)}`);
 }
 console.log(fail ? `${fail} check(s) failed` : "all checks passed");
 process.exitCode = fail ? 1 : 0;

@@ -240,6 +240,127 @@
   // Leading expansions of the plaquette, for checks
   const strongCoupling = beta => beta / 18 + beta * beta / 216; // small beta
   const weakCoupling = beta => 1 - 2 / beta;                   // large beta, one loop
-  const api = { Lattice, DEFAULTS, creutz, strongCoupling, weakCoupling, _m: { mul, mulDag, dagMul, reTr, reunitarize, M3, setId } };
+  // ---- smoothing (APE smearing) ----
+  // 3x3 complex inverse by adjugate / det
+  function inv3(a, o) {
+    const g = (i, j) => [a[(i * 3 + j) * 2], a[(i * 3 + j) * 2 + 1]];
+    const cm = (x, y) => [x[0] * y[0] - x[1] * y[1], x[0] * y[1] + x[1] * y[0]];
+    const cs = (x, y) => [x[0] - y[0], x[1] - y[1]];
+    const cof = []; // cofactor C_ij
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+      const r = [0, 1, 2].filter(k => k !== i), c = [0, 1, 2].filter(k => k !== j);
+      let m = cs(cm(g(r[0], c[0]), g(r[1], c[1])), cm(g(r[0], c[1]), g(r[1], c[0])));
+      if ((i + j) & 1) m = [-m[0], -m[1]]; cof.push(m);
+    }
+    const det = [0, 0]; for (let j = 0; j < 3; j++) { const p = cm(g(0, j), cof[j]); det[0] += p[0]; det[1] += p[1]; }
+    const d2 = det[0] * det[0] + det[1] * det[1], di = [det[0] / d2, -det[1] / d2];
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { const v = cm(cof[j * 3 + i], di); o[(i * 3 + j) * 2] = v[0]; o[(i * 3 + j) * 2 + 1] = v[1]; } // inverse = adj / det, adj = cof^T
+    return det;
+  }
+  // Project a general 3x3 matrix back onto SU(3): unitary part of the polar decomposition (Newton
+  // iteration X <- (X + X^-dagger)/2), then divide out the phase of the determinant.
+  const _pa = new Float64Array(18), _pb = new Float64Array(18);
+  function projectSU3(m, off = 0) {
+    const X = _pa, Y = _pb; for (let k = 0; k < 18; k++) X[k] = m[off + k];
+    for (let it = 0; it < 12; it++) {
+      inv3(X, Y); let d = 0;
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { // X^-dagger_ij = conj(Y_ji)
+        const re = 0.5 * (X[(i * 3 + j) * 2] + Y[(j * 3 + i) * 2]), im = 0.5 * (X[(i * 3 + j) * 2 + 1] - Y[(j * 3 + i) * 2 + 1]);
+        d += Math.abs(re - X[(i * 3 + j) * 2]) + Math.abs(im - X[(i * 3 + j) * 2 + 1]);
+        X[(i * 3 + j) * 2] = re; X[(i * 3 + j) * 2 + 1] = im;
+      }
+      if (d < 1e-14) break;
+    }
+    const det = inv3(X, Y), ph = Math.atan2(det[1], det[0]) / 3, c = Math.cos(ph), s = Math.sin(ph);
+    for (let k = 0; k < 9; k++) { const re = X[2 * k], im = X[2 * k + 1]; m[off + 2 * k] = re * c + im * s; m[off + 2 * k + 1] = im * c - re * s; }
+    reunitarize(m, off);
+  }
+  // APE smearing: each link in a direction of `dirs` becomes (1 - alpha) U + alpha/(2(d-1)) (sum of the
+  // staples through the other directions in `dirs`), projected back onto SU(3); repeated `steps` times.
+  // Links in other directions are copied unchanged. Returns a new link array; the lattice is untouched.
+  Lattice.prototype.ape = function (dirs, alpha, steps) {
+    let src = Float64Array.from(this.U), dst = new Float64Array(this.U.length);
+    const V = this.V, up = this.up, dn = this.dn, a = M3(), b = M3(), S = M3();
+    const L = (arr, i, mu) => arr.subarray((i * 4 + mu) * 18, (i * 4 + mu) * 18 + 18);
+    const w = dirs.length > 1 ? alpha / (2 * (dirs.length - 1)) : 0;
+    for (let n = 0; n < steps; n++) {
+      dst.set(src);
+      for (let i = 0; i < V; i++) for (const mu of dirs) {
+        S.fill(0); const ip = up[i * 4 + mu];
+        for (const nu of dirs) {
+          if (nu === mu) continue;
+          // forward path: U_nu(x) U_mu(x+nu) U_nu(x+mu)^dag
+          mul(L(src, i, nu), L(src, up[i * 4 + nu], mu), a); mulDag(a, L(src, ip, nu), b); for (let k = 0; k < 18; k++) S[k] += b[k];
+          // backward path: U_nu(x-nu)^dag U_mu(x-nu) U_nu(x+mu-nu)
+          const xm = dn[i * 4 + nu]; dagMul(L(src, xm, nu), L(src, xm, mu), a); mul(a, L(src, dn[ip * 4 + nu], nu), b); for (let k = 0; k < 18; k++) S[k] += b[k];
+        }
+        const o = (i * 4 + mu) * 18, u = L(src, i, mu);
+        for (let k = 0; k < 18; k++) dst[o + k] = (1 - alpha) * u[k] + w * S[k];
+        projectSU3(dst, o);
+      }
+      const t = src; src = dst; dst = t;
+    }
+    return src;
+  };
+  // Time-like Wilson loops W(R,T) for R = 1..Rmax, T = 1..Tmax, using `space` links (e.g. smeared) for
+  // the R sides and the lattice's own links for the T sides. tau = the direction used as time.
+  // Built from precomputed straight lines, so each loop costs three matrix products per site.
+  Lattice.prototype.loops = function (Rmax, Tmax, tau = 3, space = this.U) {
+    const V = this.V, up = this.up, sdirs = [0, 1, 2, 3].filter(d => d !== tau);
+    const lines = (arr, mu, n) => { // lines[r][x] = product of r links from x along mu
+      const out = [null, new Float64Array(V * 18)];
+      for (let i = 0; i < V; i++) out[1].set(arr.subarray((i * 4 + mu) * 18, (i * 4 + mu) * 18 + 18), i * 18);
+      for (let r = 2; r <= n; r++) {
+        const nx = new Float64Array(V * 18), prev = out[r - 1], t = M3(), A = M3(), B = M3();
+        for (let i = 0; i < V; i++) {
+          let j = i; for (let k = 0; k < r - 1; k++) j = up[j * 4 + mu];
+          A.set(prev.subarray(i * 18, i * 18 + 18)); B.set(arr.subarray((j * 4 + mu) * 18, (j * 4 + mu) * 18 + 18));
+          mul(A, B, t); nx.set(t, i * 18);
+        }
+        out.push(nx);
+      }
+      return out;
+    };
+    const shift = (i, mu, n) => { for (let k = 0; k < n; k++) i = up[i * 4 + mu]; return i; };
+    const Tl = lines(this.U, tau, Tmax), W = {}, cnt = {};
+    const A = M3(), B = M3(), C = M3(), D = M3(), t1 = M3(), t2 = M3(), I = setId(M3()), Dd = M3();
+    for (const mu of sdirs) {
+      const Rl = lines(space, mu, Rmax);
+      for (let R = 1; R <= Rmax; R++) for (let T = 1; T <= Tmax; T++) {
+        let s = 0;
+        for (let i = 0; i < V; i++) {
+          A.set(Rl[R].subarray(i * 18, i * 18 + 18));
+          const iR = shift(i, mu, R), iT = shift(i, tau, T);
+          B.set(Tl[T].subarray(iR * 18, iR * 18 + 18)); C.set(Rl[R].subarray(iT * 18, iT * 18 + 18)); D.set(Tl[T].subarray(i * 18, i * 18 + 18));
+          mul(A, B, t1); mulDag(t1, C, t2); s += reTrMul(t2, dagMul(D, I, Dd)) / 3; // Re Tr(A B C^dag D^dag)
+        }
+        const k = R + "," + T; W[k] = (W[k] || 0) + s / V; cnt[k] = (cnt[k] || 0) + 1;
+      }
+    }
+    for (const k in W) W[k] /= cnt[k];
+    return W;
+  };
+  // Static potential a V(R) = ln( W(R,T) / W(R,T+1) ) and a Cornell fit V(R) = V0 + sigma R - e / R
+  function potential(W, Rmax, T) {
+    const out = []; for (let R = 1; R <= Rmax; R++) { const a = W[R + "," + T], b = W[R + "," + (T + 1)]; out.push(a > 0 && b > 0 ? Math.log(a / b) : NaN); }
+    return out;
+  }
+  function cornellFit(V, Rmin = 1) { // least squares in (V0, sigma, e) over R = Rmin..len
+    const rows = []; V.forEach((v, k) => { const R = k + 1; if (R >= Rmin && isFinite(v)) rows.push([1, R, -1 / R, v]); });
+    if (rows.length < 3) return null;
+    const M = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], y = [0, 0, 0];
+    for (const r of rows) for (let i = 0; i < 3; i++) { y[i] += r[i] * r[3]; for (let j = 0; j < 3; j++) M[i][j] += r[i] * r[j]; }
+    for (let c = 0; c < 3; c++) { let p = c; for (let r = c + 1; r < 3; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r; [M[c], M[p]] = [M[p], M[c]]; [y[c], y[p]] = [y[p], y[c]];
+      for (let r = 0; r < 3; r++) if (r !== c) { const f = M[r][c] / M[c][c]; for (let k = 0; k < 3; k++) M[r][k] -= f * M[c][k]; y[r] -= f * y[c]; } }
+    const [V0, sigma, e] = y.map((v, i) => v / M[i][i]);
+    return { V0, sigma, e, n: rows.length };
+  }
+  // two-parameter version with the 1/R coefficient fixed at pi/12 (the Luscher term of a vibrating string)
+  function luscherFit(V, Rmin = 1) {
+    let n = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
+    V.forEach((v, k) => { const R = k + 1; if (R < Rmin || !isFinite(v)) return; const y = v + Math.PI / 12 / R; n++; sx += R; sy += y; sxx += R * R; sxy += R * y; });
+    if (n < 2) return null; const sigma = (n * sxy - sx * sy) / (n * sxx - sx * sx); return { V0: (sy - sigma * sx) / n, sigma, e: Math.PI / 12, n };
+  }
+  const api = { Lattice, DEFAULTS, creutz, strongCoupling, weakCoupling, potential, cornellFit, luscherFit, _m: { mul, mulDag, dagMul, reTr, reunitarize, projectSU3, inv3, M3, setId } };
   if (typeof module !== "undefined") module.exports = api; else root.SU3Lab = api;
 })(this);

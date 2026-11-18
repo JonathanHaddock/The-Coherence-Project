@@ -31,13 +31,19 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
 <main>
 <aside>
   <div class="card"><h2>Lattice</h2>
-    <div class="row"><span>space Ns</span><select id="Ns"><option>4</option><option selected>6</option><option>8</option></select><span></span></div>
-    <div class="row"><span>time Nt</span><select id="Nt"><option>2</option><option>3</option><option>4</option><option selected>6</option><option>8</option></select><span></span></div>
+    <div class="row"><span>space Ns</span><select id="Ns"><option>4</option><option>6</option><option selected>8</option><option>10</option><option>12</option></select><span></span></div>
+    <div class="row"><span>time Nt</span><select id="Nt"><option>2</option><option>3</option><option>4</option><option>6</option><option selected>8</option><option>10</option><option>12</option></select><span></span></div>
     <div class="row"><span>β = 6/g²</span><input id="beta" type="range" min="4.5" max="7" step="0.05" value="5.7"><output id="betao">5.70</output></div>
     <div class="row"><span>start</span><select id="start"><option value="cold">cold (all links = 1)</option><option value="hot">hot (random links)</option></select><span></span></div>
     <div class="row"><span>sweeps / frame</span><input id="speed" type="range" min="1" max="10" step="1" value="2"><output id="speedo">2</output></div>
-    <div class="btns"><button id="run" class="on">pause</button><button id="reset">reset</button><button id="preset1" title="Ns 6, Nt 6, β 5.7">confined</button><button id="preset2" title="Ns 6, Nt 2, β 6.0">hot plasma</button></div>
-    <p class="note">β changes take effect live. Changing size or start rebuilds the lattice. Deconfinement for Nt = 4 happens at β ≈ 5.69; for Nt = 6 at ≈ 5.89.</p>
+    <div class="btns"><button id="run" class="on">pause</button><button id="reset">reset</button><button id="preset1" title="8⁴, β 5.7">confined</button><button id="preset2" title="8³ × 2, β 6.0">hot plasma</button><button id="preset3" title="12⁴, β 5.7 (slow in a browser)">big box</button></div>
+    <p class="note">β changes take effect live. Changing size or start rebuilds the lattice. Deconfinement for Nt = 4 happens at β ≈ 5.69; for Nt = 6 at ≈ 5.89. 10⁴ and 12⁴ run slowly here (about 4 sweeps a second at 12⁴); <code>potential.js</code> is the tool for real runs at that size.</p>
+  </div>
+  <div class="card"><h2>Smoothing (APE)</h2>
+    <div class="row"><span>steps</span><input id="smear" type="range" min="0" max="30" step="1" value="10"><output id="smearo">10</output></div>
+    <div class="row"><span>α</span><input id="alpha" type="range" min="0.1" max="0.8" step="0.05" value="0.5"><output id="alphao">0.50</output></div>
+    <div class="row"><span>slice shows</span><select id="view"><option value="raw">raw field</option><option value="smooth">smoothed field</option></select><span></span></div>
+    <p class="note">Each step replaces every link by (1 − α) × itself + α × the average of the paths that go round it, projected back onto SU(3). Short-distance jitter averages out; long-distance structure stays. It's applied to a copy, for measuring: the simulation itself is never smoothed. The potential uses smoothing in space only (time links stay raw).</p>
   </div>
   <div class="card"><h2>Measured</h2><table id="meas"></table></div>
 </aside>
@@ -46,7 +52,7 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
     <div class="row"><span>slice z</span><input id="z" type="range" min="0" max="5" value="0"><output id="zo">0</output></div>
     <div class="row"><span>slice t</span><input id="t" type="range" min="0" max="3" value="0"><output id="to">0</output></div>
     <canvas id="slice" width="600" height="600" style="max-width:520px;margin:0 auto;border-radius:6px"></canvas>
-    <p class="note">Each square is one lattice site; brightness is the action at that site, summed over the six planes through it (1 − Re Tr P/3). Pale = calm field, deep colour = strongly excited. The numbers are the per-plane average. Raise β and the field calms everywhere; lower it and it gets rough.</p></div>
+    <p class="note">Each square is one lattice site; brightness is the action at that site, summed over the six planes through it (1 − Re Tr P/3). Pale = calm field, deep colour = strongly excited. The numbers are the per-plane average. "Smoothed field" redraws every 20 sweeps and is coloured relative to the slice&#39;s own maximum, so the lumps that survive smoothing show up even though their action is small. Raise β and the field calms everywhere; lower it and it gets rough.</p></div>
   <div class="card"><h2>Plaquette over sweeps</h2><canvas id="hist" height="150"></canvas>
     <p class="note">Orange = ⟨Re Tr P/3⟩ each sweep. Dashed lines: strong-coupling β/18 + β²/216 (good for β ≲ 2) and weak-coupling 1 − 2/β (good for large β). Real QCD sits between them, near β 5.7–6.5.</p></div>
 </section>
@@ -55,17 +61,16 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
     <div class="pills"><span id="phase" class="state">–</span></div>
     <canvas id="poly" width="300" height="300" style="max-width:300px;margin:0 auto"></canvas>
     <p class="note">One dot per spatial site: Tr of the time links all the way round the box, /3. The cloud's centre is ⟨L⟩. Confined: the cloud sits on 0 (a lone quark costs infinite energy). Deconfined: it moves out along one of the three marked Z₃ directions.</p></div>
-  <div class="card"><h2>Wilson loops (area law)</h2><canvas id="wl" height="190"></canvas>
+  <div class="card"><h2>Quark–antiquark potential V(R)</h2><canvas id="wl" height="210"></canvas>
     <table id="wtab" style="margin-top:6px"></table>
-    <p class="note">−ln W(R,T) against area R·T. A straight line = area law = confinement; its slope approaches the string tension σa². Creutz ratios χ(R) cancel the perimeter part and estimate σa² from above. Loops use time if Nt ≥ 6, else two space directions. Spatial loops keep an area law even in the hot plasma: that is real physics (the magnetic sector stays confining), not a bug. Updated every 10 sweeps, averaged since the last change.</p></div>
+    <p class="note">Energy of a static quark and antiquark R apart, from smoothed Wilson loops: aV(R) = ln[W(R,T)/W(R,T+1)]. Confinement = V keeps rising in a straight line; the slope is the string tension σa². Orange line: Cornell fit V₀ + σR − e/R (R ≥ 2). Dashed: e fixed at π/12, the value for a vibrating string. Bars = jackknife errors. If Nt &lt; 8, the loops use z as "time", and in the hot plasma that spatial potential still rises: real physics (the magnetic sector stays confining), not a bug. Measured every 20 sweeps, averaged since the last change.</p></div>
 </aside>
 </main>
 <script src="su3.js"></script>
 <script>
-const { Lattice, creutz, strongCoupling, weakCoupling } = SU3Lab, $ = id => document.getElementById(id);
+const { Lattice, creutz, strongCoupling, weakCoupling, potential, cornellFit, luscherFit } = SU3Lab, $ = id => document.getElementById(id);
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-let lat, running = true, hist = [], wacc = {}, wn = 0, sinceChange = 0, last = {};
-const LOOPS = [[1,1],[2,1],[2,2],[3,2],[3,3]];
+let lat, running = true, hist = [], samples = [], sinceChange = 0, last = {}, smoothCache = null;
 function build() {
   const Ns = +$("Ns").value, Nt = +$("Nt").value;
   lat = new Lattice({ Ns, Nt, beta: +$("beta").value, start: $("start").value, seed: (Math.random() * 1e9) | 0 });
@@ -73,33 +78,55 @@ function build() {
   $("z").max = Ns - 1; $("t").max = Nt - 1; if (+$("z").value > Ns - 1) $("z").value = 0; if (+$("t").value > Nt - 1) $("t").value = 0;
   $("zo").textContent = $("z").value; $("to").textContent = $("t").value;
 }
-function resetAcc() { wacc = {}; wn = 0; sinceChange = 0; }
+function resetAcc() { samples = []; sinceChange = 0; smoothCache = null; }
 $("beta").oninput = () => { lat.p.beta = +$("beta").value; $("betao").textContent = (+$("beta").value).toFixed(2); resetAcc(); };
 $("speed").oninput = () => $("speedo").textContent = $("speed").value;
+$("smear").oninput = () => { $("smearo").textContent = $("smear").value; resetAcc(); };
+$("alpha").oninput = () => { $("alphao").textContent = (+$("alpha").value).toFixed(2); resetAcc(); };
+$("view").onchange = () => { smoothCache = null; drawSlice(); };
 for (const id of ["Ns", "Nt", "start"]) $(id).onchange = build;
 $("reset").onclick = build;
 $("z").oninput = () => { $("zo").textContent = $("z").value; drawSlice(); };
 $("t").oninput = () => { $("to").textContent = $("t").value; drawSlice(); };
 $("run").onclick = () => { running = !running; $("run").textContent = running ? "pause" : "run"; $("run").classList.toggle("on", running); };
 function preset(Ns, Nt, b) { $("Ns").value = Ns; $("Nt").value = Nt; $("beta").value = b; $("betao").textContent = b.toFixed(2); build(); }
-$("preset1").onclick = () => preset(6, 6, 5.7); $("preset2").onclick = () => preset(6, 2, 6.0);
+$("preset1").onclick = () => preset(8, 8, 5.7); $("preset2").onclick = () => preset(8, 2, 6.0); $("preset3").onclick = () => preset(12, 12, 5.7);
 
+function geom() { // which direction plays time for the potential, and the loop sizes
+  const tau = lat.p.Nt >= 8 ? 3 : 2, dirs = [0, 1, 2, 3].filter(d => d !== tau && (tau === 3 || d !== 3));
+  const Rmax = Math.min(6, Math.floor(lat.p.Ns / 2)), Tmax = Math.min(6, Math.floor((tau === 3 ? lat.p.Nt : lat.p.Ns) / 2));
+  return { tau, dirs, Rmax, Tmax };
+}
 function measureLoops() {
-  const timeLike = lat.p.Nt >= 6, maxR = Math.floor(Math.min(lat.p.Ns, timeLike ? lat.p.Nt : lat.p.Ns) / 2);
-  for (const [r, t] of LOOPS) { if (r > maxR) continue; const k = r + "," + t; wacc[k] = (wacc[k] || 0) + (timeLike ? lat.wilson(r, t) : lat.wilsonSpatial(r, t)); }
-  wn++;
+  const g = geom(), n = +$("smear").value;
+  samples.push({ g, W: lat.loops(g.Rmax, g.Tmax, g.tau, n ? lat.ape(g.dirs, +$("alpha").value, n) : lat.U) });
+  if (samples.length > 120) samples.shift();
 }
 function drawSlice() {
+  let saved = null;
+  if ($("view").value === "smooth" && +$("smear").value > 0) {
+    if (!smoothCache || lat.sweeps - smoothCache.sweep >= 20 || lat.sweeps < smoothCache.sweep) smoothCache = { sweep: lat.sweeps, U: lat.ape([0, 1, 2, 3], +$("alpha").value, +$("smear").value) };
+    saved = lat.U; lat.U = smoothCache.U;
+  }
+  try { drawSliceInner(); } finally { if (saved) lat.U = saved; }
+}
+function drawSliceInner() {
   const c = $("slice"), g = c.getContext("2d"), Ns = lat.p.Ns, W = c.width, s = W / Ns, z = +$("z").value, t = +$("t").value;
-  const dark = css("--card") !== "#ffffff";
+  const dark = css("--card") !== "#ffffff", smooth = $("view").value === "smooth" && +$("smear").value > 0;
+  const act = []; let amax = 1e-9;
   for (let y = 0; y < Ns; y++) for (let x = 0; x < Ns; x++) {
-    const i = lat.index([x, y, z, t]);
-    let a = 0; for (let mu = 0; mu < 4; mu++) for (let nu = mu + 1; nu < 4; nu++) a += 1 - lat.plaq(i, mu, nu);
-    const u = Math.max(0, Math.min(1, a / 6 / 0.75));
+    const i = lat.index([x, y, z, t]); let a = 0;
+    for (let mu = 0; mu < 4; mu++) for (let nu = mu + 1; nu < 4; nu++) a += 1 - lat.plaq(i, mu, nu);
+    act.push(a / 6); amax = Math.max(amax, a / 6);
+  }
+  const scale = smooth ? amax : 0.75; // smoothed field: colour relative to this slice's maximum, so its lumps show
+  for (let y = 0; y < Ns; y++) for (let x = 0; x < Ns; x++) {
+    const a = act[y * Ns + x] * 6;
+    const u = Math.max(0, Math.min(1, a / 6 / scale));
     const r = dark ? 20 + 235 * u : 250 - 30 * u, gg = dark ? 22 + 160 * u * u : 248 - 140 * u, b = dark ? 30 + 40 * u * u * u : 245 - 225 * u;
     g.fillStyle = `rgb(${r|0},${gg|0},${b|0})`; g.fillRect(x * s + 1, (Ns - 1 - y) * s + 1, s - 2, s - 2);
     g.fillStyle = u > 0.55 ? (dark ? "#111" : "#fff") : css("--dim"); g.font = `${Math.max(10, s * 0.16)}px system-ui`; g.textAlign = "center";
-    g.fillText((a / 6).toFixed(2), x * s + s / 2, (Ns - 1 - y) * s + s / 2 + 4);
+    if (s > 34) g.fillText((a / 6).toFixed(smooth ? 3 : 2), x * s + s / 2, (Ns - 1 - y) * s + s / 2 + 4);
   }
 }
 function drawHist() {
@@ -131,23 +158,37 @@ function drawPoly() {
   last.poly = mag;
 }
 function drawLoops() {
-  const keys = LOOPS.filter(([r, t]) => wacc[r + "," + t] !== undefined), c = $("wl");
-  const w = c.width = c.clientWidth * devicePixelRatio, h = c.height = 190 * devicePixelRatio, g = c.getContext("2d"), dp = devicePixelRatio;
+  const c = $("wl"), dp = devicePixelRatio, w = c.width = c.clientWidth * dp, h = c.height = 210 * dp, g = c.getContext("2d");
   g.clearRect(0, 0, w, h);
-  const pts = keys.map(([r, t]) => { const W = wacc[r + "," + t] / wn; return [r * t, W > 0 ? -Math.log(W) : NaN, r, t, W]; }).filter(p => isFinite(p[1]));
-  const L = 34 * dp, B = 22 * dp, ymax = Math.max(1, ...pts.map(p => p[1])) * 1.1, xmax = 10.8;
-  const X = a => L + a / xmax * (w - L - 8 * dp), Y = v => h - B - v / ymax * (h - B - 8 * dp);
-  g.strokeStyle = css("--grid"); g.fillStyle = css("--dim"); g.font = `${11 * dp}px system-ui`; g.lineWidth = 1;
-  for (let a = 0; a <= 9; a += 3) { g.beginPath(); g.moveTo(X(a), 8 * dp); g.lineTo(X(a), h - B); g.stroke(); g.textAlign = "center"; g.fillText(a, X(a), h - 6 * dp); }
-  for (let k = 0; k <= 3; k++) { const v = ymax * k / 3; g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(w, Y(v)); g.stroke(); g.textAlign = "right"; g.fillText(v.toFixed(1), L - 4 * dp, Y(v) + 4 * dp); }
-  g.textAlign = "left"; g.fillText("−ln W", L + 4 * dp, 18 * dp); g.textAlign = "right"; g.fillText("area R·T", w - 4 * dp, h - B - 6 * dp);
-  if (pts.length > 1) { g.strokeStyle = css("--acc"); g.lineWidth = 2 * dp; g.beginPath(); pts.forEach((p, k) => k ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.stroke(); }
-  g.fillStyle = css("--acc"); for (const p of pts) { g.beginPath(); g.arc(X(p[0]), Y(p[1]), 4 * dp, 0, 7); g.fill(); g.fillStyle = css("--dim"); g.textAlign = "left"; g.fillText(`${p[2]}×${p[3]}`, X(p[0]) + 6 * dp, Y(p[1]) + 4 * dp); g.fillStyle = css("--acc"); }
-  const Wt = {}; for (const [a, , r, t, W] of pts) { Wt[r + "," + t] = W; Wt[t + "," + r] = W; }
-  const rows = pts.map(p => `<tr><td>W(${p[2]},${p[3]})</td><td class="r">${p[4].toExponential(3)}</td></tr>`);
-  for (const r of [2, 3]) { const x = creutz(Wt, r); if (isFinite(x)) rows.push(`<tr><td>Creutz χ(${r}) ≈ σa²</td><td class="r"><b>${x.toFixed(3)}</b></td></tr>`); }
-  rows.push(`<tr><td>samples averaged</td><td class="r">${wn}</td></tr>`);
-  $("wtab").innerHTML = rows.join("");
+  const cur = samples.length ? samples[samples.length - 1].g : geom(), use = samples.filter(s => s.g.Rmax === cur.Rmax && s.g.Tmax === cur.Tmax && s.g.tau === cur.tau);
+  const avg = list => { const o = {}; for (const k in list[0].W) o[k] = list.reduce((s, x) => s + x.W[k], 0) / list.length; return o; };
+  const jack = f => { const n = use.length, full = f(avg(use)); if (n < 3) return [full, NaN]; const v = []; for (let i = 0; i < n; i++) v.push(f(avg(use.filter((_, j) => j !== i)))); const m = v.reduce((a, b) => a + b, 0) / n; return [full, Math.sqrt((n - 1) / n * v.reduce((a, b) => a + (b - m) ** 2, 0))]; };
+  let rows = [];
+  if (use.length) {
+    let T = 1, best = null;
+    // largest T (at most 3) where every V(R) is clean to 5%: with smoothing, T 2 -> 3 is usually already on the plateau
+    for (let t = 1; t < Math.min(cur.Tmax, 4); t++) { const Vt = Array.from({ length: cur.Rmax }, (_, k) => jack(W => potential(W, cur.Rmax, t)[k])); if (t === 1 || Vt.every(([v, e]) => isFinite(v) && isFinite(e) && e < 0.05 * Math.abs(v))) { T = t; best = Vt; } }
+    const V = best.map(x => x[0]), E = best.map(x => x[1]);
+    const nfit = V.filter((v, k) => k >= 1 && isFinite(v)).length, cf = nfit >= 4 ? cornellFit(V, 2) : null, lf = luscherFit(V, 2);
+    const fin = V.filter(isFinite), ymax = Math.max(0.5, ...fin.map((v, k) => v + (isFinite(E[k]) ? E[k] : 0))) * 1.15, ymin = Math.min(0, ...fin) ;
+    const L = 38 * dp, B = 24 * dp, X = r => L + r / (cur.Rmax + 0.5) * (w - L - 10 * dp), Y = v => h - B - (v - ymin) / (ymax - ymin) * (h - B - 10 * dp);
+    g.strokeStyle = css("--grid"); g.fillStyle = css("--dim"); g.font = `${11 * dp}px system-ui`; g.lineWidth = 1;
+    for (let r = 1; r <= cur.Rmax; r++) { g.beginPath(); g.moveTo(X(r), 10 * dp); g.lineTo(X(r), h - B); g.stroke(); g.textAlign = "center"; g.fillText(r, X(r), h - 7 * dp); }
+    for (let k = 0; k <= 4; k++) { const v = ymin + (ymax - ymin) * k / 4; g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(w, Y(v)); g.stroke(); g.textAlign = "right"; g.fillText(v.toFixed(2), L - 4 * dp, Y(v) + 4 * dp); }
+    g.textAlign = "left"; g.fillText("aV(R)", L + 4 * dp, 22 * dp); g.textAlign = "right"; g.fillText("R (lattice units)", w - 4 * dp, h - B - 6 * dp);
+    const curve = (f, dash) => { if (!f) return; g.setLineDash(dash); g.strokeStyle = css("--acc"); g.lineWidth = 1.6 * dp; g.beginPath(); for (let k = 0; k <= 60; k++) { const r = 0.9 + k / 60 * (cur.Rmax - 0.9 + 0.3), v = f.V0 + f.sigma * r - f.e / r; k ? g.lineTo(X(r), Y(v)) : g.moveTo(X(r), Y(v)); } g.stroke(); g.setLineDash([]); };
+    curve(cf, []); curve(lf, [5, 4]);
+    g.strokeStyle = css("--blue"); g.fillStyle = css("--blue"); g.lineWidth = 1.5 * dp;
+    V.forEach((v, k) => { if (!isFinite(v)) return; const r = k + 1; if (isFinite(E[k])) { g.beginPath(); g.moveTo(X(r), Y(v - E[k])); g.lineTo(X(r), Y(v + E[k])); g.stroke(); } g.beginPath(); g.arc(X(r), Y(v), 4 * dp, 0, 7); g.fill(); });
+    const sc = cf ? jack(W => { const f = cornellFit(potential(W, cur.Rmax, T), 2); return f ? f.sigma : NaN; }) : [NaN, NaN], sl = jack(W => { const f = luscherFit(potential(W, cur.Rmax, T), 2); return f ? f.sigma : NaN; });
+    const fe = (x) => isFinite(x[1]) ? `${x[0].toFixed(3)} ± ${x[1].toFixed(3)}` : (isFinite(x[0]) ? x[0].toFixed(3) : "–");
+    const Wa = avg(use), Wt = {}; for (const k in Wa) { const [r, t] = k.split(","); Wt[k] = Wa[k]; Wt[t + "," + r] = Wa[k]; }
+    rows = [["σa², Cornell fit", cf ? `<b>${fe(sc)}</b>` : "needs Ns ≥ 10 (4+ points)"], ["σa², e = π/12", `<b>${fe(sl)}</b>`], ["Coulomb e (Cornell)", cf ? cf.e.toFixed(3) : "–"],
+["V from T", `${T} → ${T + 1}`],
+      ["time direction", cur.tau === 3 ? "t" : "z (Nt < 8)"], ["samples averaged", use.length]];
+  } else { g.fillStyle = css("--dim"); g.font = `${12 * dp}px system-ui`; g.textAlign = "center"; g.fillText("measuring after 20 sweeps…", w / 2, h / 2); }
+  rows.push(["literature σa² (approx.)", "≈ 0.16 at β 5.7, ≈ 0.05 at β 6.0"]);
+  $("wtab").innerHTML = rows.map(([a, b]) => `<tr><td>${a}</td><td class="r">${b}</td></tr>`).join("");
 }
 function panel() {
   const p = hist.length ? hist[hist.length - 1] : lat.plaquette();
@@ -159,7 +200,7 @@ let frame = 0;
 function loop() {
   if (running) {
     const n = +$("speed").value;
-    for (let k = 0; k < n; k++) { lat.sweep(); sinceChange++; hist.push(lat.plaquette()); if (hist.length > 400) hist.shift(); if (sinceChange > 20 && sinceChange % 10 === 0) measureLoops(); }
+    for (let k = 0; k < n; k++) { lat.sweep(); sinceChange++; hist.push(lat.plaquette()); if (hist.length > 400) hist.shift(); if (sinceChange >= 20 && sinceChange % 20 === 0) measureLoops(); }
   }
   if (frame++ % 3 === 0) { drawSlice(); drawHist(); drawPoly(); drawLoops(); panel(); }
   requestAnimationFrame(loop);

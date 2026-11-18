@@ -4,3 +4,6 @@ for b in 5.0 5.4 5.6 5.7 5.8 6.0 6.2 6.4; do node run.js Ns=8 Nt=8 beta=$b therm
 for b in 5.7 6.0; do node run.js Ns=8 Nt=8 beta=$b therm=500 meas=200 every=5 loops=3; done
 # deconfinement: Polyakov loop vs beta, 8^3 x 4 (results/deconfinement.tsv)
 for b in 5.4 5.5 5.6 5.65 5.7 5.75 5.8 5.9 6.0; do node run.js Ns=8 Nt=4 beta=$b therm=600 meas=200 every=5 loops=1; done
+# static potential with APE smoothing, 12^4 (results/potential-b5.7.json, potential-b6.0.json)
+node potential.js Ns=12 Nt=12 beta=5.7 therm=300 meas=40 every=10 smear=20 alpha=0.5 Rmax=6 Tmax=6 Rmin=2 out=results/potential-b5.7.json
+node potential.js Ns=12 Nt=12 beta=6.0 therm=300 meas=40 every=10 smear=20 alpha=0.5 Rmax=6 Tmax=6 Rmin=2 out=results/potential-b6.0.json
