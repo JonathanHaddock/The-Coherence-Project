@@ -1,0 +1,18 @@
+PASS  colour, conserve+excite, no motion: conservation  charge 331/3 kept, colour (468,-100) kept, (colour cells, weak cells) census kept over 60 ticks
+PASS  colour, conserve+excite, no motion: Gauss law  largest violation at any site, any tick: 0
+      flashes 8184, exchanges 8100, blocked 187413, plaquette moves 351379, moves 0; flux energy 1335569 -> 129447, links carrying flux 104922 -> 129101
+PASS  colour, conserve+excite, motion: conservation  charge 331/3 kept, colour (468,-100) kept, (colour cells, weak cells) census kept over 60 ticks
+PASS  colour, conserve+excite, motion: Gauss law  largest violation at any site, any tick: 0
+      flashes 10322, exchanges 9975, blocked 217417, plaquette moves 351324, moves 6045; flux energy 1335569 -> 126672, links carrying flux 104922 -> 128429
+PASS  colour, motion + EM, core 8: conservation  charge -6021/3 kept, colour (422,-110) kept, (colour cells, weak cells) census kept over 60 ticks
+PASS  colour, motion + EM, core 8: Gauss law  largest violation at any site, any tick: 0
+      flashes 15667, exchanges 11069, blocked 279889, plaquette moves 350706, moves 13106; flux energy 1305043 -> 125210, links carrying flux 104872 -> 128490
+PASS  colour off (rule 30 only), motion: conservation  charge 331/3 kept, colour (468,-100) kept, (colour cells, weak cells) census kept over 60 ticks
+      flashes 8541, exchanges 8363, blocked 192105, plaquette moves 0, moves 1302; flux energy 0 -> 0, links carrying flux 0 -> 0
+PASS  rule 32, motion: conservation  charge 331/3 kept, colour (468,-100) kept, (colour cells, weak cells) census kept over 60 ticks
+PASS  rule 32, motion: Gauss law  largest violation at any site, any tick: 0
+      flashes 469662, exchanges 202388, blocked 11842, plaquette moves 623934, moves 302584; flux energy 1335569 -> 82618, links carrying flux 104922 -> 106513
+PASS  rules 32+33, core 10, motion + EM + exclusion: conservation  charge 243/3 kept, colour (0,0) kept, (colour cells, weak cells) census kept over 60 ticks
+PASS  rules 32+33, core 10, motion + EM + exclusion: Gauss law  largest violation at any site, any tick: 0
+      flashes 654478, exchanges 57860, blocked 7776, plaquette moves 32884, moves 329620; flux energy 1284 -> 3095, links carrying flux 1926 -> 4536
+all checks passed

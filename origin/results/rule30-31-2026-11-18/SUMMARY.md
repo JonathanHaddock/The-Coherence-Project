@@ -41,3 +41,19 @@ About 80% of stuck pixels have rule 1 choosing a change that rule 31 forbids for
 1. **Rule 1 under rule 31:** should rule 1 choose only among changes the pixel's kind can make (the cell with the largest surplus *among allowed changes*), or should a flash that can't change anything still release its memory (a flash with no change)? Either would unfreeze the stuck 80%; they mean different things.
 2. **The random start is 75% quarks** (6 of 8 colour patterns are 1 or 2 cells). The real world's matter is colour-neutral at large scale. A start built from neutral groups (or from the core) may be the fairer test.
 3. **Rule 31's conservation assumption** was made when the question went unanswered; it's marked "Jono to confirm" in RULES.md.
+
+## Rules 32–33 (2026-11-18)
+
+Rule 32: rule 1 tries cells by surplus and takes the first change the pixel's kind allows with a willing partner; if none, the pixel still flashes and releases memory without changing pattern. Rule 33: start with a colour-neutral vacuum outside the core and colour pairs (quark + matching antiquark) inside it, core memory full.
+
+Checks: Zig = JS tick for tick in 6 settings (`compare32/`); charge, colour, census, Gauss law exact in all (`check5.txt`); rules 30–31 alone reproduce unchanged.
+
+| run (600 ticks unless noted) | what happens |
+|---|---|
+| allowed + motion, random start | flux energy 1.55M → 217k; 31 flashes at tick 600 |
+| allowed + neutral, core 10 | busy ~50 ticks (10–15k flashes/tick, mostly release-only), then drains to tens–hundreds; memory ≈276k → 190k |
+| same, EM on | keeps ~2.3k flashes/tick; quarks spread most (r 7.31 → 8.47) |
+
+Confinement test, core 10, 4 seeds, 300 ticks (`seeds/summary.txt`): quark mean radius grows +0.38…+0.42 with colour strings vs +0.49…+0.53 with colour off. Consistent across seeds; strings slow spreading by about a fifth but don't confine.
+
+Open for Jono: (1) the world drains like rule 27, so does something drive it (sun/core that keeps feeding, or no edge loss)? (2) Most flashes are release-only; is that okay as "heat"? (3) Confinement is weak; real QCD strings cost energy linearly with length, here only relax locally.

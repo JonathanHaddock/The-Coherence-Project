@@ -22,6 +22,8 @@ pub const Cfg = struct {
     exclusion: bool = false,
     motion: bool = false,
     em: bool = false,
+    allowed: bool = false, // RULE 32
+    neutral: bool = false, // RULE 33
 };
 
 pub fn q5(p: u8) i32 {
@@ -41,7 +43,7 @@ pub fn fE(a: i32, b: i32, c: i32) i64 {
     return 3 * (A * A + B * B + C * C) - (A + B + C) * (A + B + C);
 }
 
-pub const Stats = struct { flashes: u32, exchanges: u32, blocked: u32, relaxed: u32, swaps: u32, charge3: i64, colour: [2]i64, quarks: u32, gauss: i64, flux_e3: i64, strings: u32, carrier: f64, memory: u64 };
+pub const Stats = struct { flashes: u32, exchanges: u32, blocked: u32, released: u32, quark_r: f64, relaxed: u32, swaps: u32, charge3: i64, colour: [2]i64, quarks: u32, gauss: i64, flux_e3: i64, strings: u32, carrier: f64, memory: u64 };
 
 const Plan = struct { np: u8, has_part: bool, k: u3 = 0, j: u3 = 0, filled: u1 = 0, weak: bool = false, u: u1 = 0, d: u1 = 0, dv: [3]i32 = .{ 0, 0, 0 } };
 
@@ -62,6 +64,7 @@ pub const Five = struct {
     t: i64,
     exchanges: u32,
     blocked: u32,
+    released: u32,
     relaxed: u32,
     swaps: u32,
 
@@ -75,6 +78,7 @@ pub const Five = struct {
         g.rf5 = @splat(@splat(0));
         g.exchanges = 0;
         g.blocked = 0;
+        g.released = 0;
         g.relaxed = 0;
         g.swaps = 0;
         var s: u64 = cfg.seed ^ 0x5f5f5f5f;
@@ -85,7 +89,29 @@ pub const Five = struct {
             g.p5[i] = @intCast(s & 31);
             for (0..5) |k| g.cs5[i][k] = @intCast((s >> @intCast(8 + 2 * k)) % 2);
         }
-        if (cfg.core > 0) for (0..n) |i| if (g3.radius(i) <= @as(f64, @floatFromInt(cfg.core))) {
+        const rc: f64 = @floatFromInt(cfg.core);
+        if (cfg.neutral) {
+            // RULE 33: colour-neutral vacuum; the core is quark-antiquark pairs along +x
+            var done: [n]bool = @splat(false);
+            for (0..n) |i| {
+                if (done[i]) continue;
+                const x = i % side;
+                const in_i = cfg.core > 0 and g3.radius(i) <= rc;
+                if (in_i and x + 1 < side and g3.radius(i + 1) <= rc) {
+                    const c: u3 = @intCast(g.p5[i] % 3);
+                    g.p5[i] = (g.p5[i] & 24) | (@as(u8, 1) << c);
+                    g.p5[i + 1] = (g.p5[i + 1] & 24) | (7 ^ (@as(u8, 1) << c));
+                    done[i] = true;
+                    done[i + 1] = true;
+                } else {
+                    g.p5[i] = (g.p5[i] & 24) | (if (ncol(g.p5[i]) >= 2) @as(u8, 7) else 0);
+                    done[i] = true;
+                }
+            }
+            if (cfg.core > 0) for (0..n) |i| if (g3.radius(i) <= rc) {
+                g.cs5[i] = .{ 1, 1, 1, 1, 1 };
+            };
+        } else if (cfg.core > 0) for (0..n) |i| if (g3.radius(i) <= rc) {
             g.p5[i] = 7;
             g.cs5[i] = .{ 1, 1, 1, 1, 1 };
         };
@@ -123,8 +149,12 @@ pub const Five = struct {
         return best;
     }
     fn plan(g: *const Five, i: usize) ?Plan {
+        const kk = g.pick(i) orelse return Plan{ .np = g.p5[i], .has_part = false };
+        return g.planCell(i, kk);
+    }
+    /// RULE 31 (a): the change that changing cell kk means for this pixel, or null if its kind can't make it.
+    fn planCell(g: *const Five, i: usize, kk: u3) ?Plan {
         const p = g.p5[i];
-        const kk = g.pick(i) orelse return Plan{ .np = p, .has_part = false };
         if (kk < 3) {
             const filled: u1 = @intCast((p >> kk) & 1);
             var j: ?u3 = null;
@@ -151,6 +181,16 @@ pub const Five = struct {
     fn partnerOf(pl: Plan, q: u8) ?u8 {
         if (pl.weak) return if (((q >> 3) & 1) == pl.d and ((q >> 4) & 1) == pl.u) q ^ 24 else null;
         return if (((q >> pl.k) & 1) == (pl.filled ^ 1) and ((q >> pl.j) & 1) == pl.filled) q ^ (@as(u8, 1) << pl.k) ^ (@as(u8, 1) << pl.j) else null;
+    }
+    fn findPartner(g: *const Five, i: usize, pl: Plan) ?struct { j: usize, r: u8, f: usize } {
+        const nb = g3.neighbors(i);
+        for (0..6) |f| {
+            if (g3.Grid3.linkOf(i, f) == null) continue;
+            const j = nb[f];
+            if (g.taken[j]) continue;
+            if (partnerOf(pl, g.p5[j])) |r| return .{ .j = j, .r = r, .f = f };
+        }
+        return null;
     }
     fn excluded(g: *const Five, i: usize, np: u8) bool {
         if (!g.cfg.exclusion) return false;
@@ -194,6 +234,7 @@ pub const Five = struct {
         g.taken = @splat(false);
         g.exchanges = 0;
         g.blocked = 0;
+        g.released = 0;
         var count: u32 = 0;
         var ready = std.ArrayList(usize).empty;
         defer ready.deinit(alloc);
@@ -209,34 +250,57 @@ pub const Five = struct {
                 g.blocked += 1;
                 continue;
             }
-            const pl = g.plan(i) orelse {
-                g.blocked += 1;
-                continue;
-            };
+            var pl: Plan = undefined;
             var partner: ?usize = null;
             var pnew: u8 = 0;
             var face: usize = 0;
-            if (pl.has_part) {
-                const nb = g3.neighbors(i);
-                for (0..6) |f| {
-                    if (g3.Grid3.linkOf(i, f) == null) continue;
-                    const j = nb[f];
-                    if (g.taken[j]) continue;
-                    if (partnerOf(pl, g.p5[j])) |r| {
-                        partner = j;
-                        pnew = r;
-                        face = f;
-                        break;
-                    }
+            if (g.cfg.allowed) {
+                // RULE 32: the first allowed change by surplus (largest first, lowest index on ties), else no change
+                var order: [5]u3 = undefined;
+                var m: usize = 0;
+                for (0..5) |k| if (g.surplus(i, k) > 0) {
+                    order[m] = @intCast(k);
+                    m += 1;
+                };
+                var a: usize = 1;
+                while (a < m) : (a += 1) { // insertion sort, stable: surplus descending, index ascending
+                    var b = a;
+                    while (b > 0 and g.surplus(i, order[b - 1]) < g.surplus(i, order[b])) : (b -= 1) std.mem.swap(u3, &order[b - 1], &order[b]);
                 }
-                if (partner == null) {
+                var found = false;
+                for (order[0..m]) |k| {
+                    const c = g.planCell(i, k) orelse continue;
+                    const fp = g.findPartner(i, c) orelse continue;
+                    if (g.excluded(i, c.np)) continue;
+                    pl = c;
+                    partner = fp.j;
+                    pnew = fp.r;
+                    face = fp.f;
+                    found = true;
+                    break;
+                }
+                if (!found) {
+                    pl = Plan{ .np = g.p5[i], .has_part = false };
+                    g.released += 1;
+                }
+            } else {
+                pl = g.plan(i) orelse {
+                    g.blocked += 1;
+                    continue;
+                };
+                if (pl.has_part) {
+                    const fp = g.findPartner(i, pl) orelse {
+                        g.blocked += 1;
+                        continue;
+                    };
+                    partner = fp.j;
+                    pnew = fp.r;
+                    face = fp.f;
+                }
+                if (g.excluded(i, pl.np)) {
                     g.blocked += 1;
                     continue;
                 }
-            }
-            if (g.excluded(i, pl.np)) {
-                g.blocked += 1;
-                continue;
             }
             g.p5[i] = pl.np;
             if (partner) |j| {
@@ -421,7 +485,7 @@ pub const Five = struct {
     }
 
     pub fn stats(g: *const Five, flashes: u32) Stats {
-        var st: Stats = .{ .flashes = flashes, .exchanges = g.exchanges, .blocked = g.blocked, .relaxed = g.relaxed, .swaps = g.swaps, .charge3 = 0, .colour = .{ 0, 0 }, .quarks = 0, .gauss = 0, .flux_e3 = 0, .strings = 0, .carrier = 0, .memory = 0 };
+        var st: Stats = .{ .flashes = flashes, .exchanges = g.exchanges, .blocked = g.blocked, .released = g.released, .quark_r = 0, .relaxed = g.relaxed, .swaps = g.swaps, .charge3 = 0, .colour = .{ 0, 0 }, .quarks = 0, .gauss = 0, .flux_e3 = 0, .strings = 0, .carrier = 0, .memory = 0 };
         var R: i64 = 0;
         var G: i64 = 0;
         var B: i64 = 0;
@@ -431,11 +495,15 @@ pub const Five = struct {
             R += p & 1;
             G += (p >> 1) & 1;
             B += (p >> 2) & 1;
-            if (ncol(p) % 3 != 0) st.quarks += 1;
+            if (ncol(p) % 3 != 0) {
+                st.quarks += 1;
+                st.quark_r += g3.radius(i);
+            }
             st.carrier += g.carrier[i];
             for (g.cs5[i]) |v| st.memory += v;
         }
         st.colour = .{ R - B, G - B };
+        if (st.quarks > 0) st.quark_r /= @floatFromInt(st.quarks);
         if (g.cfg.colour) {
             for (0..n * 3) |l| {
                 const e = fE(g.fx[l][0], g.fx[l][1], g.fx[l][2]);
@@ -485,4 +553,19 @@ test "rule 31: the start obeys the Gauss law" {
     defer std.testing.allocator.destroy(g);
     g.init(.{});
     try std.testing.expectEqual(@as(i64, 0), g.stats(0).gauss);
+}
+
+test "rule 33: the neutral start is colour-neutral outside the core and obeys the Gauss law" {
+    const g = try std.testing.allocator.create(Five);
+    defer std.testing.allocator.destroy(g);
+    g.init(.{ .neutral = true, .core = 6 });
+    var quarks_outside: u32 = 0;
+    for (0..n) |i| if (g3.radius(i) > 6 and ncol(g.p5[i]) % 3 != 0) {
+        quarks_outside += 1;
+    };
+    try std.testing.expectEqual(@as(u32, 0), quarks_outside);
+    const st = g.stats(0);
+    try std.testing.expectEqual(@as(i64, 0), st.gauss);
+    try std.testing.expectEqual(@as(i64, 0), st.colour[0]);
+    try std.testing.expectEqual(@as(i64, 0), st.colour[1]);
 }

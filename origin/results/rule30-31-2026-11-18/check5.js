@@ -10,6 +10,8 @@ const settings = [
   { label: "colour, conserve+excite, motion", cfg: { five: true, colour: true, conserve: true, excite: true, motion: true } },
   { label: "colour, motion + EM, core 8", cfg: { five: true, colour: true, conserve: true, excite: true, motion: true, em: true, core: 8 } },
   { label: "colour off (rule 30 only), motion", cfg: { five: true, colour: false, conserve: true, excite: true, motion: true } },
+  { label: "rule 32, motion", cfg: { five: true, colour: true, conserve: true, excite: true, motion: true, allowed: true } },
+  { label: "rules 32+33, core 10, motion + EM + exclusion", cfg: { five: true, colour: true, conserve: true, excite: true, motion: true, em: true, exclusion: true, allowed: true, neutral: true, core: 10 } },
 ];
 for (const { label, cfg } of settings) {
   const e = new Engine(Object.assign({ mode: "lattice", display: "one_cell", update: "sync", core: 0, seed: 20261110n }, cfg));

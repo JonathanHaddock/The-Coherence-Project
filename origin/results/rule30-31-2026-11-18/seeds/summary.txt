@@ -1,0 +1,8 @@
+300_allowed-on_neutral-on_core-10_motion-on_colour-off_seed-1 quark_r 7.312 -> 7.797  spread +0.485  links with flux 0
+300_allowed-on_neutral-on_core-10_motion-on_colour-off_seed-2 quark_r 7.312 -> 7.835  spread +0.523  links with flux 0
+300_allowed-on_neutral-on_core-10_motion-on_colour-off_seed-3 quark_r 7.312 -> 7.838  spread +0.527  links with flux 0
+300_allowed-on_neutral-on_core-10_motion-on_colour-off_seed-4 quark_r 7.313 -> 7.841  spread +0.528  links with flux 0
+300_allowed-on_neutral-on_core-10_motion-on_seed-1           quark_r 7.312 -> 7.696  spread +0.383  links with flux 4054
+300_allowed-on_neutral-on_core-10_motion-on_seed-2           quark_r 7.312 -> 7.723  spread +0.411  links with flux 4127
+300_allowed-on_neutral-on_core-10_motion-on_seed-3           quark_r 7.312 -> 7.727  spread +0.415  links with flux 4046
+300_allowed-on_neutral-on_core-10_motion-on_seed-4           quark_r 7.313 -> 7.695  spread +0.382  links with flux 4002
