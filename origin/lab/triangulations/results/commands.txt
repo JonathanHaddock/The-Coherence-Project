@@ -1,0 +1,2 @@
+node run.js check > results/check.txt
+node run.js dims 2000 40 50 > results/dims.txt   # 2000 thermalization sweeps, 40 configurations 50 sweeps apart

@@ -1,0 +1,38 @@
+PASS  model A: incremental dE = full recomputation  300 random toggles on random 16-node graphs
+PASS  model A: sampler matches the Boltzmann distribution (5 nodes, all 1024 graphs, T 4)  total-variation distance 0.0039 (pure noise shrinks as 1/sqrt(steps): checked separately at 2e6, 8e6, 32e6 steps: 0.0094, 0.0050, 0.0024)
+PASS  model B: incremental dE = full recomputation  300 random toggles on random 16-node graphs
+PASS  model B: sampler matches the Boltzmann distribution (5 nodes, all 1024 graphs, T 4)  total-variation distance 0.0048 (pure noise shrinks as 1/sqrt(steps): checked separately at 2e6, 8e6, 32e6 steps: 0.0094, 0.0050, 0.0024)
+
+ENERGIES OF TWO CANDIDATE GROUND STATES, 64 nodes:
+  model A: square torus -64, eight disjoint K4,4 blocks -288   (lower wins)
+  model B: square torus -64, eight disjoint K4,4 blocks 5984
+PASS  model A prefers disconnected K4,4 blocks to a lattice  a loop reward with valence 4 does not select space
+PASS  model B prefers the lattice  with the manifold term the square torus is lower
+
+RESULT: cool from T = 4 to T = 0.02 (geometric), 3 seeds per size. (4 x 4 is left out: on so small a torus,
+  rows that wrap round in 4 steps are extra 4-cycles, so it is not a clean square lattice.)
+  model A         N 36 seed 1: E -23 (torus -36), lattice-like nodes 0/36, components 1 (largest 36), triangles 0
+  model A         N 36 seed 2: E -21 (torus -36), lattice-like nodes 1/36, components 1 (largest 36), triangles 0
+  model A         N 36 seed 3: E -24 (torus -36), lattice-like nodes 0/36, components 1 (largest 36), triangles 0
+  model A         N 64 seed 1: E -25 (torus -64), lattice-like nodes 0/64, components 1 (largest 64), triangles 0
+  model A         N 64 seed 2: E -26 (torus -64), lattice-like nodes 0/64, components 1 (largest 64), triangles 0
+  model A         N 64 seed 3: E -26 (torus -64), lattice-like nodes 1/64, components 1 (largest 64), triangles 0
+  model B         N 36 seed 1: E 10 (torus -36), lattice-like nodes 0/36, components 1 (largest 36), triangles 0
+  model B         N 36 seed 2: E -3 (torus -36), lattice-like nodes 7/36, components 1 (largest 36), triangles 0
+  model B         N 36 seed 3: E 16 (torus -36), lattice-like nodes 3/36, components 1 (largest 36), triangles 0
+  model B         N 64 seed 1: E 22 (torus -64), lattice-like nodes 4/64, components 1 (largest 64), triangles 0
+  model B         N 64 seed 2: E 21 (torus -64), lattice-like nodes 9/64, components 1 (largest 64), triangles 0
+  model B         N 64 seed 3: E 7 (torus -64), lattice-like nodes 9/64, components 1 (largest 64), triangles 0
+  model B slow x5 N 36 seed 1: E 8 (torus -36), lattice-like nodes 5/36, components 1 (largest 36), triangles 0
+  model B slow x5 N 36 seed 2: E 0 (torus -36), lattice-like nodes 6/36, components 1 (largest 36), triangles 0
+  model B slow x5 N 36 seed 3: E 0 (torus -36), lattice-like nodes 10/36, components 1 (largest 36), triangles 1
+  model B slow x5 N 64 seed 1: E 10 (torus -64), lattice-like nodes 8/64, components 1 (largest 64), triangles 0
+  model B slow x5 N 64 seed 2: E 14 (torus -64), lattice-like nodes 8/64, components 1 (largest 64), triangles 0
+  model B slow x5 N 64 seed 3: E 8 (torus -64), lattice-like nodes 5/64, components 1 (largest 64), triangles 0
+
+  model A: 1% lattice-like nodes on average, 6/6 runs connected, 0/6 at or below the torus energy
+  model B: 10% lattice-like nodes on average, 6/6 runs connected, 0/6 at or below the torus energy
+  model B, 5x slower cooling: 15% lattice-like nodes on average, 6/6 runs connected, 0/6 at or below the torus energy
+[{"model":"A","N":36,"seed":1,"E":-23,"torusE":-36,"lattice":0,"comps":1,"largest":36,"mean":2.6984126984126986,"conn":true,"c3":0},{"model":"A","N":36,"seed":2,"E":-21,"torusE":-36,"lattice":1,"comps":1,"largest":36,"mean":2.668253968253968,"conn":true,"c3":0},{"model":"A","N":36,"seed":3,"E":-24,"torusE":-36,"lattice":0,"comps":1,"largest":36,"mean":2.715873015873016,"conn":true,"c3":0},{"model":"A","N":64,"seed":1,"E":-25,"torusE":-64,"lattice":0,"comps":1,"largest":64,"mean":3.2415674603174605,"conn":true,"c3":0},{"model":"A","N":64,"seed":2,"E":-26,"torusE":-64,"lattice":0,"comps":1,"largest":64,"mean":3.2172619047619047,"conn":true,"c3":0},{"model":"A","N":64,"seed":3,"E":-26,"torusE":-64,"lattice":1,"comps":1,"largest":64,"mean":3.2172619047619047,"conn":true,"c3":0},{"model":"B","N":36,"seed":1,"E":10,"torusE":-36,"lattice":0,"comps":1,"largest":36,"mean":2.9444444444444446,"conn":true,"c3":0},{"model":"B","N":36,"seed":2,"E":-3,"torusE":-36,"lattice":7,"comps":1,"largest":36,"mean":2.933333333333333,"conn":true,"c3":0},{"model":"B","N":36,"seed":3,"E":16,"torusE":-36,"lattice":3,"comps":1,"largest":36,"mean":2.795238095238095,"conn":true,"c3":0},{"model":"B","N":64,"seed":1,"E":22,"torusE":-64,"lattice":4,"comps":1,"largest":64,"mean":3.583829365079365,"conn":true,"c3":0},{"model":"B","N":64,"seed":2,"E":21,"torusE":-64,"lattice":9,"comps":1,"largest":64,"mean":3.7549603174603177,"conn":true,"c3":0},{"model":"B","N":64,"seed":3,"E":7,"torusE":-64,"lattice":9,"comps":1,"largest":64,"mean":3.640873015873016,"conn":true,"c3":0},{"model":"B slow x5","N":36,"seed":1,"E":8,"torusE":-36,"lattice":5,"comps":1,"largest":36,"mean":2.8301587301587303,"conn":true,"c3":0},{"model":"B slow x5","N":36,"seed":2,"E":0,"torusE":-36,"lattice":6,"comps":1,"largest":36,"mean":2.8301587301587303,"conn":true,"c3":0},{"model":"B slow x5","N":36,"seed":3,"E":0,"torusE":-36,"lattice":10,"comps":1,"largest":36,"mean":2.914285714285714,"conn":true,"c3":1},{"model":"B slow x5","N":64,"seed":1,"E":10,"torusE":-64,"lattice":8,"comps":1,"largest":64,"mean":3.6879960317460316,"conn":true,"c3":0},{"model":"B slow x5","N":64,"seed":2,"E":14,"torusE":-64,"lattice":8,"comps":1,"largest":64,"mean":3.732142857142857,"conn":true,"c3":0},{"model":"B slow x5","N":64,"seed":3,"E":8,"torusE":-64,"lattice":5,"comps":1,"largest":64,"mean":3.7589285714285716,"conn":true,"c3":0}]
+
+all checks passed

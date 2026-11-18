@@ -1,0 +1,32 @@
+PASS  link counting = brute force  5 random sets of 120 points: largest difference 0
+PASS  longest chain = brute force  20 random sets of 200 points
+PASS  boosts preserve the causal order  chain length and link count unchanged under a boost of rapidity 2.3
+
+RESULT 1: count points in fixed boxes of area 4 (expect 4 per box) in a frame moving at rapidity eta.
+  A Poisson process has variance/mean = 1 and a share of empty boxes e^-4 = 0.018 in every frame.
+  eta    | random: var/mean  empty   | lattice: var/mean  empty
+  0.0    |  1.04  (mean 4.00)  0.030   |  0.17  (mean 4.06)  0.000
+  0.5    |  0.98  (mean 4.00)  0.015   |  0.03  (mean 4.00)  0.000
+  1.0    |  1.01  (mean 4.05)  0.015   |  1.26  (mean 4.00)  0.045
+  2.0    |  0.99  (mean 3.96)  0.020   |  9.93  (mean 4.00)  0.620
+  3.0    |  1.07  (mean 3.92)  0.022   |  43.19  (mean 3.66)  0.875
+PASS  random sprinkling looks the same in every frame  var/mean stays near 1 and empty boxes near e^-4 for every rapidity
+PASS  the regular lattice does not  at rapidity 3: var/mean 43.19, empty boxes 88%
+
+RESULT 2: longest chain in an interval of N points (proper time). Theory: E[L] = 2 sqrt(N) - 1.771 N^(1/6) + ...
+  N 1000: L = 57.5 ± 0.4   L/sqrt(N) = 1.8175   with Tracy-Widom correction 57.6
+  N 10000: L = 193.4 ± 0.7   L/sqrt(N) = 1.9338   with Tracy-Widom correction 191.8
+  N 100000: L = 621.8 ± 1.2   L/sqrt(N) = 1.9663   with Tracy-Widom correction 620.4
+PASS  longest chain = 2 sqrt(N) with the known correction  geometry (proper time) is read off from order and counting alone
+
+RESULT 3: links to the future per element (nearest causal neighbours). On the regular lattice it is exactly 2.
+  N 500: 4.753
+  N 1000: 5.527
+  N 2000: 6.133
+  N 4000: 6.893
+  N 8000: 7.573
+  N 16000: 8.234
+  growth: 1.002 more links per element each time ln N grows by 1
+PASS  random sprinkling: the number of nearest neighbours grows with size (nonlocal)  links per element ~ 1.00 ln N
+
+all checks passed

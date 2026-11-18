@@ -1,0 +1,42 @@
+PASS  unitarity  norm stays 1 to 6.66e-15 over 500 ticks
+PASS  strict light cone  after t ticks nothing is ever found more than t sites from the start
+PASS  dispersion is exactly cos(omega) = n cos k  plane waves for m 0, 0.1, 0.5 and four k: largest mismatch 3.24e-13
+
+RESULT 1: low momentum = relativity. Compare the automaton's omega(k) with sqrt(k^2 + m^2):
+  m      k      automaton   relativistic   rel. difference
+  0.01   0.01   0.014142    0.014142     0.000%
+  0.01   0.05   0.050989    0.050990     -0.002%
+  0.01   0.20   0.200247    0.200250     -0.002%
+  0.01   0.50   0.500092    0.500100     -0.002%
+  0.01   1.00   1.000032    1.000050     -0.002%
+  0.01   2.00   1.999977    2.000025     -0.002%
+  0.05   0.01   0.051010    0.050990     0.039%
+  0.05   0.05   0.070711    0.070711     0.000%
+  0.05   0.20   0.206079    0.206155     -0.037%
+  0.05   0.50   0.502285    0.502494     -0.042%
+  0.05   1.00   1.000803    1.001249     -0.045%
+  0.05   2.00   1.999428    2.000625     -0.060%
+
+RESULT 2: wave packets move at the group velocity and never faster than light
+PASS  packet k 0.1, m 0.2: measured speed = automaton group velocity  measured 0.4351, automaton 0.4394, relativity 0.4472
+PASS  packet k 0.4, m 0.2: measured speed = automaton group velocity  measured 0.8851, automaton 0.8857, relativity 0.8944
+PASS  packet k 1, m 0.2: measured speed = automaton group velocity  measured 0.9718, automaton 0.9718, relativity 0.9806
+PASS  packet k 2, m 0.2: measured speed = automaton group velocity  measured 0.9757, automaton 0.9757, relativity 0.9950
+PASS  no faster-than-light motion  largest group velocity at m 0.2: 0.979796 (at k = 1.571); light speed = 1 site per tick
+
+RESULT 3: Zitterbewegung (a Dirac-equation hallmark) appears unprompted
+PASS  jitter frequency = 2 omega(k = 0)  measured 0.6105, predicted 2 arccos(n) = 0.6094 (relativistic 2m = 0.6000)
+
+RESULT 4: 3D Weyl automaton (BCC lattice). omega should be |k|/sqrt3 in every direction at small k.
+  |k|     (1,0,0)    (1,1,0)    (1,1,1)    (1,-1,1)    (1,2,3)   spread/mean
+  0.01   1.000000  0.999999  1.001109  0.998886  1.000660   2.22e-3
+  0.03   1.000000  0.999987  1.003311  0.996644  1.001969   6.66e-3
+  0.10   1.000000  0.999861  1.010867  0.988639  1.006453   2.22e-2
+  0.30   1.000000  0.998747  1.031184  0.964370  1.018419   6.66e-2
+  1.00   1.000000  0.985701  1.089022  0.861539  1.050901   2.28e-1
+  (omega / (|k|/sqrt3) for each direction; 1 = exactly relativistic)
+  anisotropy grows as |k|^1.00 (0.01 -> 0.03) and |k|^1.00 (0.03 -> 0.1)
+PASS  3D Weyl automaton becomes isotropic as k -> 0  spread shrinks linearly: 2.22e-3 at |k| 0.01
+PASS  leading anisotropy = 2 a_x a_y a_z in omega^2, opposite sign for the two chiralities  200 random directions at |k| 0.01, both chiralities: largest relative residual 1.86e-6 (next order is k^2 ~ 1e-4)
+
+all checks passed

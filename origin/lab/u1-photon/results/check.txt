@@ -1,0 +1,11 @@
+PASS  2D plaquette beta 0.5  0.24299 ± 0.00047 vs exact 0.24250
+PASS  2D plaquette beta 1  0.44638 ± 0.00131 vs exact 0.44639
+PASS  2D plaquette beta 2  0.69870 ± 0.00072 vs exact 0.69777
+PASS  2D plaquette beta 4  0.86302 ± 0.00039 vs exact 0.86352
+PASS  2D Wilson loops = (I1/I0)^area  W(1,1) 0.6973/0.6978  W(2,1) 0.4873/0.4869  W(2,2) 0.2369/0.2371  W(3,2) 0.1154/0.1154
+PASS  gauge invariance  plaquette, W(2,2), smeared W(2,2): largest change 1.11e-16
+PASS  4D strong coupling beta 0.1  0.0473 ± 0.0013 vs leading order 0.0500
+PASS  4D strong coupling beta 0.2  0.0977 ± 0.0011 vs leading order 0.1000
+PASS  4D weak coupling beta 8  0.9683 ± 0.0001 vs leading order 0.9688
+PASS  4D weak coupling beta 16  0.9842 ± 0.0001 vs leading order 0.9844
+all checks passed

@@ -1,0 +1,6 @@
+node check.js > results/check.txt
+node run.js scan > results/phase-scan.tsv            # L 6, 400 + 400 sweeps per point, cold and hot
+node run.js pot beta=0.9 L=10 > results/potential-b0.9.txt
+node run.js pot beta=1.1 L=10 > results/potential-b1.1.txt
+node run.js pot beta=1.5 L=10 > results/potential-b1.5.txt
+node freefield.js 10 1.1 > results/freefield-L10.txt; node freefield.js 10 1.5 >> results/freefield-L10.txt

@@ -1,0 +1,17 @@
+PASS  Pauli algebra: XZ = -ZX  
+PASS  Pauli algebra: (XZ)^2 = -1  
+PASS  Pauli algebra: P P^dag = 1  
+PASS  L 2: every A_v commutes with every B_p; ground-state degeneracy  4 (expected 4 on a torus: topological order)
+PASS  L 3: every A_v commutes with every B_p; ground-state degeneracy  4 (expected 4 on a torus: topological order)
+PASS  L 4: every A_v commutes with every B_p; ground-state degeneracy  4 (expected 4 on a torus: topological order)
+PASS  L 5: every A_v commutes with every B_p; ground-state degeneracy  4 (expected 4 on a torus: topological order)
+PASS  L 2 brute-force diagonalisation  E0 -8.000000 (expected -8), degeneracy 4, gap 4.000000 (expected 4: two excitations of cost 2)
+PASS  open strings: excitations only at the two ends, whatever the length (deconfined)  length 1: e at 0,1; length 2: e at 0,2; length 3: e at 0,3; length 4: e at 0,4; length 5: e at 0,5
+PASS  closed strings cost nothing  a closed 2x1 loop of Z flips no stabilizer
+PASS  exchange statistics of e: same in all 10 junctions  e^{i theta} = +1 (boson)
+PASS  exchange statistics of m: same in all 10 junctions  e^{i theta} = +1 (boson)
+PASS  exchange statistics of eps: same in all 10 junctions  e^{i theta} = -1 (fermion)
+PASS  e and m are bosons, e x m is a fermion  built only from qubits (bosons) with local rules
+PASS  mutual statistics: e around m  the loop operator anticommutes with the string that made m: phase -1 (Aharonov-Bohm with flux pi)
+PASS  e x m bound on the opposite corner is still a fermion  legs valid (2 e + 2 m each): true; e^{i theta} = -1 (fermion)
+all checks passed

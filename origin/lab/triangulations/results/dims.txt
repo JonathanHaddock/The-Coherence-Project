@@ -1,0 +1,13 @@
+DT  N 1000 (vertices 502): mean distance 6.190; shell sizes r=1..10: 5.9 18.9 39.0 61.2 78.6 82.7 73.0 56.0 39.4 23.8
+DT  N 2000 (vertices 1002): mean distance 7.662; shell sizes r=1..10: 6.0 19.4 40.5 68.9 99.5 125.4 138.6 133.4 114.5 88.4
+DT  N 4000 (vertices 2002): mean distance 10.055; shell sizes r=1..10: 5.9 19.3 40.2 69.3 104.9 140.5 167.7 183.1 189.5 186.9
+DT  N 8000 (vertices 4002): mean distance 11.867; shell sizes r=1..10: 6.1 19.7 42.4 75.2 120.1 173.6 227.9 281.0 320.6 348.5
+DT  N 16000 (vertices 8002): mean distance 15.221; shell sizes r=1..10: 6.2 20.1 43.9 78.7 125.5 183.4 246.7 312.3 373.9 427.5
+DT : size scaling <r> ~ V^(1/dH) -> dH = 3.09;  ball growth n(r) ~ r^(dH-1) for r 3-8 at the largest size -> dH = 3.02
+CDT N 1000 (vertices 544): mean distance 7.234; shell sizes r=1..10: 6.1 15.7 27.8 41.1 54.3 64.5 69.1 68.9 64.4 59.8
+CDT N 2000 (vertices 1087): mean distance 10.088; shell sizes r=1..10: 6.1 16.1 28.2 41.1 55.9 70.5 83.1 92.0 96.4 95.7
+CDT N 4000 (vertices 2173): mean distance 13.711; shell sizes r=1..10: 6.1 16.0 27.9 41.5 56.0 71.1 86.4 101.3 115.5 126.4
+CDT N 8000 (vertices 4350): mean distance 18.764; shell sizes r=1..10: 6.0 15.7 27.6 41.2 56.1 71.6 87.2 105.4 123.4 140.8
+CDT N 16000 (vertices 8678): mean distance 26.008; shell sizes r=1..10: 6.1 16.0 28.0 41.4 56.5 72.7 89.4 106.3 124.0 143.3
+CDT: size scaling <r> ~ V^(1/dH) -> dH = 2.18;  ball growth n(r) ~ r^(dH-1) for r 3-8 at the largest size -> dH = 2.36
+{"dt":{"dH":3.0946162108258677,"dHshell":3.0172918922773957},"cdt":{"dH":2.178229596075106,"dHshell":2.3649039037940858}}

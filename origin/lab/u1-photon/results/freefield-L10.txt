@@ -1,0 +1,4 @@
+free photon, L 10, beta 1.1: V(R) = 0.1514 0.1901 0.2032 0.2083 0.2097
+Cornell fit R >= 1: sigma a^2 = -0.0018, e = 0.0827 (infinite-volume value 1/(4 pi beta) = 0.0723)
+free photon, L 10, beta 1.5: V(R) = 0.1110 0.1394 0.1490 0.1527 0.1538
+Cornell fit R >= 1: sigma a^2 = -0.0013, e = 0.0607 (infinite-volume value 1/(4 pi beta) = 0.0531)
