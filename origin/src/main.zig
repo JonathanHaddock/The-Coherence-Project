@@ -1345,6 +1345,9 @@ fn fiveRun(gpa: std.mem.Allocator, args: anytype) !void {
     defer gpa.free(before);
     var gaps: [201]u64 = @splat(0);
     var changes_after: u64 = 0;
+    // per-site gap list (site, gap) for the group-by-rate hazard
+    var glist = std.ArrayList([2]u32).empty;
+    defer glist.deinit(gpa);
     var t: i64 = 0;
     while (t < ticks) : (t += 1) {
         @memcpy(before, five_grid.p5[0..]);
@@ -1353,7 +1356,10 @@ fn fiveRun(gpa: std.mem.Allocator, args: anytype) !void {
             for (0..five.n) |i| {
                 if (five_grid.p5[i] == before[i]) continue;
                 changes_after += 1;
-                if (last_change[i] >= @divTrunc(ticks, 2)) gaps[@intCast(@min(200, t - last_change[i]))] += 1;
+                if (last_change[i] >= @divTrunc(ticks, 2)) {
+                    gaps[@intCast(@min(200, t - last_change[i]))] += 1;
+                    try glist.append(gpa, .{ @intCast(i), @intCast(@min(200, t - last_change[i])) });
+                }
                 last_change[i] = t;
             }
         }
@@ -1369,6 +1375,40 @@ fn fiveRun(gpa: std.mem.Allocator, args: anytype) !void {
         rem -= gaps[k];
     }
     std.debug.print("\n", .{});
+    // hazard within groups of pixels with similar change rates (quintiles of per-site gap count)
+    const cnt = try gpa.alloc(u32, five.n);
+    defer gpa.free(cnt);
+    @memset(cnt, 0);
+    for (glist.items) |e| cnt[e[0]] += 1;
+    var active = std.ArrayList(u32).empty;
+    defer active.deinit(gpa);
+    for (cnt) |c| if (c >= 5) try active.append(gpa, c);
+    std.mem.sort(u32, active.items, {}, std.sort.asc(u32));
+    if (active.items.len >= 5) {
+        var cuts: [6]u32 = undefined;
+        for (0..5) |q| cuts[q] = active.items[q * active.items.len / 5];
+        cuts[5] = std.math.maxInt(u32);
+        for (0..5) |q| {
+            var h: [201]u64 = @splat(0);
+            var sites: u64 = 0;
+            for (cnt) |c| {
+                if (c >= 5 and c >= cuts[q] and c < cuts[q + 1]) sites += 1;
+            }
+            for (glist.items) |e| {
+                const c = cnt[e[0]];
+                if (c >= 5 and c >= cuts[q] and c < cuts[q + 1]) h[e[1]] += 1;
+            }
+            var r2: u64 = 0;
+            for (h[1..]) |v| r2 += v;
+            std.debug.print("#group {d} ({d} sites, {d}-{d} gaps each, {d} gaps) hazard 1..30:", .{ q + 1, sites, cuts[q], if (q < 4) cuts[q + 1] - 1 else active.items[active.items.len - 1], r2 });
+            for (1..31) |k| {
+                if (r2 == 0) break;
+                std.debug.print(" {d:.3}", .{@as(f64, @floatFromInt(h[k])) / @as(f64, @floatFromInt(r2))});
+                r2 -= h[k];
+            }
+            std.debug.print("\n", .{});
+        }
+    }
 }
 
 var lattice: grid3.Grid3 = undefined;

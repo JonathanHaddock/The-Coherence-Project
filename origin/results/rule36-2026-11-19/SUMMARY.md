@@ -19,3 +19,11 @@ Energy ledger (memory + carrier + string energy + edge loss − driven): drift 0
 - No criticality signature: no heavy tail in the per-tick flash count at any rate (no tick above twice the mean).
 
 Files: drive-<r>.tsv (per tick; last lines: #changes and #hazard, gaps 1–40).
+
+## Check: is the falling hazard a mix of fast and slow pixels? (measurement only)
+
+Pixels with at least 5 gaps in ticks 3,000–6,000 were split into five equal groups by how many gaps they had, and the hazard was measured inside each group (groups-drive-10.txt, groups-drive-100.txt). If each pixel changed at a constant chance of its own, the hazard inside a narrow group would be flat.
+
+- Drive 10: it falls steeply in every group, including the narrowest (5, 6–7 and 8–11 gaps per pixel): e.g. group 3 goes 0.168, 0.222, 0.057, … 0.003 by gap 30.
+- Drive 100: the same in groups 1–4 (e.g. group 2: 0.177 → 0.003). Only the busiest fifth (122–629 gaps per pixel) has a slow tail, 0.058 at gap 7 → 0.037 at gap 29, still falling by about a third.
+- Mixing does not explain it. Each pixel's own timing has memory: a change is followed by a burst of quick changes, then a long quiet whose chance of ending keeps shrinking. That is not constant-chance decay at any drive tried.
