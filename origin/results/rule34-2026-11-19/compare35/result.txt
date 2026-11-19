@@ -1,0 +1,6 @@
+1 [allowed=on motion=on] IDENTICAL  ledger drift 1.3e+06  gauss 0
+2 [allowed=on neutral=on core=10 motion=on tension=on] IDENTICAL  ledger drift 0.0e+00  gauss 0
+3 [allowed=on neutral=on core=10 motion=on tension=on em=on] IDENTICAL  ledger drift 5.8e-11  gauss 0
+4 [allowed=on motion=on tension=on] IDENTICAL  ledger drift 1.0e-06  gauss 0
+5 [allowed=on neutral=on core=16 motion=on tension=on seed=3] IDENTICAL  ledger drift 5.8e-11  gauss 0
+6 [neutral=on core=10 motion=on tension=on] IDENTICAL  ledger drift 0.0e+00  gauss 0

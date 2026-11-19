@@ -485,7 +485,7 @@ class Engine {
         else { this.p5[i] = lep(this.p5[i]); done[i] = 1; } }
       for (let i = 0; i < N; i++) if (inCore(i)) for (let k = 0; k < 5; k++) this.cs5[i * 5 + k] = 1;
     } else if (this.cfg.core > 0) for (let i = 0; i < N; i++) if (RAD[i] <= this.cfg.core) { this.p5[i] = 7; for (let k = 0; k < 5; k++) this.cs5[i * 5 + k] = 1; }
-    this.taken = new Uint8Array(N); this.exchanges = 0; this.blocked5 = 0; this.relaxed = 0;
+    this.taken = new Uint8Array(N); this.exchanges = 0; this.blocked5 = 0; this.relaxed = 0; this.broke = 0; this.lost = 0; this.exchDE = 0;
     // RULE 31 (b): colour flux on links (3 counts per link; link id = site*3 + axis, as rule 28) and out of the +x edge
     this.fx = new Int32Array(N * 9); this.edge = new Int32Array(N * 3);
     for (let z = 0; z < S; z++) for (let y = 0; y < S; y++) { let r = 0, g = 0, b = 0;
@@ -496,6 +496,8 @@ class Engine {
   static fE(a, b, c) { return 3 * (a * a + b * b + c * c) - (a + b + c) * (a + b + c); }
   // add colour vector v (3 ints) to the link between site i and its neighbour through face f, oriented so that
   // site i's out-flux grows by v
+  exchCost5(i, f, v) { const l = LK[i * 6 + f], sg = (f & 1) ? -1 : 1, F = [this.fx[l * 3], this.fx[l * 3 + 1], this.fx[l * 3 + 2]]; return Engine.fE(F[0] + sg * v[0], F[1] + sg * v[1], F[2] + sg * v[2]) - Engine.fE(...F); }
+  mem5(i) { let m = 0; for (let k = 0; k < 5; k++) m += this.cs5[i * 5 + k]; return m; }
   addFlux(i, f, v) { const l = LK[i * 6 + f], sg = (f & 1) ? -1 : 1; for (let c = 0; c < 3; c++) this.fx[l * 3 + c] += sg * v[c]; }
   surplus5(i, k) { return this.cs5[i * 5 + k] - this.rf5[i * 5 + k]; }
   // rule 1 one_cell over 5 cells (the only display rule built for five cells): the cell with the largest positive surplus
@@ -538,22 +540,23 @@ class Engine {
       let pl = null, partner = -1, pnew = -1, face = -1;
       if (this.cfg.allowed) { // RULE 32: the first allowed change by surplus, else a flash without change
         const order = [0, 1, 2, 3, 4].filter(k => this.surplus5(i, k) > 0).sort((a, b) => this.surplus5(i, b) - this.surplus5(i, a) || a - b);
-        for (const k of order) { const c = this.planCell(i, k); if (!c) continue; const fp = findPartner(c); if (!fp) continue; if (this.excluded5(i, c.np)) continue; pl = c; [partner, pnew, face] = fp; break; }
+        for (const k of order) { const c = this.planCell(i, k); if (!c) continue; const fp = findPartner(c); if (!fp) continue; if (this.excluded5(i, c.np)) continue; if (colour && this.cfg.tension && c.dv && this.exchCost5(i, fp[2], c.dv) > this.mem5(i)) continue; pl = c; [partner, pnew, face] = fp; break; }
         if (!pl) { pl = { np: this.p5[i], part: null, dv: null }; this.released5++; }
       } else {
         pl = this.plan5(i); if (!pl) { this.blocked5++; continue; }
-        if (pl.part) { const fp = findPartner(pl); if (!fp) { this.blocked5++; continue; } [partner, pnew, face] = fp; }
+        if (pl.part) { const fp = findPartner(pl); if (!fp) { this.blocked5++; continue; } [partner, pnew, face] = fp; if (colour && this.cfg.tension && pl.dv && this.exchCost5(i, face, pl.dv) > this.mem5(i)) { this.blocked5++; continue; } }
         if (this.excluded5(i, pl.np)) { this.blocked5++; continue; }
       }
       // the flash: x changes, the partner takes the opposite change; colour flux moves with it (Gauss law)
-      this.p5[i] = pl.np; if (partner >= 0) { this.p5[partner] = pnew; this.taken[partner] = 1; this.exchanges++; if (colour && pl.dv) this.addFlux(i, face, pl.dv); }
+      let owe = 0; this.p5[i] = pl.np; if (partner >= 0) { this.p5[partner] = pnew; this.taken[partner] = 1; this.exchanges++; if (colour && pl.dv) { const l = LK[i * 6 + face], fx = this.fx, e0 = Engine.fE(fx[l * 3], fx[l * 3 + 1], fx[l * 3 + 2]); this.addFlux(i, face, pl.dv); const de = Engine.fE(fx[l * 3], fx[l * 3 + 1], fx[l * 3 + 2]) - e0; if (this.cfg.tension) owe = de; else this.exchDE += de; } }
       this.taken[i] = 1; this.fired[i] = 1; count++;
       const rel = []; for (let k = 0; k < 5; k++) { rel.push(this.cs5[i * 5 + k]); this.cs5[i * 5 + k] = 0; this.rf5[i * 5 + k] = 0; }
+      if (owe < 0) this.carrier[i] += -owe; while (owe > 0) { let k = 0; for (let q = 1; q < 5; q++) if (rel[q] > rel[k]) k = q; rel[k]--; owe--; } // RULE 35
       shouts.push([i, rel]);
     }
     for (const [i, rel] of shouts) this.shout5(i, rel);
     // carrier (rule 5) and its response, with 5 units per whole pixel and 5 cells
-    this.spread();
+    { let b = 0; for (let i = 0; i < N; i++) b += this.carrier[i]; this.spread(); let a = 0; for (let i = 0; i < N; i++) a += this.carrier[i]; this.lost += b - a; }
     const c = this.carrier;
     if (this.cfg.gravity || this.cfg.cancel || this.cfg.excite) for (let i = 0; i < N; i++) { if (c[i] < 5) continue; const k = Math.floor(c[i] / 5);
       if (this.cfg.gravity) { c[i] -= k * 5; for (let q = 0; q < 5; q++) this.rf5[i * 5 + q] += k; }
@@ -564,6 +567,7 @@ class Engine {
         if (x + 1 < S) nx[i + 1] += sh; if (x > 0) nx[i - 1] += sh; if (y + 1 < S) nx[i + S] += sh; if (y > 0) nx[i - S] += sh; if (z + 1 < S) nx[i + S * S] += sh; if (z > 0) nx[i - S * S] += sh; }
       this.phi = nx; this.phin = ph; }
     if (colour) this.relax5();
+    this.broke = 0; if (colour && this.cfg.tension) this.break5();
     if (this.cfg.motion) this.move5();
     this.t++; this.total += count;
     return count;
@@ -579,9 +583,23 @@ class Engine {
       let E0 = 0; for (const l of L) E0 += Engine.fE(fx[l * 3], fx[l * 3 + 1], fx[l * 3 + 2]);
       let best = -1, bestE = E0;
       for (let o = 0; o < 6; o++) { let E = 0; for (let k = 0; k < 4; k++) { const l = L[k], v = opts[o]; E += Engine.fE(fx[l * 3] + sg[k] * v[0], fx[l * 3 + 1] + sg[k] * v[1], fx[l * 3 + 2] + sg[k] * v[2]); } if (E < bestE) { bestE = E; best = o; } }
-      if (best >= 0) { for (let k = 0; k < 4; k++) { const l = L[k], v = opts[best]; for (let cc = 0; cc < 3; cc++) fx[l * 3 + cc] += sg[k] * v[cc]; } moves++; }
+      if (best >= 0) { for (let k = 0; k < 4; k++) { const l = L[k], v = opts[best]; for (let cc = 0; cc < 3; cc++) fx[l * 3 + cc] += sg[k] * v[cc]; } moves++; if (this.cfg.tension) this.carrier[i] += E0 - bestE; }
     }
     this.relaxed = moves;
+  }
+  // RULE 34 (c): a link between an all-colour pixel and a no-colour pixel may break the string by passing a colour cell
+  break5() {
+    const used = new Uint8Array(N), fx = this.fx;
+    for (let i = 0; i < N; i++) for (let ax = 0; ax < 3; ax++) {
+      const l = LK[i * 6 + 2 * ax]; if (l < 0) continue; const j = NB[i * 6 + 2 * ax]; if (used[i] || used[j]) continue;
+      const ci = Engine.ncol(this.p5[i]), cj = Engine.ncol(this.p5[j]); if (!((ci === 3 && cj === 0) || (ci === 0 && cj === 3))) continue;
+      const sgn = ci === 3 ? -1 : 1, F = [fx[l * 3], fx[l * 3 + 1], fx[l * 3 + 2]], e0 = Engine.fE(...F);
+      let best = -1, be = e0;
+      for (let c = 0; c < 3; c++) { const Fn = F.slice(); Fn[c] += sgn; const e = Engine.fE(...Fn); if (e < be) { be = e; best = c; } }
+      if (best < 0) continue;
+      fx[l * 3 + best] += sgn; this.p5[i] ^= 1 << best; this.p5[j] ^= 1 << best; this.carrier[i] += e0 - be;
+      used[i] = used[j] = 1; this.broke++;
+    }
   }
   // RULE 24 with five cells, RULE 31 (d): strings pull colour-charged pixels
   move5() {
@@ -605,6 +623,15 @@ class Engine {
         else { const c = this.carrier; let bc = c[i]; for (let q = 0; q < 6; q++) { if (LK[i * 6 + q] < 0) continue; const j = NB[i * 6 + q]; if (c[j] > bc) { best = j; bestFace = q; bc = c[j]; } } }
       }
       if (best < 0 || f[best] || m[best]) continue;
+      if (this.cfg.colour && this.cfg.tension) { // RULE 34 (a): a move pays for the string it stretches
+        const l = LK[i * 6 + bestFace], ri = col(this.p5[i]), rj = col(this.p5[best]), sg = (bestFace & 1) ? -1 : 1;
+        const F = [this.fx[l * 3], this.fx[l * 3 + 1], this.fx[l * 3 + 2]], d = Engine.fE(...F.map((v, cc) => v + sg * (rj[cc] - ri[cc]))) - Engine.fE(...F);
+        if (d > 0) { let mem = 0; for (let k = 0; k < 5; k++) mem += this.cs5[i * 5 + k];
+          if (mem + this.carrier[i] < d) continue;
+          let owe = d; while (owe > 0 && mem > 0) { let k = 0; for (let q = 1; q < 5; q++) if (this.cs5[i * 5 + q] > this.cs5[i * 5 + k]) k = q; this.cs5[i * 5 + k]--; mem--; owe--; }
+          this.carrier[i] -= owe; }
+        else if (d < 0) this.carrier[best] += -d;
+      }
       if (this.cfg.colour) { const ri = col(this.p5[i]), rj = col(this.p5[best]); this.addFlux(i, bestFace, [rj[0] - ri[0], rj[1] - ri[1], rj[2] - ri[2]]); }
       sw(this.p5, i, best); sw(this.home, i, best); sw(f, i, best);
       for (let k = 0; k < 5; k++) { sw(this.rf5, i * 5 + k, best * 5 + k); sw(this.cs5, i * 5 + k, best * 5 + k); }
@@ -622,7 +649,7 @@ class Engine {
         if (i % S === S - 1) for (let c = 0; c < 3; c++) d[c] += this.edge[i * 3 + c];
         const r = [d[0] - (p & 1), d[1] - ((p >> 1) & 1), d[2] - ((p >> 2) & 1)]; gauss = Math.max(gauss, Math.abs(r[0] - r[1]), Math.abs(r[1] - r[2])); }
     }
-    return { charge3: Q, colour: [R - B, G - B], quarks, leptons, gauss, fluxE: fluxE / 3, strings, exchanges: this.exchanges, blocked: this.blocked5, relaxed: this.relaxed, swaps: this.swaps, released: this.released5 || 0, quarkR: quarks ? qr / quarks : 0 };
+    return { charge3: Q, colour: [R - B, G - B], quarks, leptons, gauss, fluxE: fluxE / 3, strings, exchanges: this.exchanges, blocked: this.blocked5, relaxed: this.relaxed, swaps: this.swaps, released: this.released5 || 0, quarkR: quarks ? qr / quarks : 0, broke: this.broke || 0, lost: this.lost || 0, exchDE: this.exchDE || 0 };
   }
   agreement(i) {
     if (this.cfg.five) { let m = 0; const p = this.p5[i]; for (let q = 0; q < 6; q++) { const x = p ^ this.p5[NB[i * 6 + q]]; let d = 0; for (let k = 0; k < 5; k++) d += (x >> k) & 1; m += 5 - d; } return m / 30; }

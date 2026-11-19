@@ -1333,15 +1333,15 @@ fn fiveRun(gpa: std.mem.Allocator, args: anytype) !void {
         const k = a[0..eq];
         const v = a[eq + 1 ..];
         const on = std.mem.eql(u8, v, "on");
-        if (std.mem.eql(u8, k, "colour")) cfg.colour = on else if (std.mem.eql(u8, k, "conserve")) cfg.conserve = on else if (std.mem.eql(u8, k, "excite")) cfg.excite = on else if (std.mem.eql(u8, k, "gravity")) cfg.gravity = on else if (std.mem.eql(u8, k, "cancel")) cfg.cancel = on else if (std.mem.eql(u8, k, "exclusion")) cfg.exclusion = on else if (std.mem.eql(u8, k, "motion")) cfg.motion = on else if (std.mem.eql(u8, k, "em")) cfg.em = on else if (std.mem.eql(u8, k, "allowed")) cfg.allowed = on else if (std.mem.eql(u8, k, "neutral")) cfg.neutral = on else if (std.mem.eql(u8, k, "core")) cfg.core = try std.fmt.parseInt(u32, v, 10) else if (std.mem.eql(u8, k, "seed")) cfg.seed = try std.fmt.parseInt(u64, v, 10);
+        if (std.mem.eql(u8, k, "colour")) cfg.colour = on else if (std.mem.eql(u8, k, "conserve")) cfg.conserve = on else if (std.mem.eql(u8, k, "excite")) cfg.excite = on else if (std.mem.eql(u8, k, "gravity")) cfg.gravity = on else if (std.mem.eql(u8, k, "cancel")) cfg.cancel = on else if (std.mem.eql(u8, k, "exclusion")) cfg.exclusion = on else if (std.mem.eql(u8, k, "motion")) cfg.motion = on else if (std.mem.eql(u8, k, "em")) cfg.em = on else if (std.mem.eql(u8, k, "allowed")) cfg.allowed = on else if (std.mem.eql(u8, k, "neutral")) cfg.neutral = on else if (std.mem.eql(u8, k, "tension")) cfg.tension = on else if (std.mem.eql(u8, k, "core")) cfg.core = try std.fmt.parseInt(u32, v, 10) else if (std.mem.eql(u8, k, "seed")) cfg.seed = try std.fmt.parseInt(u64, v, 10);
     }
     five_grid.init(cfg);
-    std.debug.print("tick\tflashes\texchanges\tblocked\treleased\tquark_r\trelaxed\tswaps\tcharge3\tcolour_rb\tcolour_gb\tquarks\tgauss\tflux_e3\tstrings\tcarrier\tmemory\n", .{});
+    std.debug.print("tick\tflashes\texchanges\tblocked\treleased\tquark_r\trelaxed\tswaps\tcharge3\tcolour_rb\tcolour_gb\tquarks\tgauss\tflux_e3\tstrings\tcarrier\tmemory\tbroke\tlost\texch_de\n", .{});
     var t: i64 = 0;
     while (t < ticks) : (t += 1) {
         const f = try five_grid.tick(gpa);
         const st = five_grid.stats(f);
-        std.debug.print("{d}\t{d}\t{d}\t{d}\t{d}\t{d:.4}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d:.6}\t{d}\n", .{ t, st.flashes, st.exchanges, st.blocked, st.released, st.quark_r, st.relaxed, st.swaps, st.charge3, st.colour[0], st.colour[1], st.quarks, st.gauss, st.flux_e3, st.strings, st.carrier, st.memory });
+        std.debug.print("{d}\t{d}\t{d}\t{d}\t{d}\t{d:.4}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d:.6}\t{d}\t{d}\t{d:.6}\t{d}\n", .{ t, st.flashes, st.exchanges, st.blocked, st.released, st.quark_r, st.relaxed, st.swaps, st.charge3, st.colour[0], st.colour[1], st.quarks, st.gauss, st.flux_e3, st.strings, st.carrier, st.memory, st.broke, st.lost, st.exch_de });
     }
 }
 

@@ -24,6 +24,7 @@ pub const Cfg = struct {
     em: bool = false,
     allowed: bool = false, // RULE 32
     neutral: bool = false, // RULE 33
+    tension: bool = false, // RULE 34
 };
 
 pub fn q5(p: u8) i32 {
@@ -43,7 +44,7 @@ pub fn fE(a: i32, b: i32, c: i32) i64 {
     return 3 * (A * A + B * B + C * C) - (A + B + C) * (A + B + C);
 }
 
-pub const Stats = struct { flashes: u32, exchanges: u32, blocked: u32, released: u32, quark_r: f64, relaxed: u32, swaps: u32, charge3: i64, colour: [2]i64, quarks: u32, gauss: i64, flux_e3: i64, strings: u32, carrier: f64, memory: u64 };
+pub const Stats = struct { flashes: u32, exchanges: u32, blocked: u32, released: u32, quark_r: f64, relaxed: u32, swaps: u32, charge3: i64, colour: [2]i64, quarks: u32, gauss: i64, flux_e3: i64, strings: u32, carrier: f64, memory: u64, broke: u32, lost: f64, exch_de: i64 };
 
 const Plan = struct { np: u8, has_part: bool, k: u3 = 0, j: u3 = 0, filled: u1 = 0, weak: bool = false, u: u1 = 0, d: u1 = 0, dv: [3]i32 = .{ 0, 0, 0 } };
 
@@ -67,6 +68,9 @@ pub const Five = struct {
     released: u32,
     relaxed: u32,
     swaps: u32,
+    broke: u32,
+    lost: f64,
+    exch_de: i64,
 
     pub fn init(g: *Five, cfg: Cfg) void {
         g.cfg = cfg;
@@ -81,6 +85,9 @@ pub const Five = struct {
         g.released = 0;
         g.relaxed = 0;
         g.swaps = 0;
+        g.broke = 0;
+        g.lost = 0;
+        g.exch_de = 0;
         var s: u64 = cfg.seed ^ 0x5f5f5f5f;
         for (0..n) |i| {
             s ^= s << 13;
@@ -128,6 +135,18 @@ pub const Five = struct {
         };
     }
 
+    /// RULE 35: change in flux energy of the link an exchange runs along.
+    fn exchCost(g: *const Five, i: usize, face: usize, dv: [3]i32) i64 {
+        const l = g3.Grid3.linkOf(i, face).?;
+        const sg: i32 = if (face & 1 == 1) -1 else 1;
+        const F = g.fx[l];
+        return fE(F[0] + sg * dv[0], F[1] + sg * dv[1], F[2] + sg * dv[2]) - fE(F[0], F[1], F[2]);
+    }
+    fn memOf(g: *const Five, i: usize) i64 {
+        var m: i64 = 0;
+        for (g.cs5[i]) |v| m += v;
+        return m;
+    }
     fn addFlux(g: *Five, i: usize, f: usize, v: [3]i32) void {
         const l = g3.Grid3.linkOf(i, f).?;
         const sg: i32 = if (f & 1 == 1) -1 else 1;
@@ -272,6 +291,7 @@ pub const Five = struct {
                     const c = g.planCell(i, k) orelse continue;
                     const fp = g.findPartner(i, c) orelse continue;
                     if (g.excluded(i, c.np)) continue;
+                    if (g.cfg.colour and g.cfg.tension and !c.weak and g.exchCost(i, fp.f, c.dv) > g.memOf(i)) continue; // RULE 35
                     pl = c;
                     partner = fp.j;
                     pnew = fp.r;
@@ -296,29 +316,55 @@ pub const Five = struct {
                     partner = fp.j;
                     pnew = fp.r;
                     face = fp.f;
+                    if (g.cfg.colour and g.cfg.tension and !pl.weak and g.exchCost(i, face, pl.dv) > g.memOf(i)) { // RULE 35
+                        g.blocked += 1;
+                        continue;
+                    }
                 }
                 if (g.excluded(i, pl.np)) {
                     g.blocked += 1;
                     continue;
                 }
             }
+            var owe: i64 = 0;
             g.p5[i] = pl.np;
             if (partner) |j| {
                 g.p5[j] = pnew;
                 g.taken[j] = true;
                 g.exchanges += 1;
-                if (g.cfg.colour and !pl.weak) g.addFlux(i, face, pl.dv);
+                if (g.cfg.colour and !pl.weak) {
+                    const l = g3.Grid3.linkOf(i, face).?;
+                    const e0 = fE(g.fx[l][0], g.fx[l][1], g.fx[l][2]);
+                    g.addFlux(i, face, pl.dv);
+                    const de = fE(g.fx[l][0], g.fx[l][1], g.fx[l][2]) - e0;
+                    if (g.cfg.tension) owe = de else g.exch_de += de;
+                }
             }
             g.taken[i] = true;
             g.fired[i] = true;
             count += 1;
-            const rel = g.cs5[i];
+            var rel = g.cs5[i];
+            if (owe < 0) g.carrier[i] += @floatFromInt(-owe);
+            while (owe > 0) : (owe -= 1) { // RULE 35: the exchange pays for the string out of the released memory
+                var k: usize = 0;
+                for (1..5) |q| if (rel[q] > rel[k]) {
+                    k = q;
+                };
+                rel[k] -= 1;
+            }
             g.cs5[i] = .{ 0, 0, 0, 0, 0 };
             g.rf5[i] = .{ 0, 0, 0, 0, 0 };
             try shouts.append(alloc, .{ .i = i, .rel = rel });
         }
         for (shouts.items) |sh| g.shout(sh.i, sh.rel);
-        g.spread();
+        {
+            var before: f64 = 0;
+            for (g.carrier) |v| before += v;
+            g.spread();
+            var after: f64 = 0;
+            for (g.carrier) |v| after += v;
+            g.lost += before - after;
+        }
         if (g.cfg.gravity or g.cfg.cancel or g.cfg.excite) for (0..n) |i| {
             if (g.carrier[i] < 5) continue;
             const k: u32 = @intFromFloat(@floor(g.carrier[i] / 5));
@@ -338,6 +384,8 @@ pub const Five = struct {
         };
         if (g.cfg.em) g.emField();
         if (g.cfg.colour) g.relax();
+        g.broke = 0;
+        if (g.cfg.colour and g.cfg.tension) g.breakStrings();
         if (g.cfg.motion) g.move();
         g.t += 1;
         return count;
@@ -410,6 +458,7 @@ pub const Five = struct {
                     g.fx[L[k]][cc] += sg[k] * opts[o][cc];
                 };
                 moves += 1;
+                if (g.cfg.tension) g.carrier[i] += @floatFromInt(e0 - best_e); // RULE 34 (b)
             }
         };
         g.relaxed = moves;
@@ -469,6 +518,29 @@ pub const Five = struct {
             }
             const b = best orelse continue;
             if (g.fired[b] or g.moved[b]) continue;
+            if (g.cfg.colour and g.cfg.tension) { // RULE 34 (a): a move pays for the string it stretches
+                const l = g3.Grid3.linkOf(i, best_face).?;
+                const ri = col(g.p5[i]);
+                const rj = col(g.p5[b]);
+                const s: i32 = if (best_face & 1 == 1) -1 else 1;
+                const F = g.fx[l];
+                const d = fE(F[0] + s * (rj[0] - ri[0]), F[1] + s * (rj[1] - ri[1]), F[2] + s * (rj[2] - ri[2])) - fE(F[0], F[1], F[2]);
+                if (d > 0) {
+                    var mem: i64 = 0;
+                    for (g.cs5[i]) |v| mem += v;
+                    if (@as(f64, @floatFromInt(mem)) + g.carrier[i] < @as(f64, @floatFromInt(d))) continue;
+                    var owe = d;
+                    while (owe > 0 and mem > 0) : (owe -= 1) {
+                        var k: usize = 0;
+                        for (1..5) |q| if (g.cs5[i][q] > g.cs5[i][k]) {
+                            k = q;
+                        };
+                        g.cs5[i][k] -= 1;
+                        mem -= 1;
+                    }
+                    g.carrier[i] -= @floatFromInt(owe);
+                } else if (d < 0) g.carrier[b] += @floatFromInt(-d);
+            }
             if (g.cfg.colour) {
                 const ri = col(g.p5[i]);
                 const rj = col(g.p5[b]);
@@ -484,8 +556,44 @@ pub const Five = struct {
         }
     }
 
+    /// RULE 34 (c): a link between an all-colour pixel and a no-colour pixel may break the string by passing a colour cell.
+    fn breakStrings(g: *Five) void {
+        var used: [n]bool = @splat(false);
+        for (0..n) |i| for (0..3) |ax| {
+            const l = g3.Grid3.linkOf(i, 2 * ax) orelse continue;
+            const j = g3.neighbors(i)[2 * ax];
+            if (used[i] or used[j]) continue;
+            const ci = ncol(g.p5[i]);
+            const cj = ncol(g.p5[j]);
+            if (!((ci == 3 and cj == 0) or (ci == 0 and cj == 3))) continue;
+            const sgn: i32 = if (ci == 3) -1 else 1; // flux change on the link: -e_c if i gives c, +e_c if i takes c
+            const F = g.fx[l];
+            const e0 = fE(F[0], F[1], F[2]);
+            var best: ?usize = null;
+            var be = e0;
+            for (0..3) |c| {
+                var Fn = F;
+                Fn[c] += sgn;
+                const e = fE(Fn[0], Fn[1], Fn[2]);
+                if (e < be) {
+                    be = e;
+                    best = c;
+                }
+            }
+            const c = best orelse continue;
+            g.fx[l][c] += sgn;
+            const bit = @as(u8, 1) << @intCast(c);
+            g.p5[i] ^= bit;
+            g.p5[j] ^= bit;
+            g.carrier[i] += @floatFromInt(e0 - be);
+            used[i] = true;
+            used[j] = true;
+            g.broke += 1;
+        };
+    }
+
     pub fn stats(g: *const Five, flashes: u32) Stats {
-        var st: Stats = .{ .flashes = flashes, .exchanges = g.exchanges, .blocked = g.blocked, .released = g.released, .quark_r = 0, .relaxed = g.relaxed, .swaps = g.swaps, .charge3 = 0, .colour = .{ 0, 0 }, .quarks = 0, .gauss = 0, .flux_e3 = 0, .strings = 0, .carrier = 0, .memory = 0 };
+        var st: Stats = .{ .flashes = flashes, .exchanges = g.exchanges, .blocked = g.blocked, .released = g.released, .quark_r = 0, .relaxed = g.relaxed, .swaps = g.swaps, .charge3 = 0, .colour = .{ 0, 0 }, .quarks = 0, .gauss = 0, .flux_e3 = 0, .strings = 0, .carrier = 0, .memory = 0, .broke = g.broke, .lost = g.lost, .exch_de = g.exch_de };
         var R: i64 = 0;
         var G: i64 = 0;
         var B: i64 = 0;

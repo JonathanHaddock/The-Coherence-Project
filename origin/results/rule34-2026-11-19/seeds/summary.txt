@@ -1,0 +1,7 @@
+300_allowed-on_motion-on_tension-on                        r 23.038->23.065 (+0.027) quarks 87952->108246 flux_e 1536360->332918 breaks 12419 flashes@50 62238 @end 60084 mem 45108775
+300_allowed-on_neutral-on_core-10_motion-on_tension-on_seed-1 r 7.309->19.705 (+12.395) quarks 3852->67928 flux_e 3942->187376 breaks 32038 flashes@50 17458 @end 61192 mem 7837947
+300_allowed-on_neutral-on_core-10_motion-on_tension-on_seed-2 r 7.310->19.686 (+12.376) quarks 3852->67646 flux_e 3966->186632 breaks 31897 flashes@50 17340 @end 61122 mem 7793203
+300_allowed-on_neutral-on_core-10_motion-on_tension-on_seed-3 r 7.309->19.656 (+12.346) quarks 3852->67378 flux_e 3972->185704 breaks 31763 flashes@50 17462 @end 61229 mem 7760507
+300_allowed-on_neutral-on_core-10_motion-on_tension-on_seed-4 r 7.310->19.678 (+12.368) quarks 3852->67428 flux_e 4000->186768 breaks 31788 flashes@50 17542 @end 61240 mem 7725275
+600_allowed-on_neutral-on_core-10_motion-on_tension-on     r 7.310->23.009 (+15.699) quarks 3852->107482 flux_e 3960->291982 breaks 51815 flashes@50 17847 @end 60129 mem 45288890
+600_allowed-on_neutral-on_core-10_motion-on_tension-on_em-on r 7.311->23.045 (+15.735) quarks 3852->108682 flux_e 3982->320708 breaks 52415 flashes@50 16597 @end 59780 mem 49181506

@@ -1,0 +1,8 @@
+300_allowed-on_neutral-on_core-10_motion-on_tension-on_seed-1 r 7.309->7.325 (+0.016) quarks 3852->3854 stringE 3856->5770 breaks 1 flashes@50 10636 end 1416 mem 286979->193229
+300_allowed-on_neutral-on_core-10_motion-on_tension-on_seed-2 r 7.309->7.327 (+0.018) quarks 3852->3856 stringE 3856->5718 breaks 2 flashes@50 10627 end 1369 mem 286869->191453
+300_allowed-on_neutral-on_core-10_motion-on_tension-on_seed-3 r 7.309->7.325 (+0.016) quarks 3852->3860 stringE 3854->5800 breaks 4 flashes@50 10486 end 1360 mem 287109->194835
+300_allowed-on_neutral-on_core-10_motion-on_tension-on_seed-4 r 7.310->7.320 (+0.010) quarks 3852->3852 stringE 3860->5864 breaks 0 flashes@50 10539 end 1371 mem 286343->195095
+600_allowed-on_motion-on_tension-on                      r 23.038->23.027 (-0.011) quarks 87938->108486 stringE 1531072->231776 breaks 12539 flashes@50 59099 end 22666 mem 281952->552407
+600_allowed-on_neutral-on_core-10_motion-on_tension-on   r 7.310->7.326 (+0.016) quarks 3852->3858 stringE 3856->5750 breaks 3 flashes@50 10592 end 145 mem 286685->185533
+600_allowed-on_neutral-on_core-10_motion-on_tension-on_em-on r 7.311->7.353 (+0.043) quarks 3852->3868 stringE 3884->5810 breaks 8 flashes@50 10816 end 2099 mem 286657->207842
+600_allowed-on_neutral-on_core-16_motion-on_tension-on   r 11.802->11.815 (+0.013) quarks 16280->16302 stringE 16286->25238 breaks 11 flashes@50 9961 end 235 mem 318841->177769
