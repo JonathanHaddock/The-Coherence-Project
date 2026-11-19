@@ -1333,16 +1333,42 @@ fn fiveRun(gpa: std.mem.Allocator, args: anytype) !void {
         const k = a[0..eq];
         const v = a[eq + 1 ..];
         const on = std.mem.eql(u8, v, "on");
-        if (std.mem.eql(u8, k, "colour")) cfg.colour = on else if (std.mem.eql(u8, k, "conserve")) cfg.conserve = on else if (std.mem.eql(u8, k, "excite")) cfg.excite = on else if (std.mem.eql(u8, k, "gravity")) cfg.gravity = on else if (std.mem.eql(u8, k, "cancel")) cfg.cancel = on else if (std.mem.eql(u8, k, "exclusion")) cfg.exclusion = on else if (std.mem.eql(u8, k, "motion")) cfg.motion = on else if (std.mem.eql(u8, k, "em")) cfg.em = on else if (std.mem.eql(u8, k, "allowed")) cfg.allowed = on else if (std.mem.eql(u8, k, "neutral")) cfg.neutral = on else if (std.mem.eql(u8, k, "tension")) cfg.tension = on else if (std.mem.eql(u8, k, "core")) cfg.core = try std.fmt.parseInt(u32, v, 10) else if (std.mem.eql(u8, k, "seed")) cfg.seed = try std.fmt.parseInt(u64, v, 10);
+        if (std.mem.eql(u8, k, "colour")) cfg.colour = on else if (std.mem.eql(u8, k, "conserve")) cfg.conserve = on else if (std.mem.eql(u8, k, "excite")) cfg.excite = on else if (std.mem.eql(u8, k, "gravity")) cfg.gravity = on else if (std.mem.eql(u8, k, "cancel")) cfg.cancel = on else if (std.mem.eql(u8, k, "exclusion")) cfg.exclusion = on else if (std.mem.eql(u8, k, "motion")) cfg.motion = on else if (std.mem.eql(u8, k, "em")) cfg.em = on else if (std.mem.eql(u8, k, "allowed")) cfg.allowed = on else if (std.mem.eql(u8, k, "neutral")) cfg.neutral = on else if (std.mem.eql(u8, k, "tension")) cfg.tension = on else if (std.mem.eql(u8, k, "core")) cfg.core = try std.fmt.parseInt(u32, v, 10) else if (std.mem.eql(u8, k, "seed")) cfg.seed = try std.fmt.parseInt(u64, v, 10) else if (std.mem.eql(u8, k, "drive")) cfg.drive = try std.fmt.parseFloat(f64, v);
     }
     five_grid.init(cfg);
-    std.debug.print("tick\tflashes\texchanges\tblocked\treleased\tquark_r\trelaxed\tswaps\tcharge3\tcolour_rb\tcolour_gb\tquarks\tgauss\tflux_e3\tstrings\tcarrier\tmemory\tbroke\tlost\texch_de\n", .{});
+    std.debug.print("tick\tflashes\texchanges\tblocked\treleased\tquark_r\trelaxed\tswaps\tcharge3\tcolour_rb\tcolour_gb\tquarks\tgauss\tflux_e3\tstrings\tcarrier\tmemory\tbroke\tlost\texch_de\tdriven\n", .{});
+    // RULE 36 measurement: per-pixel gaps between changes (pattern changes), ticks >= ticks/2
+    const last_change = try gpa.alloc(i64, five.n);
+    defer gpa.free(last_change);
+    @memset(last_change, -1);
+    const before = try gpa.alloc(u8, five.n);
+    defer gpa.free(before);
+    var gaps: [201]u64 = @splat(0);
+    var changes_after: u64 = 0;
     var t: i64 = 0;
     while (t < ticks) : (t += 1) {
+        @memcpy(before, five_grid.p5[0..]);
         const f = try five_grid.tick(gpa);
+        if (t >= @divTrunc(ticks, 2)) {
+            for (0..five.n) |i| {
+                if (five_grid.p5[i] == before[i]) continue;
+                changes_after += 1;
+                if (last_change[i] >= @divTrunc(ticks, 2)) gaps[@intCast(@min(200, t - last_change[i]))] += 1;
+                last_change[i] = t;
+            }
+        }
         const st = five_grid.stats(f);
-        std.debug.print("{d}\t{d}\t{d}\t{d}\t{d}\t{d:.4}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d:.6}\t{d}\t{d}\t{d:.6}\t{d}\n", .{ t, st.flashes, st.exchanges, st.blocked, st.released, st.quark_r, st.relaxed, st.swaps, st.charge3, st.colour[0], st.colour[1], st.quarks, st.gauss, st.flux_e3, st.strings, st.carrier, st.memory, st.broke, st.lost, st.exch_de });
+        std.debug.print("{d}\t{d}\t{d}\t{d}\t{d}\t{d:.4}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d}\t{d:.6}\t{d}\t{d}\t{d:.6}\t{d}\t{d}\n", .{ t, st.flashes, st.exchanges, st.blocked, st.released, st.quark_r, st.relaxed, st.swaps, st.charge3, st.colour[0], st.colour[1], st.quarks, st.gauss, st.flux_e3, st.strings, st.carrier, st.memory, st.broke, st.lost, st.exch_de, five_grid.driven });
     }
+    var rem: u64 = 0;
+    for (gaps[1..]) |v| rem += v;
+    std.debug.print("#changes {d} gaps {d}\n#hazard", .{ changes_after, rem });
+    for (1..41) |k| {
+        if (rem == 0) break;
+        std.debug.print(" {d:.4}", .{@as(f64, @floatFromInt(gaps[k])) / @as(f64, @floatFromInt(rem))});
+        rem -= gaps[k];
+    }
+    std.debug.print("\n", .{});
 }
 
 var lattice: grid3.Grid3 = undefined;

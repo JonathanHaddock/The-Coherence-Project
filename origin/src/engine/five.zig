@@ -8,7 +8,7 @@
 
 const std = @import("std");
 const g3 = @import("grid3.zig");
-const n = g3.n;
+pub const n = g3.n;
 const side = g3.side;
 
 pub const Cfg = struct {
@@ -25,6 +25,7 @@ pub const Cfg = struct {
     allowed: bool = false, // RULE 32
     neutral: bool = false, // RULE 33
     tension: bool = false, // RULE 34
+    drive: f64 = 0, // RULE 36: memory units added per tick from outside
 };
 
 pub fn q5(p: u8) i32 {
@@ -71,6 +72,10 @@ pub const Five = struct {
     broke: u32,
     lost: f64,
     exch_de: i64,
+    drive_acc: f64,
+    drive_s: u64,
+    drive_cell: u8,
+    driven: u64,
 
     pub fn init(g: *Five, cfg: Cfg) void {
         g.cfg = cfg;
@@ -88,6 +93,10 @@ pub const Five = struct {
         g.broke = 0;
         g.lost = 0;
         g.exch_de = 0;
+        g.drive_acc = 0;
+        g.drive_s = cfg.seed ^ 0x9E3779B97F4A7C15;
+        g.drive_cell = 0;
+        g.driven = 0;
         var s: u64 = cfg.seed ^ 0x5f5f5f5f;
         for (0..n) |i| {
             s ^= s << 13;
@@ -254,6 +263,20 @@ pub const Five = struct {
         g.exchanges = 0;
         g.blocked = 0;
         g.released = 0;
+        // RULE 36: slow driving from outside, r units per tick, sites from a fixed sequence, cells in turn
+        if (g.cfg.drive > 0) {
+            g.drive_acc += g.cfg.drive;
+            while (g.drive_acc >= 1) {
+                g.drive_acc -= 1;
+                g.drive_s ^= g.drive_s << 13;
+                g.drive_s ^= g.drive_s >> 7;
+                g.drive_s ^= g.drive_s << 17;
+                const site: usize = @intCast(g.drive_s % n);
+                g.cs5[site][g.drive_cell] += 1;
+                g.drive_cell = (g.drive_cell + 1) % 5;
+                g.driven += 1;
+            }
+        }
         var count: u32 = 0;
         var ready = std.ArrayList(usize).empty;
         defer ready.deinit(alloc);
