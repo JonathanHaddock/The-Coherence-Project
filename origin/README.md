@@ -52,10 +52,11 @@ A teaching-grade reactor physics workbench under `src/reactor/`.
 | `reactor materials` | Two-group cross-section sets (lwr fuel, water, graphite), with k_inf and migration area |
 | `reactor core [geom=slab\|cyl\|sphere] [fuel=cm] [refl=water\|graphite\|none] [rt=cm]` | Two-group finite-volume diffusion, power iteration for k_eff; reactivity, leakage, power peaking. Writes `results/reactor-core.svg` (fast/thermal flux and power) |
 | `reactor critical [geom=..] [refl=..] [rt=cm]` | Bisection for the critical fuel size, reflected and bare; reflector savings |
+| `reactor lattice [rods=out\|all\|center\|ring\|checker] [fuel=cm] [refl=..] [rt=cm] [cell=cm]` | 2D quarter-core two-group diffusion (SOR inner solve) with 20 cm assemblies and control-rod channels. Reports k_eff with rods in and out, rod worth in pcm and dollars, power peaking. Writes `results/reactor-lattice-<rods>.svg` heat maps of thermal flux and power |
 | `reactor kinetics [rho=$] [t=s] [feedback=on\|off]` | Point kinetics, six delayed groups (Keepin U-235), lumped fuel-temperature feedback. Inhour period and feedback equilibrium for comparison. Writes `results/reactor-kinetics.svg` |
 
-Cross sections are illustrative textbook values, not from any real design. Tests check the solver
-against the analytic bare-slab buckling result, the kinetics against the inhour equation, and the
+Cross sections are illustrative textbook values, not from any real design. Tests check the 1D and 2D solvers
+against the analytic bare-slab and bare-square buckling results, the kinetics against the inhour equation, and the
 feedback run against its analytic equilibrium.
 
 ## Data

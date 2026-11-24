@@ -74,7 +74,23 @@ pub const graphite = Material{
     .sf2 = 0,
 };
 
-pub const all = [_]Material{ lwr_fuel, water, graphite };
+/// Fuel cell with a control rod inserted (homogenized, teaching values):
+/// the lwr lattice plus a strong thermal absorber.
+pub const rodded = Material{
+    .name = "rodded",
+    .note = "lwr lattice with control rod inserted",
+    .d1 = 1.43,
+    .d2 = 0.37,
+    .sa1 = 0.0101 + 0.004,
+    .sa2 = 0.0805 + 0.10,
+    .s12 = 0.0172,
+    .nsf1 = 0.0063,
+    .nsf2 = 0.1355,
+    .sf1 = 0.0025,
+    .sf2 = 0.0556,
+};
+
+pub const all = [_]Material{ lwr_fuel, water, graphite, rodded };
 
 pub fn find(name: []const u8) ?Material {
     for (all) |m| if (std.ascii.eqlIgnoreCase(m.name, name)) return m;

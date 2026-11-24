@@ -31,12 +31,15 @@ const photo = @import("engine/photo.zig");
 const reactor_mat = @import("reactor/materials.zig");
 const diffusion = @import("reactor/diffusion.zig");
 const kinetics = @import("reactor/kinetics.zig");
+const diffusion2d = @import("reactor/diffusion2d.zig");
+const heatmap_svg = @import("visualization/heatmap_svg.zig");
 const reactor_svg = @import("visualization/reactor_svg.zig");
 
 test {
     _ = reactor_mat;
     _ = diffusion;
     _ = kinetics;
+    _ = diffusion2d;
     _ = koide;
     _ = projector;
     _ = weak;
@@ -108,6 +111,7 @@ fn help() void {
         \\  origin reactor core [geom=slab|cyl|sphere] [fuel=cm] [refl=water|graphite|none] [rt=cm] [--no-open]
         \\  origin reactor critical [geom=..] [refl=..] [rt=cm]
         \\  origin reactor kinetics [rho=dollars] [t=s] [feedback=on|off] [--no-open]
+        \\  origin reactor lattice [rods=out|all|center|ring|checker] [fuel=cm] [refl=..] [rt=cm] [cell=cm] [--no-open]
         \\  origin reactor materials
         \\  origin help
         \\
@@ -1509,6 +1513,9 @@ const ReactorArgs = struct {
     rho: f64 = 0.1,
     t_end: f64 = 30,
     feedback: bool = true,
+    rods: diffusion2d.RodPattern = .all,
+    cell: f64 = 1.0,
+    fuel_set: bool = false,
     open_it: bool = true,
 };
 
@@ -1532,6 +1539,12 @@ fn parseReactorArgs(args: *std.process.Args.Iterator) !ReactorArgs {
             ra.geom = diffusion.Geometry.parse(v) orelse return error.BadGeometry;
         } else if (std.mem.eql(u8, k, "fuel")) {
             ra.fuel_cm = try std.fmt.parseFloat(f64, v);
+            ra.fuel_set = true;
+        } else if (std.mem.eql(u8, k, "rods")) {
+            ra.rods = diffusion2d.RodPattern.parse(v) orelse return error.UnknownRodPattern;
+        } else if (std.mem.eql(u8, k, "cell")) {
+            ra.cell = try std.fmt.parseFloat(f64, v);
+            if (ra.cell < 0.25) return error.BadValue;
         } else if (std.mem.eql(u8, k, "refl")) {
             ra.refl = if (std.ascii.eqlIgnoreCase(v, "none")) null else (reactor_mat.find(v) orelse return error.UnknownMaterial);
         } else if (std.mem.eql(u8, k, "rt")) {
@@ -1565,6 +1578,7 @@ fn reactorReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Ite
         return;
     }
     if (std.mem.eql(u8, ra.sub, "kinetics")) return reactorKinetics(io, gpa, ra);
+    if (std.mem.eql(u8, ra.sub, "lattice")) return reactorLattice(io, gpa, ra);
 
     var regions_buf: [2]diffusion.Region = undefined;
     regions_buf[0] = .{ .mat = reactor_mat.lwr_fuel, .thickness = ra.fuel_cm };
@@ -1625,6 +1639,49 @@ fn reactorReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Ite
     });
     defer gpa.free(svg);
     try writeAndOpen(io, gpa, "reactor-core.svg", svg, ra.open_it);
+}
+
+fn reactorLattice(io: std.Io, gpa: std.mem.Allocator, ra: ReactorArgs) !void {
+    reactorBanner("REACTOR LATTICE (2D quarter core)");
+    const base = diffusion2d.Layout{
+        .half_width = if (ra.fuel_set) ra.fuel_cm else 60,
+        .reflector = if (ra.refl != null) ra.refl_cm else 0,
+        .refl_mat = ra.refl orelse reactor_mat.water,
+        .cell = ra.cell,
+    };
+    var lay = base;
+    lay.rods = ra.rods;
+    const beta = kinetics.betaTotal();
+    std.debug.print("  core       {d:.0} x {d:.0} cm fuel, assemblies {d:.0} cm, rod channels {d:.0} cm\n", .{ 2 * base.half_width, 2 * base.half_width, base.assembly, base.rod_width });
+    std.debug.print("  reflector  {s}, {d:.0} cm\n  mesh       {d:.2} cm\n  rods       {s}\n\n", .{ if (ra.refl) |m| m.name else "none", base.reflector, base.cell, @tagName(ra.rods) });
+
+    var out_r = try diffusion2d.solve(gpa, base);
+    defer out_r.deinit(gpa);
+    var res = try diffusion2d.solve(gpa, lay);
+    defer res.deinit(gpa);
+
+    var nrod: usize = 0;
+    for (res.kind) |k| if (k == .rod) {
+        nrod += 1;
+    };
+    const worth = 1 / res.k - 1 / out_r.k; // reactivity removed by the rods, > 0
+    std.debug.print("  k_eff rods out    {d:.5}   peaking {d:.3}\n", .{ out_r.k, out_r.peaking });
+    std.debug.print("  k_eff rods {s:<6} {d:.5}   peaking {d:.3}   ({d} outer iterations)\n", .{ @tagName(ra.rods), res.k, res.peaking, res.outer });
+    std.debug.print("  rod worth         {d:.0} pcm = {d:.2} $ removed\n", .{ worth * 1e5, worth / beta });
+    const state = if (@abs(res.k - 1) < 1e-3) "about critical" else if (res.k > 1) "still supercritical" else "subcritical: rods hold the core down";
+    std.debug.print("  state             {s}\n\n", .{state});
+    std.debug.print("  Each rod digs a hole in the thermal flux around it and shifts power to\n  unrodded fuel. A central rod flattens the peak; rods only at the edge\n  would sharpen it. This core has no soluble boron or burnup, so it starts\n  far above critical and the rods alone cannot hold it down.\n\n", .{});
+
+    const subtitle = try std.fmt.allocPrint(gpa, "rods {s}: k_eff {d:.4} (out {d:.4}), worth {d:.2} $, peaking {d:.2}", .{ @tagName(ra.rods), res.k, out_r.k, worth / beta, res.peaking });
+    defer gpa.free(subtitle);
+    const svg = try heatmap_svg.render(gpa, res, "2D core: thermal flux and power", subtitle, &.{
+        .{ .title = "thermal flux", .field = res.phi2 },
+        .{ .title = "power / mean", .field = res.power },
+    });
+    defer gpa.free(svg);
+    const name = try std.fmt.allocPrint(gpa, "reactor-lattice-{s}.svg", .{@tagName(ra.rods)});
+    defer gpa.free(name);
+    try writeAndOpen(io, gpa, name, svg, ra.open_it);
 }
 
 fn reactorKinetics(io: std.Io, gpa: std.mem.Allocator, ra: ReactorArgs) !void {
