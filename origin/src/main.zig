@@ -111,7 +111,8 @@ fn help() void {
         \\  origin reactor core [geom=slab|cyl|sphere] [fuel=cm] [refl=water|graphite|none] [rt=cm] [--no-open]
         \\  origin reactor critical [geom=..] [refl=..] [rt=cm]
         \\  origin reactor kinetics [rho=dollars] [t=s] [feedback=on|off] [--no-open]
-        \\  origin reactor lattice [rods=out|all|center|ring|checker] [fuel=cm] [refl=..] [rt=cm] [cell=cm] [--no-open]
+        \\  origin reactor lattice [rods=out|all|center|ring|checker] [h=cm] [ins=0..1] [boron=ppm] [fuel=cm] [refl=..] [rt=cm] [cell=cm] [--no-open]
+        \\  origin reactor boron [rods=..] [h=cm] [ins=0..1] [fuel=cm] [refl=..] [rt=cm] [cell=cm]
         \\  origin reactor materials
         \\  origin help
         \\
@@ -1514,7 +1515,10 @@ const ReactorArgs = struct {
     t_end: f64 = 30,
     feedback: bool = true,
     rods: diffusion2d.RodPattern = .all,
-    cell: f64 = 1.0,
+    cell: ?f64 = null,
+    height: f64 = 0,
+    insertion: f64 = 1.0,
+    boron: f64 = 0,
     fuel_set: bool = false,
     open_it: bool = true,
 };
@@ -1543,8 +1547,18 @@ fn parseReactorArgs(args: *std.process.Args.Iterator) !ReactorArgs {
         } else if (std.mem.eql(u8, k, "rods")) {
             ra.rods = diffusion2d.RodPattern.parse(v) orelse return error.UnknownRodPattern;
         } else if (std.mem.eql(u8, k, "cell")) {
-            ra.cell = try std.fmt.parseFloat(f64, v);
-            if (ra.cell < 0.25) return error.BadValue;
+            const c = try std.fmt.parseFloat(f64, v);
+            if (c < 0.25) return error.BadValue;
+            ra.cell = c;
+        } else if (std.mem.eql(u8, k, "h")) {
+            ra.height = try std.fmt.parseFloat(f64, v);
+            if (ra.height < 0) return error.BadValue;
+        } else if (std.mem.eql(u8, k, "ins")) {
+            ra.insertion = try std.fmt.parseFloat(f64, v);
+            if (ra.insertion < 0 or ra.insertion > 1) return error.BadValue;
+        } else if (std.mem.eql(u8, k, "boron")) {
+            ra.boron = try std.fmt.parseFloat(f64, v);
+            if (ra.boron < 0) return error.BadValue;
         } else if (std.mem.eql(u8, k, "refl")) {
             ra.refl = if (std.ascii.eqlIgnoreCase(v, "none")) null else (reactor_mat.find(v) orelse return error.UnknownMaterial);
         } else if (std.mem.eql(u8, k, "rt")) {
@@ -1579,6 +1593,7 @@ fn reactorReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Ite
     }
     if (std.mem.eql(u8, ra.sub, "kinetics")) return reactorKinetics(io, gpa, ra);
     if (std.mem.eql(u8, ra.sub, "lattice")) return reactorLattice(io, gpa, ra);
+    if (std.mem.eql(u8, ra.sub, "boron")) return reactorBoron(gpa, ra);
 
     var regions_buf: [2]diffusion.Region = undefined;
     regions_buf[0] = .{ .mat = reactor_mat.lwr_fuel, .thickness = ra.fuel_cm };
@@ -1641,47 +1656,164 @@ fn reactorReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Ite
     try writeAndOpen(io, gpa, "reactor-core.svg", svg, ra.open_it);
 }
 
-fn reactorLattice(io: std.Io, gpa: std.mem.Allocator, ra: ReactorArgs) !void {
-    reactorBanner("REACTOR LATTICE (2D quarter core)");
-    const base = diffusion2d.Layout{
+const Slice = struct {
+    field: []f64,
+    kind: []diffusion2d.Kind,
+    fn deinit(self: Slice, gpa: std.mem.Allocator) void {
+        gpa.free(self.field);
+        gpa.free(self.kind);
+    }
+};
+
+/// Horizontal x-y slice at z cell k.
+fn sliceXY(gpa: std.mem.Allocator, r: diffusion2d.Result, src: []const f64, k: usize) !Slice {
+    const n = r.n;
+    const f = try gpa.alloc(f64, n * n);
+    const kd = try gpa.alloc(diffusion2d.Kind, n * n);
+    for (0..n) |j| for (0..n) |i| {
+        f[j * n + i] = src[r.idx(i, j, k)];
+        kd[j * n + i] = r.kind[r.idx(i, j, k)];
+    };
+    return .{ .field = f, .kind = kd };
+}
+
+/// Vertical x-z slice at y cell j.
+fn sliceXZ(gpa: std.mem.Allocator, r: diffusion2d.Result, src: []const f64, j: usize) !Slice {
+    const n = r.n;
+    const f = try gpa.alloc(f64, n * r.nz);
+    const kd = try gpa.alloc(diffusion2d.Kind, n * r.nz);
+    for (0..r.nz) |k| for (0..n) |i| {
+        f[k * n + i] = src[r.idx(i, j, k)];
+        kd[k * n + i] = r.kind[r.idx(i, j, k)];
+    };
+    return .{ .field = f, .kind = kd };
+}
+
+fn latticeLayout(ra: ReactorArgs) diffusion2d.Layout {
+    return .{
         .half_width = if (ra.fuel_set) ra.fuel_cm else 60,
         .reflector = if (ra.refl != null) ra.refl_cm else 0,
         .refl_mat = ra.refl orelse reactor_mat.water,
-        .cell = ra.cell,
+        .cell = ra.cell orelse (if (ra.height > 0) 2.5 else 1.0),
+        .height = ra.height,
+        .insertion = ra.insertion,
+        .boron_ppm = ra.boron,
     };
+}
+
+fn printLayout(lay: diffusion2d.Layout, ra: ReactorArgs) void {
+    std.debug.print("  core       {d:.0} x {d:.0} cm fuel", .{ 2 * lay.half_width, 2 * lay.half_width });
+    if (lay.height > 0) std.debug.print(" x {d:.0} cm tall (3D, {d:.0} cm axial reflectors)", .{ lay.height, lay.axial_reflector }) else std.debug.print(" (2D, infinitely tall)", .{});
+    std.debug.print("\n  assemblies {d:.0} cm, rod channels {d:.0} cm, mesh {d:.2} cm\n", .{ lay.assembly, lay.rod_width, lay.cell });
+    std.debug.print("  reflector  {s}, {d:.0} cm\n", .{ if (ra.refl) |m| m.name else "none", lay.reflector });
+    std.debug.print("  rods       {s}", .{@tagName(lay.rods)});
+    if (lay.height > 0 and lay.rods != .out) std.debug.print(", inserted {d:.0}% from the top", .{lay.insertion * 100});
+    std.debug.print("\n  boron      {d:.0} ppm\n\n", .{lay.boron_ppm});
+}
+
+fn reactorLattice(io: std.Io, gpa: std.mem.Allocator, ra: ReactorArgs) !void {
+    reactorBanner(if (ra.height > 0) "REACTOR LATTICE (3D quarter core)" else "REACTOR LATTICE (2D quarter core)");
+    const base = latticeLayout(ra);
     var lay = base;
     lay.rods = ra.rods;
     const beta = kinetics.betaTotal();
-    std.debug.print("  core       {d:.0} x {d:.0} cm fuel, assemblies {d:.0} cm, rod channels {d:.0} cm\n", .{ 2 * base.half_width, 2 * base.half_width, base.assembly, base.rod_width });
-    std.debug.print("  reflector  {s}, {d:.0} cm\n  mesh       {d:.2} cm\n  rods       {s}\n\n", .{ if (ra.refl) |m| m.name else "none", base.reflector, base.cell, @tagName(ra.rods) });
+    printLayout(lay, ra);
 
     var out_r = try diffusion2d.solve(gpa, base);
     defer out_r.deinit(gpa);
     var res = try diffusion2d.solve(gpa, lay);
     defer res.deinit(gpa);
 
-    var nrod: usize = 0;
-    for (res.kind) |k| if (k == .rod) {
-        nrod += 1;
-    };
     const worth = 1 / res.k - 1 / out_r.k; // reactivity removed by the rods, > 0
+    const rho = (res.k - 1) / res.k;
     std.debug.print("  k_eff rods out    {d:.5}   peaking {d:.3}\n", .{ out_r.k, out_r.peaking });
-    std.debug.print("  k_eff rods {s:<6} {d:.5}   peaking {d:.3}   ({d} outer iterations)\n", .{ @tagName(ra.rods), res.k, res.peaking, res.outer });
+    std.debug.print("  k_eff as set      {d:.5}   peaking {d:.3}   ({d} outer iterations)\n", .{ res.k, res.peaking, res.outer });
     std.debug.print("  rod worth         {d:.0} pcm = {d:.2} $ removed\n", .{ worth * 1e5, worth / beta });
-    const state = if (@abs(res.k - 1) < 1e-3) "about critical" else if (res.k > 1) "still supercritical" else "subcritical: rods hold the core down";
-    std.debug.print("  state             {s}\n\n", .{state});
-    std.debug.print("  Each rod digs a hole in the thermal flux around it and shifts power to\n  unrodded fuel. A central rod flattens the peak; rods only at the edge\n  would sharpen it. This core has no soluble boron or burnup, so it starts\n  far above critical and the rods alone cannot hold it down.\n\n", .{});
+    std.debug.print("  excess reactivity {d:.0} pcm = {d:.2} $\n", .{ rho * 1e5, rho / beta });
+    const state = if (@abs(res.k - 1) < 1e-3) "about critical" else if (res.k > 1) "supercritical: add boron or insert rods" else "subcritical";
+    std.debug.print("  state             {s}\n", .{state});
 
-    const subtitle = try std.fmt.allocPrint(gpa, "rods {s}: k_eff {d:.4} (out {d:.4}), worth {d:.2} $, peaking {d:.2}", .{ @tagName(ra.rods), res.k, out_r.k, worth / beta, res.peaking });
-    defer gpa.free(subtitle);
-    const svg = try heatmap_svg.render(gpa, res, "2D core: thermal flux and power", subtitle, &.{
-        .{ .title = "thermal flux", .field = res.phi2 },
-        .{ .title = "power / mean", .field = res.power },
+    if (res.nz > 1) {
+        const ap = try res.axialPower(gpa);
+        defer gpa.free(ap);
+        const ao = try res.axialOffset(gpa);
+        std.debug.print("\n  axial offset      {d:.3}  (top minus bottom; negative = bottom-heavy)\n\n", .{ao});
+        std.debug.print("  axial power (fuel mean per slice, top to bottom)\n", .{});
+        var pmax: f64 = 0;
+        for (ap) |v| pmax = @max(pmax, v);
+        const step = @max(1, ap.len / 16);
+        var z: usize = ap.len;
+        while (z >= step) {
+            z -= step;
+            const height_cm = (@as(f64, @floatFromInt(z)) + 0.5) * res.hz;
+            const bars: usize = @intFromFloat(@round(ap[z] / pmax * 40));
+            std.debug.print("  {d:>6.0} cm {d:>6.3} ", .{ height_cm, ap[z] });
+            for (0..bars) |_| std.debug.print("#", .{});
+            std.debug.print("\n", .{});
+        }
+    }
+    std.debug.print("\n  Rods dig holes in the thermal flux and shift power to unrodded fuel.\n", .{});
+    if (res.nz > 1) std.debug.print("  Rods entering from the top push power toward the bottom of the core.\n", .{});
+    std.debug.print("\n", .{});
+
+    const subtitle = try std.fmt.allocPrint(gpa, "rods {s}{s}, boron {d:.0} ppm: k_eff {d:.4} (rods out {d:.4}), worth {d:.2} $, peaking {d:.2}", .{
+        @tagName(ra.rods), if (res.nz > 1) " (partial)" else "", lay.boron_ppm, res.k, out_r.k, worth / beta, res.peaking,
     });
+    defer gpa.free(subtitle);
+    const extent = res.h * @as(f64, @floatFromInt(res.n));
+    var svg: []u8 = undefined;
+    if (res.nz == 1) {
+        svg = try heatmap_svg.render(gpa, "2D core: thermal flux and power", subtitle, &.{
+            .{ .title = "thermal flux", .nx = res.n, .ny = res.n, .w_cm = extent, .h_cm = extent, .field = res.phi2, .kind = res.kind },
+            .{ .title = "power / mean", .nx = res.n, .ny = res.n, .w_cm = extent, .h_cm = extent, .field = res.power, .kind = res.kind },
+        });
+    } else {
+        const mid = (res.z_active[0] + res.z_active[1]) / 2;
+        const xy = try sliceXY(gpa, res, res.power, mid);
+        defer xy.deinit(gpa);
+        const xz = try sliceXZ(gpa, res, res.power, 0);
+        defer xz.deinit(gpa);
+        const xzf = try sliceXZ(gpa, res, res.phi2, 0);
+        defer xzf.deinit(gpa);
+        const zext = res.hz * @as(f64, @floatFromInt(res.nz));
+        svg = try heatmap_svg.render(gpa, "3D core: power and flux slices", subtitle, &.{
+            .{ .title = "power, horizontal slice at mid-height", .nx = res.n, .ny = res.n, .w_cm = extent, .h_cm = extent, .field = xy.field, .kind = xy.kind },
+            .{ .title = "power, vertical slice through centre", .nx = res.n, .ny = res.nz, .w_cm = extent, .h_cm = zext, .field = xz.field, .kind = xz.kind, .y_label = "z" },
+            .{ .title = "thermal flux, vertical slice", .nx = res.n, .ny = res.nz, .w_cm = extent, .h_cm = zext, .field = xzf.field, .kind = xzf.kind, .y_label = "z" },
+        });
+    }
     defer gpa.free(svg);
-    const name = try std.fmt.allocPrint(gpa, "reactor-lattice-{s}.svg", .{@tagName(ra.rods)});
+    const name = try std.fmt.allocPrint(gpa, "reactor-lattice{s}-{s}.svg", .{ if (res.nz > 1) "3d" else "", @tagName(ra.rods) });
     defer gpa.free(name);
     try writeAndOpen(io, gpa, name, svg, ra.open_it);
+}
+
+fn reactorBoron(gpa: std.mem.Allocator, ra: ReactorArgs) !void {
+    reactorBanner("CRITICAL BORON SEARCH");
+    var lay = latticeLayout(ra);
+    lay.rods = ra.rods;
+    printLayout(lay, ra);
+    const ppm = try diffusion2d.criticalBoron(gpa, lay, 1.0) orelse {
+        std.debug.print("  Already subcritical with no boron: no boron needed.\n\n", .{});
+        return;
+    };
+    var r0 = try diffusion2d.solve(gpa, blk: {
+        var l0 = lay;
+        l0.boron_ppm = 0;
+        break :blk l0;
+    });
+    defer r0.deinit(gpa);
+    var r100 = try diffusion2d.solve(gpa, blk: {
+        var l1 = lay;
+        l1.boron_ppm = 100;
+        break :blk l1;
+    });
+    defer r100.deinit(gpa);
+    const worth = (1 / r100.k - 1 / r0.k) * 1e5 / 100;
+    std.debug.print("  k_eff, no boron   {d:.5}\n", .{r0.k});
+    std.debug.print("  boron worth       {d:.1} pcm/ppm (first 100 ppm)\n", .{worth});
+    std.debug.print("  critical boron    {d:.0} ppm\n\n", .{ppm});
+    std.debug.print("  Boron in the coolant soaks up thermal neutrons evenly everywhere, so it\n  cancels excess reactivity without the flux holes rods make. Operators\n  dilute it as fuel burns up to hold the core critical.\n\n", .{});
 }
 
 fn reactorKinetics(io: std.Io, gpa: std.mem.Allocator, ra: ReactorArgs) !void {

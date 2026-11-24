@@ -7,7 +7,18 @@ const surface = "#fcfcfb";
 const ink = "#1f1f1e";
 const ink_2 = "#6b6a64";
 
-pub const Panel = struct { title: []const u8, field: []const f64 };
+/// One 2D slice: nx by ny cells, row-major with y (or z) increasing upward.
+pub const Panel = struct {
+    title: []const u8,
+    nx: usize,
+    ny: usize,
+    w_cm: f64,
+    h_cm: f64,
+    field: []const f64,
+    kind: []const d2.Kind,
+    x_label: []const u8 = "x",
+    y_label: []const u8 = "y",
+};
 
 // Sequential scale, dark blue -> teal -> yellow.
 const stops = [_][3]f64{
@@ -28,7 +39,7 @@ fn color(t_in: f64) [3]u8 {
 }
 
 /// Caller frees.
-pub fn render(gpa: std.mem.Allocator, r: d2.Result, title: []const u8, subtitle: []const u8, panels: []const Panel) ![]u8 {
+pub fn render(gpa: std.mem.Allocator, title: []const u8, subtitle: []const u8, panels: []const Panel) ![]u8 {
     var out: std.Io.Writer.Allocating = .init(gpa);
     errdefer out.deinit();
     const w = &out.writer;
@@ -40,8 +51,6 @@ pub fn render(gpa: std.mem.Allocator, r: d2.Result, title: []const u8, subtitle:
     const np: f64 = @floatFromInt(panels.len);
     const width = left * 2 + side * np + gap * (np - 1);
     const height = top + side + 90;
-    const n = r.n;
-    const px = side / @as(f64, @floatFromInt(n));
 
     try w.print(
         \\<?xml version="1.0" encoding="UTF-8"?>
@@ -54,36 +63,41 @@ pub fn render(gpa: std.mem.Allocator, r: d2.Result, title: []const u8, subtitle:
 
     for (panels, 0..) |p, pi| {
         const ox = left + @as(f64, @floatFromInt(pi)) * (side + gap);
+        const nx = p.nx;
+        const ny = p.ny;
+        const scale = side / @max(p.w_cm, p.h_cm);
+        const pxw = p.w_cm * scale / @as(f64, @floatFromInt(nx));
+        const pxh = p.h_cm * scale / @as(f64, @floatFromInt(ny));
+        const base_y = top + p.h_cm * scale;
         var vmax: f64 = 0;
         for (p.field) |v| vmax = @max(vmax, v);
         try w.print("<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"14\" font-weight=\"bold\">{s}</text>\n", .{ ox, top - 12, ink, p.title });
         try w.print("<g shape-rendering=\"crispEdges\">\n", .{});
-        for (0..n) |j| for (0..n) |i| {
-            const c = j * n + i;
+        for (0..ny) |j| for (0..nx) |i| {
+            const c = j * nx + i;
             const col = color(p.field[c] / vmax);
             // y grows upward in physics, downward in SVG.
-            const x = ox + @as(f64, @floatFromInt(i)) * px;
-            const y = top + side - @as(f64, @floatFromInt(j + 1)) * px;
-            try w.print("<rect x=\"{d:.2}\" y=\"{d:.2}\" width=\"{d:.2}\" height=\"{d:.2}\" fill=\"#{x:0>2}{x:0>2}{x:0>2}\"/>", .{ x, y, px + 0.3, px + 0.3, col[0], col[1], col[2] });
+            const x = ox + @as(f64, @floatFromInt(i)) * pxw;
+            const y = base_y - @as(f64, @floatFromInt(j + 1)) * pxh;
+            try w.print("<rect x=\"{d:.2}\" y=\"{d:.2}\" width=\"{d:.2}\" height=\"{d:.2}\" fill=\"#{x:0>2}{x:0>2}{x:0>2}\"/>", .{ x, y, pxw + 0.3, pxh + 0.3, col[0], col[1], col[2] });
         };
         try w.writeAll("</g>\n");
         // Outline rods and the fuel boundary.
-        for (0..n) |j| for (0..n) |i| {
-            const c = j * n + i;
-            const x = ox + @as(f64, @floatFromInt(i)) * px;
-            const y = top + side - @as(f64, @floatFromInt(j + 1)) * px;
-            const k = r.kind[c];
-            if (k == .rod) try w.print("<rect x=\"{d:.2}\" y=\"{d:.2}\" width=\"{d:.2}\" height=\"{d:.2}\" fill=\"none\" stroke=\"#eb6834\" stroke-width=\"1\"/>", .{ x, y, px, px });
-            const east = i + 1 < n and (r.kind[c + 1] == .reflector) != (k == .reflector);
-            const north = j + 1 < n and (r.kind[c + n] == .reflector) != (k == .reflector);
-            if (east) try w.print("<line x1=\"{d:.2}\" y1=\"{d:.2}\" x2=\"{d:.2}\" y2=\"{d:.2}\" stroke=\"#ffffff\" stroke-width=\"1.5\" stroke-dasharray=\"3 3\"/>", .{ x + px, y, x + px, y + px });
-            if (north) try w.print("<line x1=\"{d:.2}\" y1=\"{d:.2}\" x2=\"{d:.2}\" y2=\"{d:.2}\" stroke=\"#ffffff\" stroke-width=\"1.5\" stroke-dasharray=\"3 3\"/>", .{ x, y, x + px, y });
+        for (0..ny) |j| for (0..nx) |i| {
+            const c = j * nx + i;
+            const x = ox + @as(f64, @floatFromInt(i)) * pxw;
+            const y = base_y - @as(f64, @floatFromInt(j + 1)) * pxh;
+            const k = p.kind[c];
+            if (k == .rod) try w.print("<rect x=\"{d:.2}\" y=\"{d:.2}\" width=\"{d:.2}\" height=\"{d:.2}\" fill=\"none\" stroke=\"#eb6834\" stroke-width=\"1\"/>", .{ x, y, pxw, pxh });
+            const east = i + 1 < nx and (p.kind[c + 1] == .reflector) != (k == .reflector);
+            const north = j + 1 < ny and (p.kind[c + nx] == .reflector) != (k == .reflector);
+            if (east) try w.print("<line x1=\"{d:.2}\" y1=\"{d:.2}\" x2=\"{d:.2}\" y2=\"{d:.2}\" stroke=\"#ffffff\" stroke-width=\"1.5\" stroke-dasharray=\"3 3\"/>", .{ x + pxw, y, x + pxw, y + pxh });
+            if (north) try w.print("<line x1=\"{d:.2}\" y1=\"{d:.2}\" x2=\"{d:.2}\" y2=\"{d:.2}\" stroke=\"#ffffff\" stroke-width=\"1.5\" stroke-dasharray=\"3 3\"/>", .{ x, y, x + pxw, y });
         };
         try w.writeAll("\n");
         // Axis labels.
-        const extent = r.h * @as(f64, @floatFromInt(n));
         try w.print("<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"12\">0</text>\n", .{ ox, top + side + 16, ink_2 });
-        try w.print("<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"12\" text-anchor=\"end\">{d:.0} cm</text>\n", .{ ox + side, top + side + 16, ink_2, extent });
+        try w.print("<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"12\" text-anchor=\"end\">{s} {d:.0} cm, {s} {d:.0} cm</text>\n", .{ ox + side, top + side + 16, ink_2, p.x_label, p.w_cm, p.y_label, p.h_cm });
         try w.print("<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"12\">peak {d:.2}</text>\n", .{ ox, top + side + 36, ink_2, vmax });
         // Colour bar.
         const bx = ox + side - 160;
@@ -93,7 +107,7 @@ pub fn render(gpa: std.mem.Allocator, r: d2.Result, title: []const u8, subtitle:
         }
         try w.print("\n<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"11\">0</text><text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"11\" text-anchor=\"end\">max</text>\n", .{ bx - 10, top + side + 36, ink_2, bx + 172, top + side + 36, ink_2 });
     }
-    try w.print("<text x=\"24\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"12\">Quarter core: centre at bottom-left. Orange squares: control rods. Dashed white: fuel / reflector boundary.</text>\n", .{ height - 14, ink_2 });
+    try w.print("<text x=\"24\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"12\">Quarter core: centre axis at the left edge. Orange: control rods: control rods. Dashed white: fuel / reflector boundary.</text>\n", .{ height - 14, ink_2 });
     try w.writeAll("</svg>\n");
     return out.toOwnedSlice();
 }

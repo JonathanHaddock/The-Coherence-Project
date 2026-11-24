@@ -53,6 +53,8 @@ A teaching-grade reactor physics workbench under `src/reactor/`.
 | `reactor core [geom=slab\|cyl\|sphere] [fuel=cm] [refl=water\|graphite\|none] [rt=cm]` | Two-group finite-volume diffusion, power iteration for k_eff; reactivity, leakage, power peaking. Writes `results/reactor-core.svg` (fast/thermal flux and power) |
 | `reactor critical [geom=..] [refl=..] [rt=cm]` | Bisection for the critical fuel size, reflected and bare; reflector savings |
 | `reactor lattice [rods=out\|all\|center\|ring\|checker] [fuel=cm] [refl=..] [rt=cm] [cell=cm]` | 2D quarter-core two-group diffusion (SOR inner solve) with 20 cm assemblies and control-rod channels. Reports k_eff with rods in and out, rod worth in pcm and dollars, power peaking. Writes `results/reactor-lattice-<rods>.svg` heat maps of thermal flux and power |
+| `reactor lattice ... h=cm ins=0..1 boron=ppm` | `h` > 0 makes the core 3D with 20 cm axial reflectors; rods enter from the top to fraction `ins` of the height. Prints axial power and axial offset; SVG shows horizontal and vertical slices. `boron` adds soluble boron (about 7 pcm/ppm) |
+| `reactor boron [rods=..] [h=cm] [ins=..]` | Bisection for the critical boron concentration, plus boron worth |
 | `reactor kinetics [rho=$] [t=s] [feedback=on\|off]` | Point kinetics, six delayed groups (Keepin U-235), lumped fuel-temperature feedback. Inhour period and feedback equilibrium for comparison. Writes `results/reactor-kinetics.svg` |
 
 Cross sections are illustrative textbook values, not from any real design. Tests check the 1D and 2D solvers
