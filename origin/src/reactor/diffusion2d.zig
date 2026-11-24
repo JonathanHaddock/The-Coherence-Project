@@ -160,18 +160,33 @@ pub fn solve(gpa: std.mem.Allocator, l: Layout) !Result {
 
     const kind = try gpa.alloc(Kind, nn);
     errdefer gpa.free(kind);
-    var za = [2]usize{ nz, 0 };
+    const mats = try gpa.alloc(Material, nn);
+    defer gpa.free(mats);
     for (0..nz) |k| for (0..n) |j| for (0..n) |i| {
         const x = (@as(f64, @floatFromInt(i)) + 0.5) * h;
         const y = (@as(f64, @floatFromInt(j)) + 0.5) * h;
         const z = (@as(f64, @floatFromInt(k)) + 0.5) * hz;
         const c = (k * n + j) * n + i;
         kind[c] = classify(l, x, y, if (three_d) z else 0);
-        if (i == 0 and j == 0 and kind[c] != .reflector) {
+        mats[c] = matOf(l, kind[c]);
+    };
+    return solveMesh(gpa, .{ .n = n, .nz = nz, .h = h, .hz = hz }, kind, mats);
+}
+
+/// Solve on a prepared mesh. Takes ownership of `kind` (freed by Result.deinit).
+pub fn solveMesh(gpa: std.mem.Allocator, mesh: Mesh, kind: []Kind, mats: []const Material) !Result {
+    const n = mesh.n;
+    const nz = mesh.nz;
+    const h = mesh.h;
+    const hz = mesh.hz;
+    const nn = n * n * nz;
+    var za = [2]usize{ nz, 0 };
+    for (0..nz) |k| {
+        if (kind[k * n * n] != .reflector) {
             za[0] = @min(za[0], k);
             za[1] = @max(za[1], k + 1);
         }
-    };
+    }
 
     const buf = try gpa.alloc(f64, nn * 9);
     defer gpa.free(buf);
@@ -182,7 +197,7 @@ pub fn solve(gpa: std.mem.Allocator, l: Layout) !Result {
     const src = buf[7 * nn .. 8 * nn];
     const fis = buf[8 * nn .. 9 * nn];
     for (0..nn) |c| {
-        const m = matOf(l, kind[c]);
+        const m = mats[c];
         d[0][c] = m.d1;
         d[1][c] = m.d2;
         rem[0][c] = m.sa1 + m.s12;
@@ -207,7 +222,6 @@ pub fn solve(gpa: std.mem.Allocator, l: Layout) !Result {
         total += fis[c];
     }
 
-    const mesh = Mesh{ .n = n, .nz = nz, .h = h, .hz = hz };
     var outer: u32 = 0;
     while (outer < 3000) : (outer += 1) {
         for (0..2) |g| {
@@ -241,7 +255,7 @@ pub fn solve(gpa: std.mem.Allocator, l: Layout) !Result {
     var psum: f64 = 0;
     var cnt: f64 = 0;
     for (0..nn) |c| {
-        const m = matOf(l, kind[c]);
+        const m = mats[c];
         power[c] = m.sf1 * phi1[c] + m.sf2 * phi2[c];
         if (kind[c] != .reflector) {
             psum += power[c];
@@ -284,7 +298,7 @@ pub fn criticalBoron(gpa: std.mem.Allocator, l: Layout, target: f64) !?f64 {
     return 0.5 * (lo + hi);
 }
 
-const Mesh = struct { n: usize, nz: usize, h: f64, hz: f64 };
+pub const Mesh = struct { n: usize, nz: usize, h: f64, hz: f64 };
 
 fn coupling(da: f64, db: f64, step2: f64) f64 {
     return 2 * da * db / (da + db) / step2;

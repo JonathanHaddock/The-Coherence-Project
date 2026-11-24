@@ -1,0 +1,33 @@
+{
+  "name": "Three-zone loading pattern",
+  "notes": "Low (L), medium (M) and high (H) enrichment stand-ins plus burnable-absorber assemblies (B). Optimize shuffles them to flatten power.",
+  "assembly_cm": 20,
+  "cell_cm": 2.5,
+  "boron_ppm": 1600,
+  "rod_insertion": 0,
+  "legend": {
+    "L": { "mat": "lwr", "fission_scale": 0.92 },
+    "M": { "mat": "lwr" },
+    "H": { "mat": "lwr", "fission_scale": 1.08 },
+    "B": { "mat": "lwr", "fission_scale": 1.08, "extra_sa2": 0.006 },
+    "C": { "mat": "lwr", "rod": true },
+    "W": { "mat": "water" }
+  },
+  "map": [
+    "W W W W W",
+    "L L M M W",
+    "M H H B W",
+    "H H B L W",
+    "C M L L W"
+  ],
+  "constraints": {
+    "k_min": 1.0,
+    "peaking_max": 1.45,
+    "shutdown_k_max": 1.2
+  },
+  "optimize": {
+    "objective": "peaking",
+    "swappable": ["L", "M", "H", "B"],
+    "max_passes": 25
+  }
+}

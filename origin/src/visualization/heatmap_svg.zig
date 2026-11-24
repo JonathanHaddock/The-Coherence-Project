@@ -107,7 +107,7 @@ pub fn render(gpa: std.mem.Allocator, title: []const u8, subtitle: []const u8, p
         }
         try w.print("\n<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"11\">0</text><text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"11\" text-anchor=\"end\">max</text>\n", .{ bx - 10, top + side + 36, ink_2, bx + 172, top + side + 36, ink_2 });
     }
-    try w.print("<text x=\"24\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"12\">Quarter core: centre axis at the left edge. Orange: control rods: control rods. Dashed white: fuel / reflector boundary.</text>\n", .{ height - 14, ink_2 });
+    try w.print("<text x=\"24\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"12\">Quarter core: centre axis at the left edge. Orange: control rods. Dashed white: fuel / reflector boundary.</text>\n", .{ height - 14, ink_2 });
     try w.writeAll("</svg>\n");
     return out.toOwnedSlice();
 }

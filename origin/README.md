@@ -61,6 +61,35 @@ Cross sections are illustrative textbook values, not from any real design. Tests
 against the analytic bare-slab and bare-square buckling results, the kinetics against the inhour equation, and the
 feedback run against its analytic equilibrium.
 
+### Design files
+
+`reactor design <file.json>` evaluates a core described as data; `reactor optimize <file.json>` searches for a
+better loading pattern and writes `results/<name>-optimized.json`. Examples are in `designs/`.
+
+A design is a quarter-core map, one character per assembly. The last row is the centre row and the first column
+the centre column, so the bottom-left symbol is the central assembly. Each symbol is defined in `legend`:
+
+```json
+"legend": {
+  "H": { "mat": "lwr", "fission_scale": 1.08 },          // enrichment stand-in
+  "B": { "mat": "lwr", "extra_sa2": 0.006 },             // burnable absorber stand-in
+  "C": { "mat": "lwr", "rod": true },                    // control rod channel
+  "W": { "mat": "water" }                                // reflector
+}
+```
+
+`mat` is a built-in (`lwr`, `water`, `graphite`) or a name defined under `"materials"` with your own two-group
+cross sections. Other keys: `assembly_cm`, `rod_width_cm`, `cell_cm`, `height_cm` (> 0 for 3D), `axial_reflector_cm`,
+`rod_insertion` (the operating state), `boron_ppm`.
+
+`constraints` (all optional): `k_min`, `k_max` (rods out), `peaking_max` (operating state), `shutdown_k_max`
+(all rods in), `rod_worth_min_dollars`, `axial_offset_abs_max` (3D). Each is reported PASS or FAIL.
+
+`optimize`: `objective` (`peaking`, `fuel` = least excess reactivity above `k_min`, or `neg_k`), `swappable`
+symbols, `max_passes`. The search is deterministic steepest descent: each pass tries every swap of two different
+swappable assemblies, applies the best improvement, and stops at a local optimum. Constraint violations are
+penalised, so the search first drives a failing design toward feasibility.
+
 ## Data
 
 CMS Run2011A dimuon events from [CERN Open Data record 545](https://opendata.cern.ch/record/545),

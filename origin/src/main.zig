@@ -32,6 +32,7 @@ const reactor_mat = @import("reactor/materials.zig");
 const diffusion = @import("reactor/diffusion.zig");
 const kinetics = @import("reactor/kinetics.zig");
 const diffusion2d = @import("reactor/diffusion2d.zig");
+const rdesign = @import("reactor/design.zig");
 const heatmap_svg = @import("visualization/heatmap_svg.zig");
 const reactor_svg = @import("visualization/reactor_svg.zig");
 
@@ -40,6 +41,7 @@ test {
     _ = diffusion;
     _ = kinetics;
     _ = diffusion2d;
+    _ = rdesign;
     _ = koide;
     _ = projector;
     _ = weak;
@@ -113,6 +115,8 @@ fn help() void {
         \\  origin reactor kinetics [rho=dollars] [t=s] [feedback=on|off] [--no-open]
         \\  origin reactor lattice [rods=out|all|center|ring|checker] [h=cm] [ins=0..1] [boron=ppm] [fuel=cm] [refl=..] [rt=cm] [cell=cm] [--no-open]
         \\  origin reactor boron [rods=..] [h=cm] [ins=0..1] [fuel=cm] [refl=..] [rt=cm] [cell=cm]
+        \\  origin reactor design <file.json> [--no-open]
+        \\  origin reactor optimize <file.json> [--no-open]
         \\  origin reactor materials
         \\  origin help
         \\
@@ -1519,6 +1523,7 @@ const ReactorArgs = struct {
     height: f64 = 0,
     insertion: f64 = 1.0,
     boron: f64 = 0,
+    file: ?[]const u8 = null,
     fuel_set: bool = false,
     open_it: bool = true,
 };
@@ -1532,7 +1537,7 @@ fn parseReactorArgs(args: *std.process.Args.Iterator) !ReactorArgs {
             continue;
         }
         const eq = std.mem.indexOfScalar(u8, arg, '=') orelse {
-            if (first) ra.sub = arg;
+            if (first) ra.sub = arg else ra.file = arg;
             first = false;
             continue;
         };
@@ -1594,6 +1599,8 @@ fn reactorReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Ite
     if (std.mem.eql(u8, ra.sub, "kinetics")) return reactorKinetics(io, gpa, ra);
     if (std.mem.eql(u8, ra.sub, "lattice")) return reactorLattice(io, gpa, ra);
     if (std.mem.eql(u8, ra.sub, "boron")) return reactorBoron(gpa, ra);
+    if (std.mem.eql(u8, ra.sub, "design")) return reactorDesign(io, gpa, ra, false);
+    if (std.mem.eql(u8, ra.sub, "optimize")) return reactorDesign(io, gpa, ra, true);
 
     var regions_buf: [2]diffusion.Region = undefined;
     regions_buf[0] = .{ .mat = reactor_mat.lwr_fuel, .thickness = ra.fuel_cm };
@@ -1784,6 +1791,132 @@ fn reactorLattice(io: std.Io, gpa: std.mem.Allocator, ra: ReactorArgs) !void {
     }
     defer gpa.free(svg);
     const name = try std.fmt.allocPrint(gpa, "reactor-lattice{s}-{s}.svg", .{ if (res.nz > 1) "3d" else "", @tagName(ra.rods) });
+    defer gpa.free(name);
+    try writeAndOpen(io, gpa, name, svg, ra.open_it);
+}
+
+fn printMap(des: rdesign.Design) void {
+    var r: usize = des.na;
+    while (r > 0) {
+        r -= 1;
+        std.debug.print("    ", .{});
+        for (des.grid[r]) |c| std.debug.print("{c} ", .{c});
+        std.debug.print("\n", .{});
+    }
+}
+
+fn printScore(sc: rdesign.Score) void {
+    std.debug.print("  k_eff rods out    {d:.5}\n", .{sc.k_out});
+    std.debug.print("  k_eff as set      {d:.5}\n", .{sc.k_set});
+    std.debug.print("  k_eff all rods in {d:.5}\n", .{sc.k_in});
+    std.debug.print("  rod worth         {d:.2} $\n", .{sc.worth_dollars});
+    std.debug.print("  peaking (as set)  {d:.3}\n", .{sc.peaking});
+    if (sc.axial_offset) |a| std.debug.print("  axial offset      {d:.3}\n", .{a});
+    std.debug.print("  fuel fraction     {d:.2} of map positions\n\n", .{sc.fuel_fraction});
+    var any = false;
+    for (sc.checks) |ch| if (ch) |x| {
+        if (!any) std.debug.print("  CONSTRAINTS\n", .{});
+        any = true;
+        std.debug.print("    {s:<4} {s:<22} {d:>9.4}  limit {d:.4}\n", .{ if (x.pass) "PASS" else "FAIL", x.name, x.value, x.limit });
+    };
+    if (any) std.debug.print("    => {s}\n\n", .{if (sc.pass) "design meets all constraints" else "design FAILS constraints"});
+}
+
+fn reactorDesign(io: std.Io, gpa: std.mem.Allocator, ra: ReactorArgs, do_opt: bool) !void {
+    const path = ra.file orelse {
+        std.debug.print("Usage: origin reactor {s} <design.json>\n", .{if (do_opt) "optimize" else "design"});
+        return;
+    };
+    var arena = std.heap.ArenaAllocator.init(gpa);
+    defer arena.deinit();
+    const text = try std.Io.Dir.cwd().readFileAlloc(io, path, arena.allocator(), .limited(1 << 20));
+    var des = rdesign.parse(gpa, arena.allocator(), text) catch |err| {
+        std.debug.print("Could not read design {s}: {s}\n", .{ path, @errorName(err) });
+        return err;
+    };
+    defer des.deinit(gpa);
+    const sp = des.spec;
+
+    reactorBanner(if (do_opt) "DESIGN OPTIMIZATION" else "DESIGN EVALUATION");
+    std.debug.print("  {s}\n", .{sp.name});
+    if (sp.notes.len > 0) std.debug.print("  {s}\n", .{sp.notes});
+    std.debug.print("\n  quarter-core map (centre at bottom-left), {d:.0} cm assemblies", .{sp.assembly_cm});
+    if (sp.height_cm > 0) std.debug.print(", {d:.0} cm tall", .{sp.height_cm});
+    std.debug.print(", boron {d:.0} ppm\n", .{sp.boron_ppm});
+    printMap(des);
+    std.debug.print("\n  legend\n", .{});
+    var it = sp.legend.map.iterator();
+    while (it.next()) |e| {
+        const v = e.value_ptr.*;
+        std.debug.print("    {s}  {s}", .{ e.key_ptr.*, v.mat });
+        if (v.fission_scale != 1) std.debug.print(", fission x{d:.2}", .{v.fission_scale});
+        if (v.extra_sa2 != 0) std.debug.print(", absorber +{d:.4}/cm", .{v.extra_sa2});
+        if (v.rod) std.debug.print(", control rod", .{});
+        std.debug.print("\n", .{});
+    }
+    std.debug.print("\n", .{});
+
+    var sc = try rdesign.score(gpa, des);
+    printScore(sc);
+
+    if (do_opt) {
+        const o = sp.optimize;
+        std.debug.print("  SEARCH  objective: {s}   swappable:", .{o.objective});
+        for (o.swappable) |x| std.debug.print(" {s}", .{x});
+        std.debug.print("\n  deterministic steepest descent over pairwise swaps\n\n", .{});
+        const before = sc.objective(o.objective, sp.constraints);
+        var log: std.ArrayList(rdesign.Step) = .empty;
+        defer log.deinit(gpa);
+        sc = try rdesign.optimize(gpa, &des, &log);
+        if (log.items.len == 0) {
+            std.debug.print("  No single swap improves the design: it is a local optimum.\n\n", .{});
+        } else {
+            std.debug.print("    {s:>4}  {s:<22}  {s:>10}\n", .{ "pass", "swap (col,row from centre)", "objective" });
+            std.debug.print("    {s:>4}  {s:<22}  {d:>10.4}\n", .{ "0", "start", before });
+            for (log.items) |st| {
+                std.debug.print("    {d:>4}  ({d},{d}) <-> ({d},{d})            {d:>10.4}\n", .{ st.pass, st.a[0], st.a[1], st.b[0], st.b[1], st.objective });
+            }
+            std.debug.print("\n  optimized map\n", .{});
+            printMap(des);
+            std.debug.print("\n", .{});
+            printScore(sc);
+        }
+        const js = try rdesign.toJson(gpa, des);
+        defer gpa.free(js);
+        try std.Io.Dir.cwd().createDirPath(io, store.results_dir);
+        const base = std.fs.path.stem(path);
+        const out_path = try std.fmt.allocPrint(gpa, "{s}/{s}-optimized.json", .{ store.results_dir, base });
+        defer gpa.free(out_path);
+        try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = out_path, .data = js });
+        std.debug.print("Wrote {s}\n", .{out_path});
+    }
+
+    // Picture of the as-set state.
+    var res = try rdesign.solve(gpa, des, .{ .insertion = sp.rod_insertion });
+    defer res.deinit(gpa);
+    const subtitle = try std.fmt.allocPrint(gpa, "{s}: k_eff {d:.4} rods out, {d:.4} as set, peaking {d:.2}{s}", .{ sp.name, sc.k_out, sc.k_set, sc.peaking, if (sc.pass) "" else "  (FAILS constraints)" });
+    defer gpa.free(subtitle);
+    const extent = res.h * @as(f64, @floatFromInt(res.n));
+    var svg: []u8 = undefined;
+    if (res.nz == 1) {
+        svg = try heatmap_svg.render(gpa, "Design: thermal flux and power", subtitle, &.{
+            .{ .title = "thermal flux", .nx = res.n, .ny = res.n, .w_cm = extent, .h_cm = extent, .field = res.phi2, .kind = res.kind },
+            .{ .title = "power / mean", .nx = res.n, .ny = res.n, .w_cm = extent, .h_cm = extent, .field = res.power, .kind = res.kind },
+        });
+    } else {
+        const mid = (res.z_active[0] + res.z_active[1]) / 2;
+        const xy = try sliceXY(gpa, res, res.power, mid);
+        defer xy.deinit(gpa);
+        const xz = try sliceXZ(gpa, res, res.power, 0);
+        defer xz.deinit(gpa);
+        const zext = res.hz * @as(f64, @floatFromInt(res.nz));
+        svg = try heatmap_svg.render(gpa, "Design: power slices", subtitle, &.{
+            .{ .title = "power, mid-height", .nx = res.n, .ny = res.n, .w_cm = extent, .h_cm = extent, .field = xy.field, .kind = xy.kind },
+            .{ .title = "power, vertical through centre", .nx = res.n, .ny = res.nz, .w_cm = extent, .h_cm = zext, .field = xz.field, .kind = xz.kind, .y_label = "z" },
+        });
+    }
+    defer gpa.free(svg);
+    const name = try std.fmt.allocPrint(gpa, "design-{s}{s}.svg", .{ std.fs.path.stem(path), if (do_opt) "-optimized" else "" });
     defer gpa.free(name);
     try writeAndOpen(io, gpa, name, svg, ra.open_it);
 }

@@ -1,0 +1,33 @@
+{
+  "name": "Baseline square core",
+  "notes": "Uniform fuel, rods in alternating assemblies, water reflector. Deliberately fails: too much excess reactivity, peaked power, and the rods cannot shut it down. Edit it until it passes.",
+  "assembly_cm": 20,
+  "cell_cm": 2,
+  "boron_ppm": 1800,
+  "rod_insertion": 0,
+  "legend": {
+    "F": {
+      "mat": "lwr"
+    },
+    "C": {
+      "mat": "lwr",
+      "rod": true
+    },
+    "W": {
+      "mat": "water"
+    }
+  },
+  "map": [
+    "W W W W W",
+    "C F C F W",
+    "F C F C W",
+    "C F C F W",
+    "F C F C W"
+  ],
+  "constraints": {
+    "k_min": 1.0,
+    "k_max": 1.05,
+    "peaking_max": 1.6,
+    "shutdown_k_max": 0.99
+  }
+}

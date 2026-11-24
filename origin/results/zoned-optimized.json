@@ -1,0 +1,72 @@
+{
+  "name": "Three-zone loading pattern",
+  "notes": "Low (L), medium (M) and high (H) enrichment stand-ins plus burnable-absorber assemblies (B). Optimize shuffles them to flatten power.",
+  "assembly_cm": 20,
+  "rod_width_cm": 4,
+  "cell_cm": 2.5,
+  "height_cm": 0,
+  "axial_reflector_cm": 20,
+  "rod_insertion": 0,
+  "boron_ppm": 1600,
+  "materials": {},
+  "legend": {
+    "L": {
+      "mat": "lwr",
+      "fission_scale": 0.92,
+      "extra_sa2": 0,
+      "rod": false
+    },
+    "M": {
+      "mat": "lwr",
+      "fission_scale": 1,
+      "extra_sa2": 0,
+      "rod": false
+    },
+    "H": {
+      "mat": "lwr",
+      "fission_scale": 1.08,
+      "extra_sa2": 0,
+      "rod": false
+    },
+    "B": {
+      "mat": "lwr",
+      "fission_scale": 1.08,
+      "extra_sa2": 0.006,
+      "rod": false
+    },
+    "C": {
+      "mat": "lwr",
+      "fission_scale": 1,
+      "extra_sa2": 0,
+      "rod": true
+    },
+    "W": {
+      "mat": "water",
+      "fission_scale": 1,
+      "extra_sa2": 0,
+      "rod": false
+    }
+  },
+  "map": [
+    "W W W W W",
+    "H H B L W",
+    "M M H B W",
+    "L L M H W",
+    "C M L L W"
+  ],
+  "constraints": {
+    "k_min": 1,
+    "peaking_max": 1.45,
+    "shutdown_k_max": 1.2
+  },
+  "optimize": {
+    "objective": "peaking",
+    "swappable": [
+      "L",
+      "M",
+      "H",
+      "B"
+    ],
+    "max_passes": 25
+  }
+}
