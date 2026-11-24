@@ -28,8 +28,15 @@ const grid3 = @import("engine/grid3.zig");
 const lepton = @import("engine/lepton.zig");
 const record = @import("engine/record.zig");
 const photo = @import("engine/photo.zig");
+const reactor_mat = @import("reactor/materials.zig");
+const diffusion = @import("reactor/diffusion.zig");
+const kinetics = @import("reactor/kinetics.zig");
+const reactor_svg = @import("visualization/reactor_svg.zig");
 
 test {
+    _ = reactor_mat;
+    _ = diffusion;
+    _ = kinetics;
     _ = koide;
     _ = projector;
     _ = weak;
@@ -98,6 +105,10 @@ fn help() void {
         \\  origin photo [all7|next] [ticks] [none|same|unreal]
         \\  origin pixel [--no-open]
         \\  origin record mode=lattice|v1|signed|turing|control core=.. p=.. ticks=.. every=.. [display=.. update=.. gravity=on seed=..]
+        \\  origin reactor core [geom=slab|cyl|sphere] [fuel=cm] [refl=water|graphite|none] [rt=cm] [--no-open]
+        \\  origin reactor critical [geom=..] [refl=..] [rt=cm]
+        \\  origin reactor kinetics [rho=dollars] [t=s] [feedback=on|off] [--no-open]
+        \\  origin reactor materials
         \\  origin help
         \\
     , .{});
@@ -1487,6 +1498,184 @@ fn photoReport(args: anytype) void {
     std.debug.print("MEASURED (PMNS columns, D): nu1 0.083  nu2 0.001  nu3 0.129\n", .{});
 }
 
+// ------------------------------------------------------------ reactor
+
+const ReactorArgs = struct {
+    sub: []const u8 = "core",
+    geom: diffusion.Geometry = .cylinder,
+    fuel_cm: f64 = 40,
+    refl: ?reactor_mat.Material = reactor_mat.water,
+    refl_cm: f64 = 20,
+    rho: f64 = 0.1,
+    t_end: f64 = 30,
+    feedback: bool = true,
+    open_it: bool = true,
+};
+
+fn parseReactorArgs(args: *std.process.Args.Iterator) !ReactorArgs {
+    var ra = ReactorArgs{};
+    var first = true;
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--no-open")) {
+            ra.open_it = false;
+            continue;
+        }
+        const eq = std.mem.indexOfScalar(u8, arg, '=') orelse {
+            if (first) ra.sub = arg;
+            first = false;
+            continue;
+        };
+        first = false;
+        const k = arg[0..eq];
+        const v = arg[eq + 1 ..];
+        if (std.mem.eql(u8, k, "geom")) {
+            ra.geom = diffusion.Geometry.parse(v) orelse return error.BadGeometry;
+        } else if (std.mem.eql(u8, k, "fuel")) {
+            ra.fuel_cm = try std.fmt.parseFloat(f64, v);
+        } else if (std.mem.eql(u8, k, "refl")) {
+            ra.refl = if (std.ascii.eqlIgnoreCase(v, "none")) null else (reactor_mat.find(v) orelse return error.UnknownMaterial);
+        } else if (std.mem.eql(u8, k, "rt")) {
+            ra.refl_cm = try std.fmt.parseFloat(f64, v);
+        } else if (std.mem.eql(u8, k, "rho")) {
+            ra.rho = try std.fmt.parseFloat(f64, v);
+        } else if (std.mem.eql(u8, k, "t")) {
+            ra.t_end = try std.fmt.parseFloat(f64, v);
+        } else if (std.mem.eql(u8, k, "feedback")) {
+            ra.feedback = !std.mem.eql(u8, v, "off");
+        } else return error.UnknownOption;
+    }
+    if (ra.fuel_cm <= 0 or ra.refl_cm < 0 or ra.t_end <= 0) return error.BadValue;
+    return ra;
+}
+
+fn reactorBanner(title: []const u8) void {
+    std.debug.print("\n========================================\n          {s}\n========================================\n\n", .{title});
+}
+
+fn reactorReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
+    const ra = try parseReactorArgs(args);
+    if (std.mem.eql(u8, ra.sub, "materials")) {
+        reactorBanner("REACTOR MATERIALS");
+        std.debug.print("Two-group homogenized constants (illustrative teaching values, 1/cm)\n\n", .{});
+        std.debug.print("  {s:<9} {s:>6} {s:>6} {s:>8} {s:>8} {s:>8} {s:>8} {s:>7} {s:>8}\n", .{ "NAME", "D1", "D2", "Sa1", "Sa2", "S12", "nuSf2", "k_inf", "M^2 cm2" });
+        for (reactor_mat.all) |m| {
+            std.debug.print("  {s:<9} {d:>6.2} {d:>6.2} {d:>8.5} {d:>8.5} {d:>8.5} {d:>8.4} {d:>7.4} {d:>8.1}\n", .{ m.name, m.d1, m.d2, m.sa1, m.sa2, m.s12, m.nsf2, m.kInf(), m.migrationArea() });
+        }
+        std.debug.print("\n", .{});
+        return;
+    }
+    if (std.mem.eql(u8, ra.sub, "kinetics")) return reactorKinetics(io, gpa, ra);
+
+    var regions_buf: [2]diffusion.Region = undefined;
+    regions_buf[0] = .{ .mat = reactor_mat.lwr_fuel, .thickness = ra.fuel_cm };
+    var nreg: usize = 1;
+    if (ra.refl) |m| if (ra.refl_cm > 0) {
+        regions_buf[1] = .{ .mat = m, .thickness = ra.refl_cm };
+        nreg = 2;
+    };
+    const regions = regions_buf[0..nreg];
+    const size_word = if (ra.geom == .slab) "half-thickness" else "radius";
+    const refl_name = if (nreg == 2) regions[1].mat.name else "none";
+
+    if (std.mem.eql(u8, ra.sub, "critical")) {
+        reactorBanner("CRITICAL SIZE SEARCH");
+        const crit = try diffusion.criticalSize(gpa, ra.geom, regions, 1.0);
+        regions[0].thickness = 1000;
+        var bare = [_]diffusion.Region{.{ .mat = reactor_mat.lwr_fuel, .thickness = 1 }};
+        const crit_bare = try diffusion.criticalSize(gpa, ra.geom, &bare, 1.0);
+        std.debug.print("  geometry {s}, fuel lwr, reflector {s} ({d:.1} cm)\n\n", .{ @tagName(ra.geom), refl_name, if (nreg == 2) ra.refl_cm else 0 });
+        std.debug.print("  critical {s}, reflected: {d:>7.2} cm\n", .{ size_word, crit });
+        std.debug.print("  critical {s}, bare:      {d:>7.2} cm\n", .{ size_word, crit_bare });
+        std.debug.print("  reflector savings:            {d:>7.2} cm\n\n", .{crit_bare - crit});
+        std.debug.print("  A reflector returns leaking neutrons, so less fuel is needed.\n\n", .{});
+        return;
+    }
+
+    if (!std.mem.eql(u8, ra.sub, "core")) return error.UnknownSubcommand;
+    reactorBanner("REACTOR CORE (2-group diffusion)");
+    var res = try diffusion.solve(gpa, ra.geom, regions, .{});
+    defer res.deinit(gpa);
+    const beta = kinetics.betaTotal();
+    const rho = (res.k - 1) / res.k;
+    std.debug.print("  geometry   {s}\n  fuel       lwr, {s} {d:.1} cm  (k_inf {d:.4})\n  reflector  {s}", .{ @tagName(ra.geom), size_word, ra.fuel_cm, reactor_mat.lwr_fuel.kInf(), refl_name });
+    if (nreg == 2) std.debug.print(", {d:.1} cm", .{ra.refl_cm});
+    std.debug.print("\n\n  k_eff      {d:.5}   ({d} power iterations, {d} cells)\n", .{ res.k, res.iterations, res.r.len });
+    std.debug.print("  reactivity {d:.0} pcm = {d:.2} $\n", .{ rho * 1e5, rho / beta });
+    std.debug.print("  leakage    {d:.1}% of neutrons lost vs infinite medium\n", .{100 * (1 - res.k / reactor_mat.lwr_fuel.kInf())});
+    std.debug.print("  peaking    {d:.3} (max / mean fission rate in fuel)\n", .{res.peaking});
+    const state = if (@abs(res.k - 1) < 1e-3) "about critical" else if (res.k > 1) "supercritical: needs control absorber" else "subcritical: chain reaction dies out";
+    std.debug.print("  state      {s}\n\n", .{state});
+
+    const subtitle = try std.fmt.allocPrint(gpa, "{s}, fuel {d:.0} cm, reflector {s}: k_eff = {d:.4}, peaking {d:.2}", .{ @tagName(ra.geom), ra.fuel_cm, refl_name, res.k, res.peaking });
+    defer gpa.free(subtitle);
+    const svg = try reactor_svg.render(gpa, .{
+        .title = "Neutron flux and power across the core",
+        .subtitle = subtitle,
+        .x_label = if (ra.geom == .slab) "distance from midplane (cm)" else "radius (cm)",
+        .y_label = "relative value",
+        .x = res.r,
+        .series = &.{
+            .{ .name = "thermal flux", .color = reactor_svg.blue, .y = res.phi2 },
+            .{ .name = "fast flux", .color = reactor_svg.orange, .y = res.phi1 },
+            .{ .name = "power / mean", .color = reactor_svg.green, .y = res.power },
+        },
+        .marker_x = if (nreg == 2) res.fuel_edge else null,
+        .marker_label = "fuel | reflector",
+        .y_min = 0,
+    });
+    defer gpa.free(svg);
+    try writeAndOpen(io, gpa, "reactor-core.svg", svg, ra.open_it);
+}
+
+fn reactorKinetics(io: std.Io, gpa: std.mem.Allocator, ra: ReactorArgs) !void {
+    reactorBanner("POINT KINETICS");
+    if (ra.rho >= 1.0) std.debug.print("  WARNING: rho >= 1$ is prompt supercritical; power rises on the prompt-neutron time scale.\n\n", .{});
+    const p = kinetics.Params{ .rho_dollars = ra.rho, .t_end = ra.t_end, .feedback = ra.feedback };
+    const s = try kinetics.run(gpa, p);
+    defer gpa.free(s);
+    std.debug.print("  step reactivity {d:.3} $  (beta = {d:.5}, Lambda = {e} s)\n", .{ ra.rho, kinetics.betaTotal(), p.gen_time });
+    std.debug.print("  feedback        {s}  (alpha {d:.1} pcm/K, tau {d:.1} s)\n\n", .{ if (ra.feedback) "on" else "off", p.alpha * 1e5, p.tau });
+    if (ra.rho > 0 and ra.rho < 1) std.debug.print("  inhour stable period (no feedback): {d:.2} s\n", .{kinetics.inhourPeriod(ra.rho, p.gen_time)});
+    if (ra.feedback) std.debug.print("  feedback equilibrium power:         {d:.4}\n", .{kinetics.feedbackEquilibrium(p)});
+    std.debug.print("\n  {s:>8} {s:>12} {s:>10} {s:>10}\n", .{ "t (s)", "P / P0", "rho ($)", "dT (K)" });
+    const marks = [_]f64{ 0, 0.1, 0.5, 1, 2, 5, 10, 20, 30, 60, 120 };
+    for (marks) |tm| {
+        if (tm > ra.t_end + 1e-9) break;
+        const idx: usize = @intFromFloat(@round(tm / ra.t_end * @as(f64, @floatFromInt(p.samples))));
+        const e = s[idx];
+        std.debug.print("  {d:>8.2} {d:>12.4} {d:>10.4} {d:>10.2}\n", .{ e.t, e.p, e.rho_dollars, e.dtemp });
+    }
+    std.debug.print("\n  Prompt jump, then delayed neutrons set the pace; negative temperature\n  feedback pulls reactivity back toward zero and power levels off.\n\n", .{});
+
+    const t = try gpa.alloc(f64, s.len);
+    defer gpa.free(t);
+    const pw = try gpa.alloc(f64, s.len);
+    defer gpa.free(pw);
+    const rh = try gpa.alloc(f64, s.len);
+    defer gpa.free(rh);
+    for (s, 0..) |e, i| {
+        t[i] = e.t;
+        pw[i] = e.p;
+        rh[i] = e.rho_dollars;
+    }
+    const subtitle = try std.fmt.allocPrint(gpa, "step {d:.2} $, feedback {s}", .{ ra.rho, if (ra.feedback) "on" else "off" });
+    defer gpa.free(subtitle);
+    const svg = try reactor_svg.render(gpa, .{
+        .title = "Power transient after a reactivity step",
+        .subtitle = subtitle,
+        .x_label = "time (s)",
+        .y_label = "relative",
+        .x = t,
+        .series = &.{
+            .{ .name = "power P / P0", .color = reactor_svg.blue, .y = pw },
+            .{ .name = "net reactivity ($)", .color = reactor_svg.orange, .y = rh },
+        },
+        .y_min = 0,
+    });
+    defer gpa.free(svg);
+    try writeAndOpen(io, gpa, "reactor-kinetics.svg", svg, ra.open_it);
+}
+
 pub fn main(init: std.process.Init) void {
     var args = init.minimal.args.iterate();
     _ = args.skip();
@@ -1562,6 +1751,8 @@ pub fn main(init: std.process.Init) void {
         clocksReport(&args);
     } else if (std.mem.eql(u8, command, "engine")) {
         engineReport(&args);
+    } else if (std.mem.eql(u8, command, "reactor")) {
+        reactorReport(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "koide")) {
         koideReport();
     } else {

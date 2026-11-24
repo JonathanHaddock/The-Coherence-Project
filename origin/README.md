@@ -43,6 +43,21 @@ zig-out/bin/origin analyze
 
 Datasets: `Zmumu`, `Jpsimumu`, `Ymumu`, `Dimuon_DoubleMu` (default for `analyze`), and `Zee` (Z -> ee).
 
+## Reactor design module
+
+A teaching-grade reactor physics workbench under `src/reactor/`.
+
+| Command | What it does |
+|---|---|
+| `reactor materials` | Two-group cross-section sets (lwr fuel, water, graphite), with k_inf and migration area |
+| `reactor core [geom=slab\|cyl\|sphere] [fuel=cm] [refl=water\|graphite\|none] [rt=cm]` | Two-group finite-volume diffusion, power iteration for k_eff; reactivity, leakage, power peaking. Writes `results/reactor-core.svg` (fast/thermal flux and power) |
+| `reactor critical [geom=..] [refl=..] [rt=cm]` | Bisection for the critical fuel size, reflected and bare; reflector savings |
+| `reactor kinetics [rho=$] [t=s] [feedback=on\|off]` | Point kinetics, six delayed groups (Keepin U-235), lumped fuel-temperature feedback. Inhour period and feedback equilibrium for comparison. Writes `results/reactor-kinetics.svg` |
+
+Cross sections are illustrative textbook values, not from any real design. Tests check the solver
+against the analytic bare-slab buckling result, the kinetics against the inhour equation, and the
+feedback run against its analytic equilibrium.
+
 ## Data
 
 CMS Run2011A dimuon events from [CERN Open Data record 545](https://opendata.cern.ch/record/545),
