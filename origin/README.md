@@ -38,6 +38,7 @@ zig-out/bin/origin analyze
 | `export` | Writes derived datasets to `datasets/` with a checksummed manifest: per-event dilepton table (160,000 rows, regenerated, not committed), Z -> ee vs Z -> mumu spectra and summary, selection table |
 | `universality` | Lepton universality: ORIGIN's Z peak comparison, the CMS efficiency-corrected ee/mumu ratio, and LEP partial widths |
 | `generations` | Mass within an entity: Brannen parameters (mu, A, delta) per entity, Koide tau prediction vs measurements, delta vs 2/9 |
+| `levels [zeros\|box\|all] [t_max]` | Level statistics against the Riemann zeta zeros. Computes the zeros (Riemann-Siegel), unfolds, tests nearest-neighbour spacing (Poisson / GOE / GUE), number variance, and the orbit signal: Fourier peaks of the spectrum at log p^k, with depths against the explicit formula. Integrable box as control. CSV and SVG to `results/` |
 | `app` | Opens ORIGIN Explorer in the browser: sliders and presets for your own vector, live triangle and D axis, hover details, data table |
 | `science` | Unit system demo |
 

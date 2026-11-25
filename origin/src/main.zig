@@ -28,6 +28,8 @@ const grid3 = @import("engine/grid3.zig");
 const lepton = @import("engine/lepton.zig");
 const record = @import("engine/record.zig");
 const photo = @import("engine/photo.zig");
+const levels = @import("analysis/levels.zig");
+const levels_svg = @import("visualization/levels_svg.zig");
 
 test {
     _ = koide;
@@ -53,6 +55,8 @@ test {
     _ = lepton;
     _ = record;
     _ = photo;
+    _ = levels;
+    _ = levels_svg;
     _ = @import("visualization/labels.zig");
 }
 
@@ -76,6 +80,7 @@ fn help() void {
         \\  origin catalogue
         \\  origin constants
         \\  origin observe <particle>
+        \\  origin levels [zeros|box|all] [t_max]   level statistics vs the zeta zeros
         \\  origin dataset
         \\  origin analyze [dataset]
         \\  origin koide
@@ -1487,6 +1492,164 @@ fn photoReport(args: anytype) void {
     std.debug.print("MEASURED (PMNS columns, D): nu1 0.083  nu2 0.001  nu3 0.129\n", .{});
 }
 
+const Source = enum { zeros, box };
+
+fn levelsReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
+    const which = args.next() orelse "all";
+    const t_max: f64 = if (args.next()) |a| std.fmt.parseFloat(f64, a) catch 10000.0 else 10000.0;
+    std.debug.print(
+        \\
+        \\========================================
+        \\          LEVEL STATISTICS
+        \\========================================
+        \\Does a spectrum look like the Riemann zeta zeros?
+        \\Tests: spacing (Poisson / GOE / GUE), rigidity, orbit periods at log p^k.
+        \\
+    , .{});
+    const do_zeros = !std.mem.eql(u8, which, "box");
+    const do_box = !std.mem.eql(u8, which, "zeros");
+    var n_zeros: usize = 10000;
+    if (do_zeros) n_zeros = try levelsOne(io, gpa, .zeros, t_max, 0);
+    if (do_box) _ = try levelsOne(io, gpa, .box, t_max, n_zeros);
+}
+
+fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count: usize) !usize {
+    const lv = switch (src) {
+        .zeros => try levels.zetaZeros(gpa, t_max),
+        .box => try levels.boxLevels(gpa, count),
+    };
+    defer gpa.free(lv);
+    const smooth: *const fn (f64) f64 = switch (src) {
+        .zeros => &levels.zetaSmoothCount,
+        .box => &levels.boxSmoothCount,
+    };
+    const name = @tagName(src);
+    switch (src) {
+        .zeros => std.debug.print(
+            \\
+            \\--- ZETA ZEROS (Riemann-Siegel, 0 < t < {d:.0}) ---
+            \\zeros found {d}   smooth count N(t_max) {d:.1}
+            \\first five: {d:.6} {d:.6} {d:.6} {d:.6} {d:.6}
+            \\
+        , .{ t_max, lv.len, levels.zetaSmoothCount(t_max), lv[0], lv[1], lv[2], lv[3], lv[4] }),
+        .box => std.debug.print(
+            \\
+            \\--- CONTROL: RECTANGULAR BOX (integrable, side ratio^2 = golden ratio) ---
+            \\levels {d}   E range {d:.2} .. {d:.1}
+            \\
+        , .{ lv.len, lv[0], lv[lv.len - 1] }),
+    }
+
+    const u = try levels.unfold(gpa, lv, smooth);
+    defer gpa.free(u);
+    const sp = try levels.spacings(gpa, u);
+    std.debug.print(
+        \\
+        \\SPACING  (mean unfolded gap {d:.4}; should be 1)
+        \\  KS distance   Poisson {d:.4}   GOE {d:.4}   GUE {d:.4}   (smaller = closer)
+        \\  gaps < 0.25   measured {d:.4}   Poisson {d:.4}   GOE {d:.4}   GUE {d:.4}
+        \\
+    , .{ sp.mean, sp.ks[0], sp.ks[1], sp.ks[2], sp.small_frac, sp.small_expected[0], sp.small_expected[1], sp.small_expected[2] });
+    const ks_names = [_][]const u8{ "Poisson", "GOE", "GUE" };
+    const best = std.mem.indexOfMin(f64, &sp.ks);
+    std.debug.print("  closest: {s}\n", .{ks_names[best]});
+
+    std.debug.print("\nRIGIDITY  number variance Sigma^2(L)\n  {s:>6} {s:>10} {s:>10} {s:>10} {s:>10}\n", .{ "L", "measured", "Poisson", "GOE", "GUE" });
+    for (levels.rigidity_lengths) |l| {
+        std.debug.print("  {d:>6.1} {d:>10.4} {d:>10.4} {d:>10.4} {d:>10.4}\n", .{ l, levels.numberVariance(u, l), l, levels.numberVarianceTheory(.goe, l), levels.numberVarianceTheory(.gue, l) });
+    }
+
+    // Orbit test on the raw levels (heights t for the zeros).
+    const x_lo = 0.3;
+    const x_hi = 4.2;
+    const nx: usize = 7801;
+    const s = try gpa.alloc(f64, nx);
+    defer gpa.free(s);
+    levels.orbitSignal(lv, x_lo, x_hi, s);
+    const dx = (x_hi - x_lo) / @as(f64, @floatFromInt(nx - 1));
+
+    // Strongest extrema of |S|.
+    const Ext = struct { x: f64, v: f64 };
+    var ext: std.ArrayList(Ext) = .empty;
+    defer ext.deinit(gpa);
+    for (1..nx - 1) |i| {
+        const a = @abs(s[i]);
+        if (a > @abs(s[i - 1]) and a >= @abs(s[i + 1])) try ext.append(gpa, .{ .x = x_lo + dx * @as(f64, @floatFromInt(i)), .v = s[i] });
+    }
+    std.mem.sort(Ext, ext.items, {}, struct {
+        fn lt(_: void, a: Ext, b: Ext) bool {
+            return @abs(a.v) > @abs(b.v);
+        }
+    }.lt);
+    const top_n = @min(ext.items.len, 20);
+    var on_log_q: usize = 0;
+    var dips: usize = 0;
+    std.debug.print("\nORBITS  strongest {d} features of S(x) = sum w cos(E x), x in [{d:.1}, {d:.1}]\n  {s:>8} {s:>10}  nearest log q\n", .{ top_n, x_lo, x_hi, "x", "S/|S|max" });
+    const smax = @abs(ext.items[0].v);
+    for (ext.items[0..top_n]) |e| {
+        const q_near: u32 = @intFromFloat(@round(@exp(e.x)));
+        const pp = levels.primePower(q_near);
+        const off = e.x - @log(@as(f64, @floatFromInt(@max(q_near, 1))));
+        const hit = pp != null and @abs(off) < 0.005;
+        if (hit) on_log_q += 1;
+        if (e.v < 0) dips += 1;
+        std.debug.print("  {d:>8.4} {d:>10.3}  {s}", .{ e.x, e.v / smax, if (hit) "log " else "-   " });
+        if (hit) std.debug.print("{d} (off {d:.4})\n", .{ q_near, off }) else std.debug.print("\n", .{});
+    }
+    std.debug.print("  on log(prime power) within 0.005: {d}/{d}   dips (negative): {d}/{d}\n", .{ on_log_q, top_n, dips, top_n });
+
+    if (src == .zeros) {
+        // Depth at each log q vs the explicit-formula prediction log p / p^(k/2).
+        const at = struct {
+            fn f(sig: []const f64, x: f64, lo: f64, d: f64) f64 {
+                const c: usize = @intFromFloat(@round((x - lo) / d));
+                var m: f64 = sig[c];
+                var i = c -| 10;
+                while (i <= c + 10 and i < sig.len) : (i += 1) m = @min(m, sig[i]);
+                return m;
+            }
+        }.f;
+        const ref = at(s, @log(2.0), x_lo, dx);
+        const ref_pred = @log(2.0) / @sqrt(2.0);
+        std.debug.print("\n  explicit formula: dip depth at log q relative to q = 2\n  {s:>4} {s:>4} {s:>10} {s:>10}\n", .{ "q", "p^k", "measured", "predicted" });
+        var q: u32 = 2;
+        while (q <= 32) : (q += 1) {
+            const pp = levels.primePower(q) orelse continue;
+            const pf: f64 = @floatFromInt(pp.p);
+            const pred = @log(pf) / std.math.pow(f64, pf, @as(f64, @floatFromInt(pp.k)) / 2.0) / ref_pred;
+            std.debug.print("  {d:>4} {d:>2}^{d} {d:>10.3} {d:>10.3}\n", .{ q, pp.p, pp.k, at(s, @log(@as(f64, @floatFromInt(q))), x_lo, dx) / ref, pred });
+        }
+    }
+
+    // Files.
+    try std.Io.Dir.cwd().createDirPath(io, store.results_dir);
+    var csv: std.Io.Writer.Allocating = .init(gpa);
+    defer csv.deinit();
+    try csv.writer.writeAll("x,S\n");
+    for (s, 0..) |v, i| try csv.writer.print("{d:.5},{d:.6}\n", .{ x_lo + dx * @as(f64, @floatFromInt(i)), v });
+    const csv_path = try std.fmt.allocPrint(gpa, "{s}/levels-{s}-orbits.csv", .{ store.results_dir, name });
+    defer gpa.free(csv_path);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = csv_path, .data = csv.written() });
+    std.debug.print("\nWrote {s}\n", .{csv_path});
+
+    const t1 = try std.fmt.allocPrint(gpa, "Orbit signal: {s} ({d} levels)", .{ name, lv.len });
+    defer gpa.free(t1);
+    const svg1 = try levels_svg.orbit(gpa, t1, x_lo, x_hi, s);
+    defer gpa.free(svg1);
+    const f1 = try std.fmt.allocPrint(gpa, "levels-{s}-orbits.svg", .{name});
+    defer gpa.free(f1);
+    try writeAndOpen(io, gpa, f1, svg1, false);
+
+    const t2 = try std.fmt.allocPrint(gpa, "Nearest-neighbour spacing: {s}", .{name});
+    defer gpa.free(t2);
+    const svg2 = try levels_svg.spacing(gpa, t2, sp.hist);
+    defer gpa.free(svg2);
+    const f2 = try std.fmt.allocPrint(gpa, "levels-{s}-spacing.svg", .{name});
+    defer gpa.free(f2);
+    try writeAndOpen(io, gpa, f2, svg2, false);
+    return lv.len;
+}
+
 pub fn main(init: std.process.Init) void {
     var args = init.minimal.args.iterate();
     _ = args.skip();
@@ -1562,6 +1725,8 @@ pub fn main(init: std.process.Init) void {
         clocksReport(&args);
     } else if (std.mem.eql(u8, command, "engine")) {
         engineReport(&args);
+    } else if (std.mem.eql(u8, command, "levels")) {
+        levelsReport(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "koide")) {
         koideReport();
     } else {
