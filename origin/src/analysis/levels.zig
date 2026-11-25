@@ -119,7 +119,7 @@ pub fn boxLevels(gpa: std.mem.Allocator, count: usize) ![]f64 {
     return list.toOwnedSlice(gpa);
 }
 
-/// Weyl count with the Dirichlet boundary term.
+/// Average count for the box, including the wall correction.
 pub fn boxSmoothCount(e: f64) f64 {
     const sa = @sqrt(box_alpha);
     return pi / (4.0 * sa) * e - (1.0 + 1.0 / sa) / 2.0 * @sqrt(e);
@@ -245,24 +245,57 @@ pub fn numberVarianceTheory(e: Ensemble, l: f64) f64 {
 
 // ---------------------------------------------------------------- orbit test
 
-/// Orbit signal S(x) = sum_n w(E_n) cos(E_n x), with a cos^2 taper w so the
-/// cutoff at the top level doesn't ring. Peaks or dips mark orbit periods x.
-/// For the zeta zeros the explicit formula predicts dips at x = log(p^k)
-/// with depth proportional to log(p) / p^(k/2).
-pub fn orbitSignal(levels: []const f64, x_lo: f64, x_hi: f64, out: []f64) void {
-    const e_max = levels[levels.len - 1];
-    const w = std.heap.page_allocator.alloc(f64, levels.len) catch unreachable;
-    defer std.heap.page_allocator.free(w);
-    for (levels, w) |e, *wi| {
-        const c = @cos(0.5 * pi * e / e_max);
-        wi.* = c * c;
+/// The smooth (average) level count for each source.
+pub const Smooth = union(enum) {
+    zeta,
+    box,
+    poly: [3]f64,
+    pub fn count(self: Smooth, e: f64) f64 {
+        return switch (self) {
+            .zeta => zetaSmoothCount(e),
+            .box => boxSmoothCount(e),
+            .poly => |c| c[0] + c[1] * e + c[2] * e * e,
+        };
+    }
+};
+
+/// Loop signal S(x) = sum_n w(E_n) cos(E_n x) minus the same sum spread
+/// evenly over the smooth count. What is left is only the wiggles: loops.
+/// w is a cos^2 taper so the top of the list doesn't ring.
+pub fn orbitSignal(gpa: std.mem.Allocator, lv: []const f64, smooth: Smooth, x_lo: f64, x_hi: f64, out: []f64) !void {
+    const e0 = lv[0];
+    const e_max = lv[lv.len - 1];
+    const taper = struct {
+        fn f(e: f64, top: f64) f64 {
+            const c = @cos(0.5 * pi * e / top);
+            return c * c;
+        }
+    }.f;
+    const w = try gpa.alloc(f64, lv.len);
+    defer gpa.free(w);
+    for (lv, w) |e, *wi| wi.* = taper(e, e_max);
+    // Smooth part on a fine grid: 8 points per wiggle at the largest x.
+    const ng: usize = @max(2000, @as(usize, @intFromFloat(8.0 * x_hi * (e_max - e0) / (2.0 * pi))) | 1);
+    const ge = try gpa.alloc(f64, ng);
+    defer gpa.free(ge);
+    const gw = try gpa.alloc(f64, ng);
+    defer gpa.free(gw);
+    const h = (e_max - e0) / @as(f64, @floatFromInt(ng - 1));
+    for (0..ng) |i| {
+        const e = e0 + h * @as(f64, @floatFromInt(i));
+        const dens = (smooth.count(e + 0.5 * h) - smooth.count(e - 0.5 * h)) / h;
+        const simpson: f64 = if (i == 0 or i == ng - 1) 1 else if (i % 2 == 1) 4 else 2;
+        ge[i] = e;
+        gw[i] = simpson * h / 3.0 * dens * taper(e, e_max);
     }
     const nx = out.len;
     for (out, 0..) |*o, i| {
         const x = x_lo + (x_hi - x_lo) * @as(f64, @floatFromInt(i)) / @as(f64, @floatFromInt(nx - 1));
         var s: f64 = 0;
-        for (levels, w) |e, wi| s += wi * @cos(e * x);
-        o.* = s;
+        for (lv, w) |e, wi| s += wi * @cos(e * x);
+        var sm: f64 = 0;
+        for (ge, gw) |e, wi| sm += wi * @cos(e * x);
+        o.* = s - sm;
     }
 }
 
@@ -310,4 +343,55 @@ test "prime powers" {
 
 test "gue cdf integrates to 1" {
     try std.testing.expectApproxEqAbs(1.0, spacingCdf(.gue, 6.0), 1e-6);
+}
+
+// ------------------------------------------------------- fitted unfolding
+
+/// For spectra with no known smooth count: fit N(E) = c0 + c1 E + c2 E^2 to
+/// the staircase (level i sits at count i + 1/2) and use the fit to stretch.
+pub fn fitSmooth(lv: []const f64) Smooth {
+    var s: [5]f64 = @splat(0); // sums of E^0..E^4
+    var t: [3]f64 = @splat(0); // sums of N E^0..E^2
+    for (lv, 0..) |e, i| {
+        const nn = @as(f64, @floatFromInt(i)) + 0.5;
+        var p: f64 = 1;
+        for (0..5) |k| {
+            s[k] += p;
+            if (k < 3) t[k] += nn * p;
+            p *= e;
+        }
+    }
+    // Solve the 3x3 normal equations by Cramer's rule.
+    const a = [3][3]f64{ .{ s[0], s[1], s[2] }, .{ s[1], s[2], s[3] }, .{ s[2], s[3], s[4] } };
+    const det3 = struct {
+        fn f(m: [3][3]f64) f64 {
+            return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+        }
+    }.f;
+    const d = det3(a);
+    var c: [3]f64 = undefined;
+    for (0..3) |k| {
+        var m = a;
+        for (0..3) |r| m[r][k] = t[r];
+        c[k] = det3(m) / d;
+    }
+    return .{ .poly = c };
+}
+
+/// Share of the loop-length range [lo, hi] lying within `tol` of some log q
+/// (q a prime power): how often a feature would land on a prime by chance.
+pub fn chanceOnPrime(lo: f64, hi: f64, tol: f64) f64 {
+    const steps: usize = 20000;
+    var hit: usize = 0;
+    for (0..steps) |i| {
+        const x = lo + (hi - lo) * (@as(f64, @floatFromInt(i)) + 0.5) / @as(f64, @floatFromInt(steps));
+        const q: u32 = @intFromFloat(@round(@exp(x)));
+        var near = false;
+        var qq = q -| 2;
+        while (qq <= q + 2) : (qq += 1) {
+            if (primePower(qq) != null and @abs(x - @log(@as(f64, @floatFromInt(qq)))) < tol) near = true;
+        }
+        if (near) hit += 1;
+    }
+    return @as(f64, @floatFromInt(hit)) / @as(f64, @floatFromInt(steps));
 }

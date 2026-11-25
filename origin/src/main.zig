@@ -29,6 +29,7 @@ const lepton = @import("engine/lepton.zig");
 const record = @import("engine/record.zig");
 const photo = @import("engine/photo.zig");
 const levels = @import("analysis/levels.zig");
+const hydrogen = @import("analysis/hydrogen.zig");
 const levels_svg = @import("visualization/levels_svg.zig");
 
 test {
@@ -56,6 +57,7 @@ test {
     _ = record;
     _ = photo;
     _ = levels;
+    _ = hydrogen;
     _ = levels_svg;
     _ = @import("visualization/labels.zig");
 }
@@ -81,6 +83,7 @@ fn help() void {
         \\  origin constants
         \\  origin observe <particle>
         \\  origin levels [zeros|box|all] [t_max]   does a spectrum carry the primes?
+        \\  origin levels hydrogen [setting] [size] same checks on hydrogen in a strong magnet
         \\  origin dataset
         \\  origin analyze [dataset]
         \\  origin koide
@@ -1492,11 +1495,18 @@ fn photoReport(args: anytype) void {
     std.debug.print("MEASURED (PMNS columns, D): nu1 0.083  nu2 0.001  nu3 0.129\n", .{});
 }
 
-const Source = enum { zeros, box };
+const Source = enum { zeros, box, hydrogen };
+
+var hydrogen_eps: f64 = -0.1;
+var hydrogen_nmax: usize = 100;
 
 fn levelsReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
     const which = args.next() orelse "all";
-    const t_max: f64 = if (args.next()) |a| std.fmt.parseFloat(f64, a) catch 10000.0 else 10000.0;
+    if (std.mem.eql(u8, which, "hydrogen")) {
+        if (args.next()) |a| hydrogen_eps = std.fmt.parseFloat(f64, a) catch hydrogen_eps;
+        if (args.next()) |a| hydrogen_nmax = std.fmt.parseInt(usize, a, 10) catch hydrogen_nmax;
+    }
+    const t_max: f64 = if (std.mem.eql(u8, which, "hydrogen")) 0 else if (args.next()) |a| std.fmt.parseFloat(f64, a) catch 10000.0 else 10000.0;
     std.debug.print(
         \\
         \\========================================
@@ -1516,6 +1526,10 @@ fn levelsReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iter
         \\of this should show up.
         \\
     , .{});
+    if (std.mem.eql(u8, which, "hydrogen")) {
+        _ = try levelsOne(io, gpa, .hydrogen, 0, 0);
+        return;
+    }
     const do_zeros = !std.mem.eql(u8, which, "box");
     const do_box = !std.mem.eql(u8, which, "zeros");
     var n_zeros: usize = 10000;
@@ -1529,12 +1543,17 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
     const lv = switch (src) {
         .zeros => try levels.zetaZeros(gpa, t_max),
         .box => try levels.boxLevels(gpa, count),
+        .hydrogen => blk: {
+            const b = 0.25 * @sqrt(0.1 / @abs(hydrogen_eps)) * @sqrt(120.0 / @as(f64, @floatFromInt(hydrogen_nmax + 20)));
+            std.debug.print("\nSolving hydrogen twice (basis {d} and {d}) to see which levels have settled...\n", .{ hydrogen_nmax, hydrogen_nmax + 20 });
+            const small = try hydrogen.levels(gpa, hydrogen_eps, hydrogen_nmax, b);
+            defer gpa.free(small);
+            const big = try hydrogen.levels(gpa, hydrogen_eps, hydrogen_nmax + 20, b);
+            defer gpa.free(big);
+            break :blk try hydrogen.converged(gpa, small, big);
+        },
     };
     defer gpa.free(lv);
-    const smooth: *const fn (f64) f64 = switch (src) {
-        .zeros => &levels.zetaSmoothCount,
-        .box => &levels.boxSmoothCount,
-    };
     const name = @tagName(src);
     switch (src) {
         .zeros => std.debug.print(
@@ -1550,10 +1569,25 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
             \\{d} energy levels. No chaos, so expect: no avoidance, no stiffness, no prime loops.
             \\
         , .{lv.len}),
+        .hydrogen => std.debug.print(
+            \\
+            \\################ HYDROGEN IN A STRONG MAGNET ################
+            \\Setting {d:.2} (about -0.6 = orderly paths, about -0.1 = scrambled paths).
+            \\{d} levels settled, up to w = {d:.2}. (w grows as the magnet weakens.)
+            \\Expect: levels avoid each other, but its loops are the electron's real
+            \\paths around the nucleus, so they should NOT sit on the primes.
+            \\
+        , .{ hydrogen_eps, lv.len, lv[lv.len - 1] }),
     }
 
     // 1. Line up.
-    const u = try levels.unfold(gpa, lv, smooth);
+    const smooth: levels.Smooth = switch (src) {
+        .zeros => .zeta,
+        .box => .box,
+        .hydrogen => levels.fitSmooth(lv),
+    };
+    const u = try gpa.alloc(f64, lv.len);
+    for (lv, u) |e, *o| o.* = smooth.count(e);
     defer gpa.free(u);
     const sp = try levels.spacings(gpa, u);
     std.debug.print("\n1. LINE UP: average gap after stretching = {d:.4}  ({s})\n", .{ sp.mean, if (@abs(sp.mean - 1) < 0.01) "good" else "off - later checks unreliable" });
@@ -1587,19 +1621,28 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
     const flat = last < levels.numberVarianceTheory(.gue, 50) * 0.7;
     const wander = last > 10;
     std.debug.print("   Reading: {s}\n", .{if (flat)
-        "wobble stops growing over long stretches - something sets a longest\n            wavelength. For the zeros that is the shortest prime loop, log 2."
+        "wobble stops growing over long stretches - the levels are held in place.\n            The shortest repeating loop in the system sets where it levels off\n            (for the zeros, that loop is log 2)."
     else if (wander)
         "wobble keeps growing with length - levels drift freely, no stiffness."
     else
         "stiff, grows slowly."});
 
-    // 4. Loops.
-    const x_lo = 0.3;
-    const x_hi = 4.2;
+    // 4. Loops. A system's units are arbitrary (double every level and every
+    // loop halves), so only the RATIOS of loop lengths can be compared with the
+    // primes. Rescale so the shortest strong loop sits at log 2, then ask
+    // whether the others land on log 3, log 4, log 5, ...
+    const x_lo: f64 = switch (src) {
+        .hydrogen => 2.0, // below this the signal is leftover from the average, not loops
+        else => 0.3,
+    };
+    const x_hi: f64 = switch (src) {
+        .hydrogen => 25.0,
+        else => 4.2,
+    };
     const nx: usize = 7801;
     const s = try gpa.alloc(f64, nx);
     defer gpa.free(s);
-    levels.orbitSignal(lv, x_lo, x_hi, s);
+    try levels.orbitSignal(gpa, lv, smooth, x_lo, x_hi, s);
     const dx = (x_hi - x_lo) / @as(f64, @floatFromInt(nx - 1));
 
     const Ext = struct { x: f64, v: f64 };
@@ -1614,31 +1657,47 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
             return @abs(a.v) > @abs(b.v);
         }
     }.lt);
-    const top_n = @min(ext.items.len, 20);
+    const smax = @abs(ext.items[0].v);
+    var top_n: usize = 0;
+    while (top_n < @min(ext.items.len, 20) and @abs(ext.items[top_n].v) >= 0.2 * smax) top_n += 1;
+    var x_short: f64 = std.math.inf(f64);
+    for (ext.items[0..top_n]) |e| x_short = @min(x_short, e.x);
+    const scale = @log(2.0) / x_short;
+    // A loop can only be placed as finely as the list is long.
+    const tol = @max(0.005, scale * 0.5 * std.math.pi / lv[lv.len - 1]);
+    const chance = levels.chanceOnPrime(@log(2.0), scale * x_hi, tol);
     var on_log_q: usize = 0;
     var dips: usize = 0;
     std.debug.print(
         \\
         \\4. LOOPS: treat the levels as a chord and find the strongest hidden
-        \\   repeats in it. Each repeat is a loop length. For the zeros, loops
-        \\   should sit at log(prime). A dip means the loop removes, not adds.
-        \\     {s:>7} {s:>9} {s:>5}  on a prime?
+        \\   repeats in it. Each repeat is a loop length. A dip means the loop
+        \\   removes, a peak means it adds.
+        \\   Units are arbitrary, so lengths are rescaled until the shortest strong
+        \\   loop sits at log 2 (scale x{d:.4}). The test: do the rest then land
+        \\   on log 3, log 4, log 5, ... the way the primes would?
+        \\     {s:>7} {s:>9} {s:>9} {s:>5}  on a prime?
         \\
-    , .{ "length", "strength", "kind" });
-    const smax = @abs(ext.items[0].v);
+    , .{ scale, "length", "rescaled", "strength", "kind" });
     for (ext.items[0..top_n]) |e| {
-        const q_near: u32 = @intFromFloat(@round(@exp(e.x)));
+        const y = scale * e.x;
+        const q_near: u32 = @intFromFloat(@round(@exp(y)));
         const pp = levels.primePower(q_near);
-        const off = e.x - @log(@as(f64, @floatFromInt(@max(q_near, 1))));
-        const hit = pp != null and @abs(off) < 0.005;
+        const off = y - @log(@as(f64, @floatFromInt(@max(q_near, 1))));
+        const anchor = e.x == x_short;
+        const hit = !anchor and pp != null and @abs(off) < tol;
         if (hit) on_log_q += 1;
         if (e.v < 0) dips += 1;
-        std.debug.print("     {d:>7.4} {d:>9.2} {s:>5}  ", .{ e.x, @abs(e.v) / smax, if (e.v < 0) "dip" else "peak" });
-        if (hit) {
+        std.debug.print("     {d:>7.4} {d:>9.4} {d:>9.2} {s:>5}  ", .{ e.x, y, @abs(e.v) / smax, if (e.v < 0) "dip" else "peak" });
+        if (anchor) {
+            std.debug.print("(set to log 2)\n", .{});
+        } else if (hit) {
             if (pp.?.k == 1) std.debug.print("log {d}\n", .{q_near}) else std.debug.print("log {d} = {d} loops of log {d}\n", .{ q_near, pp.?.k, pp.?.p });
         } else std.debug.print("no\n", .{});
     }
-    std.debug.print("   Reading: {d} of {d} strongest loops land on a prime (or prime power); {d} of {d} are dips.\n", .{ on_log_q, top_n, dips, top_n });
+    const others = @max(top_n, 1) - 1;
+    std.debug.print("   Reading: {d} of the other {d} strong loops land on a prime (or prime power); {d} of {d} are dips.\n", .{ on_log_q, others, dips, top_n });
+    std.debug.print("   By pure chance, a loop would land within {d:.3} of one {d:.0}% of the time.\n", .{ tol, 100 * chance });
 
     if (src == .zeros) {
         const at = struct {
@@ -1672,8 +1731,8 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
     std.debug.print("\nVERDICT ({s}): gaps {s}; stiffness {s}; prime loops {s}.\n", .{
         name,
         if (best == 2) "zeta-like" else if (best == 0) "random" else "avoiding, not zeta-like",
-        if (flat) "zeta-like" else if (wander) "none" else "partial",
-        if (on_log_q * 4 >= top_n * 3) "YES" else "no",
+        if (flat) "held in place" else if (wander) "none" else "partial",
+        if (others >= 3 and @as(f64, @floatFromInt(on_log_q)) / @as(f64, @floatFromInt(others)) > @min(0.75, chance + 0.5)) "YES" else "no",
     });
 
     // Files.
@@ -1687,15 +1746,23 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = csv_path, .data = csv.written() });
     std.debug.print("\nWrote {s}\n", .{csv_path});
 
-    const t1 = try std.fmt.allocPrint(gpa, "Hidden loops in the {s} ({d} levels)", .{ if (src == .zeros) "zeta zeros" else "box (control)", lv.len });
+    const t1 = try std.fmt.allocPrint(gpa, "Hidden loops in the {s} ({d} levels)", .{ switch (src) {
+        .zeros => "zeta zeros",
+        .box => "box (control)",
+        .hydrogen => "magnetized hydrogen",
+    }, lv.len });
     defer gpa.free(t1);
-    const svg1 = try levels_svg.orbit(gpa, t1, x_lo, x_hi, s);
+    const svg1 = try levels_svg.orbit(gpa, t1, x_lo, x_hi, s, scale);
     defer gpa.free(svg1);
     const f1 = try std.fmt.allocPrint(gpa, "levels-{s}-orbits.svg", .{name});
     defer gpa.free(f1);
     try writeAndOpen(io, gpa, f1, svg1, false);
 
-    const t2 = try std.fmt.allocPrint(gpa, "Gaps between neighbouring levels: {s}", .{if (src == .zeros) "zeta zeros" else "box (control)"});
+    const t2 = try std.fmt.allocPrint(gpa, "Gaps between neighbouring levels: {s}", .{switch (src) {
+        .zeros => "zeta zeros",
+        .box => "box (control)",
+        .hydrogen => "magnetized hydrogen",
+    }});
     defer gpa.free(t2);
     const svg2 = try levels_svg.spacing(gpa, t2, sp.hist);
     defer gpa.free(svg2);

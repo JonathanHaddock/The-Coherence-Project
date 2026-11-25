@@ -28,7 +28,7 @@ fn frame(w: *std.Io.Writer, title: []const u8, x_label: []const u8, y_label: []c
 }
 
 /// Orbit signal with a marker at every log(prime power). Caller frees.
-pub fn orbit(gpa: std.mem.Allocator, title: []const u8, x_lo: f64, x_hi: f64, s: []const f64) ![]u8 {
+pub fn orbit(gpa: std.mem.Allocator, title: []const u8, x_lo: f64, x_hi: f64, s: []const f64, scale: f64) ![]u8 {
     var out: std.Io.Writer.Allocating = .init(gpa);
     errdefer out.deinit();
     const w = &out.writer;
@@ -47,10 +47,13 @@ pub fn orbit(gpa: std.mem.Allocator, title: []const u8, x_lo: f64, x_hi: f64, s:
         }
     };
     // Prime-power markers.
+    // Markers at log q, in this spectrum's own units (log q / scale).
     var q: u32 = 2;
-    while (@log(@as(f64, @floatFromInt(q))) < x_hi) : (q += 1) {
+    while (@log(@as(f64, @floatFromInt(q))) / scale < x_hi and q < 200) : (q += 1) {
         const pp = levels.primePower(q) orelse continue;
-        const x = X.f(@log(@as(f64, @floatFromInt(q))), x_lo, x_hi, pw);
+        const lx = @log(@as(f64, @floatFromInt(q))) / scale;
+        if (lx < x_lo) continue;
+        const x = X.f(lx, x_lo, x_hi, pw);
         const col = if (pp.k == 1) "#d33" else "#e9a";
         try w.print("<line x1=\"{d:.1}\" y1=\"{d}\" x2=\"{d:.1}\" y2=\"{d}\" stroke=\"{s}\" stroke-width=\"1\" opacity=\"0.6\"/>\n", .{ x, top, x, height - bottom, col });
         if (pp.k == 1 and q < 30) try w.print("<text x=\"{d:.1}\" y=\"{d}\" fill=\"#d33\" text-anchor=\"middle\" font-size=\"11\">{d}</text>\n", .{ x, top - 6, q });
@@ -65,11 +68,12 @@ pub fn orbit(gpa: std.mem.Allocator, title: []const u8, x_lo: f64, x_hi: f64, s:
         try w.print("{d:.1},{d:.1} ", .{ x, y });
     }
     try w.writeAll("\"/>\n");
-    var x_tick: f64 = @ceil(x_lo * 2) / 2;
-    while (x_tick <= x_hi) : (x_tick += 0.5) {
+    const tick_step: f64 = if (x_hi - x_lo > 10) 2.0 else 0.5;
+    var x_tick: f64 = @ceil(x_lo / tick_step) * tick_step;
+    while (x_tick <= x_hi) : (x_tick += tick_step) {
         try w.print("<text x=\"{d:.1}\" y=\"{d}\" text-anchor=\"middle\" font-size=\"11\">{d:.1}</text>\n", .{ X.f(x_tick, x_lo, x_hi, pw), height - bottom + 16, x_tick });
     }
-    try w.print("<text x=\"{d}\" y=\"{d}\" font-size=\"11\" fill=\"#555\">red lines: log of each prime (dark) and prime powers (light)</text>\n", .{ width - right - 260, height - bottom + 34 });
+    try w.print("<text x=\"{d}\" y=\"{d}\" font-size=\"11\" fill=\"#555\">red: where primes would fall</text>\n", .{ width - right - 260, height - bottom + 34 });
     try w.writeAll("</svg>\n");
     return out.toOwnedSlice();
 }
