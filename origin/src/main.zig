@@ -1699,6 +1699,77 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
     std.debug.print("   Reading: {d} of the other {d} strong loops land on a prime (or prime power); {d} of {d} are dips.\n", .{ on_log_q, others, dips, top_n });
     std.debug.print("   By pure chance, a loop would land within {d:.3} of one {d:.0}% of the time.\n", .{ tol, 100 * chance });
 
+    var path_verdict: []const u8 = "";
+    if (src == .hydrogen) {
+        const ps = try hydrogen.paths(gpa, hydrogen_eps, x_hi);
+        defer gpa.free(ps);
+        const line_name = [_][]const u8{ "across-field plane", "axis (other side)", "field axis", "a dead stop" };
+        std.debug.print(
+            \\
+            \\5. PATHS: the electron's actual closed paths at the same setting,
+            \\   found by launching it and keeping the paths that come back on
+            \\   themselves. A real loop in the levels should match one of these.
+            \\   "new" = a path of its own; "repeat" = a shorter path run k times.
+            \\     {s:>7}  {s:<36} {s}
+            \\
+        , .{ "length", "kind", "route" });
+        for (ps) |pth| {
+            var kind_buf: [48]u8 = undefined;
+            const kind = if (pth.repeat_of) |r| std.fmt.bufPrint(&kind_buf, "repeat: {d:.3} run {d} times", .{ r.base, r.k }) catch "repeat" else "new";
+            std.debug.print("     {d:>7.3}  {s:<36} {s} -> {s} and back\n", .{ pth.length, kind, line_name[@intFromEnum(pth.from)], line_name[@intFromEnum(pth.to)] });
+        }
+
+        // Match spectrum loops to paths.
+        const match_tol = 1.2 * std.math.pi / lv[lv.len - 1];
+        var matched: usize = 0;
+        std.debug.print("\n   Strong loops from step 4, matched to paths (within {d:.2}):\n", .{match_tol});
+        const sorted = try gpa.dupe(Ext, ext.items[0..top_n]);
+        defer gpa.free(sorted);
+        std.mem.sort(Ext, sorted, {}, struct {
+            fn lt(_: void, a: Ext, b: Ext) bool {
+                return a.x < b.x;
+            }
+        }.lt);
+        for (sorted) |e| {
+            var best_d: f64 = std.math.inf(f64);
+            var best_p: ?hydrogen.Path = null;
+            for (ps) |pth| if (@abs(pth.length - e.x) < best_d) {
+                best_d = @abs(pth.length - e.x);
+                best_p = pth;
+            };
+            if (best_p != null and best_d < match_tol) {
+                matched += 1;
+                std.debug.print("     loop {d:>7.3} -> path {d:.3}{s}\n", .{ e.x, best_p.?.length, if (best_p.?.repeat_of != null) "  (repeat)" else "" });
+            } else std.debug.print("     loop {d:>7.3} -> no path (side lobe of a nearby loop, or a path the search missed)\n", .{e.x});
+        }
+
+        // The real prime test: only NEW paths count, and they should sit in
+        // the ratios of log 2 : log 3 : log 5 : log 7 ... (primes, not powers).
+        var first: f64 = 0;
+        var new_n: usize = 0;
+        var on_prime: usize = 0;
+        std.debug.print("\n   New paths only, shortest set to log 2. Do the rest sit on log of a prime?\n     {s:>7} {s:>9} {s:>12}\n", .{ "length", "rescaled", "nearest" });
+        for (ps) |pth| {
+            if (pth.repeat_of != null) continue;
+            if (first == 0) first = pth.length;
+            const y = pth.length / first * @log(2.0);
+            var best_q: u32 = 2;
+            var q: u32 = 2;
+            while (q < 2000) : (q += 1) {
+                const pq = levels.primePower(q) orelse continue;
+                if (pq.k != 1) continue;
+                if (@abs(@log(@as(f64, @floatFromInt(q))) - y) < @abs(@log(@as(f64, @floatFromInt(best_q))) - y)) best_q = q;
+            }
+            const off = y - @log(@as(f64, @floatFromInt(best_q)));
+            const hit = new_n > 0 and @abs(off) < 0.005 * y;
+            if (new_n > 0 and hit) on_prime += 1;
+            std.debug.print("     {d:>7.3} {d:>9.4}   log {d:<5} off {d:>7.4}{s}\n", .{ pth.length, y, best_q, off, if (new_n == 0) "  (set)" else if (hit) "  ON A PRIME" else "" });
+            new_n += 1;
+        }
+        std.debug.print("   Reading: {d} of {d} spectrum loops are real paths. {d} of the other {d} new paths sit on a prime (to 0.5%).\n", .{ matched, top_n, on_prime, new_n -| 1 });
+        path_verdict = if (new_n > 3 and on_prime * 2 > new_n - 1) "; paths on primes YES" else "; paths on primes no";
+    }
+
     if (src == .zeros) {
         const at = struct {
             fn f(sig: []const f64, x: f64, lo: f64, d: f64) f64 {
@@ -1728,11 +1799,12 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
         }
     }
 
-    std.debug.print("\nVERDICT ({s}): gaps {s}; stiffness {s}; prime loops {s}.\n", .{
+    std.debug.print("\nVERDICT ({s}): gaps {s}; stiffness {s}; prime loops {s}{s}.\n", .{
         name,
         if (best == 2) "zeta-like" else if (best == 0) "random" else "avoiding, not zeta-like",
         if (flat) "held in place" else if (wander) "none" else "partial",
         if (others >= 3 and @as(f64, @floatFromInt(on_log_q)) / @as(f64, @floatFromInt(others)) > @min(0.75, chance + 0.5)) "YES" else "no",
+        path_verdict,
     });
 
     // Files.
