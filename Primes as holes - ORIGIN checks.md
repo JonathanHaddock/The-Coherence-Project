@@ -80,3 +80,15 @@ The ½ in the gate world means each state's strength falls as 1/√(size): membe
 (hold and fill_empty flash every pixel every tick, so they say nothing here.)
 
 Reading: the engine's regions are more in step than halfway at every scale, and more so over longer windows: flashes travel as waves, so neighbours share timing. Identity groups barely form (about one pixel each), so counting by identity changes almost nothing. Under the current rules, identity does not yet bind pixels into one thing. The halfway falloff does not appear.
+
+### With the neutrino carrying what was not displayed (photograph mode)
+
+Photograph mode (rules 12-16): the flash emits a neutrino made of the pixel's unrealized possibilities, and it is delivered by identity, not by space: `same` = to pixels showing the same pattern, `unreal` = to pixels showing one of the patterns left undisplayed. It arrives as conserved share. `none` = emitted but no effect (baseline; identical to the plain sweep update).
+
+| Mode | a, all flashes (window 2 / 32) | a, identity groups (window 2 / 32) |
+|---|---|---|
+| none (baseline) | 0.69 / 0.76 | 0.66 / 0.75 |
+| same | 0.73 / 0.86 | 0.62 / 0.76 |
+| unreal | 0.74 / 0.85 | 0.59 / 0.69 |
+
+With delivery to the undisplayed patterns, counting by identity pulls toward ½ while counting raw flashes pulls toward lockstep: identity now matters. Step by step in size (unreal, window 2, 12,000 ticks), the identity exponent is 0.52 (1 to 8 pixels), 0.53 (8 to 64), 0.58 (64 to 512), then 0.72 and 0.89 at the largest cubes, where a lattice-wide wave takes over. So: halfway at small scales when the neutrino carries the undisplayed, lockstep at large scales.

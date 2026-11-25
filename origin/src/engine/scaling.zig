@@ -22,6 +22,15 @@
 const std = @import("std");
 const px = @import("pixel.zig");
 const g3 = @import("grid3.zig");
+const photo = @import("photo.zig");
+
+/// Which engine to measure.
+pub const Engine = union(enum) {
+    lattice: px.Config,
+    /// Photograph mode: one_cell display, sweep update, the neutrino is the
+    /// undisplayed possibility, delivered by identity (or not at all).
+    photo: photo.Deliver,
+};
 
 pub const sides = [_]usize{ 1, 2, 4, 8, 16, 24 };
 const n = g3.n;
@@ -137,10 +146,23 @@ const Rng = struct {
     }
 };
 
-pub fn measure(gpa: std.mem.Allocator, cfg: px.Config, ticks: i64, settle: i64, window: i64) !Result {
-    const g = try gpa.create(g3.Grid3);
-    defer gpa.destroy(g);
-    g.init(cfg);
+pub fn measure(gpa: std.mem.Allocator, which: Engine, ticks: i64, settle: i64, window: i64) !Result {
+    var lat: ?*g3.Grid3 = null;
+    var ph: ?*photo.Photo = null;
+    defer if (lat) |x| gpa.destroy(x);
+    defer if (ph) |x| gpa.destroy(x);
+    switch (which) {
+        .lattice => |cfg| {
+            lat = try gpa.create(g3.Grid3);
+            lat.?.init(cfg);
+        },
+        .photo => |d| {
+            ph = try gpa.create(photo.Photo);
+            ph.?.init(.all7, 20261110);
+            ph.?.deliver = d;
+        },
+    }
+    const g: *g3.Grid3 = if (lat) |x| x else &ph.?.g;
 
     var block_of: [S][]u32 = undefined;
     for (sides, 0..) |s, k| {
@@ -171,7 +193,11 @@ pub fn measure(gpa: std.mem.Allocator, cfg: px.Config, ticks: i64, settle: i64, 
     var in_window: i64 = 0;
     const centre = g3.index(g3.side / 2, g3.side / 2, g3.side / 2);
     while (t < ticks) : (t += 1) {
-        _ = g.tick(t, if (t == 0) centre else null);
+        if (ph) |x| {
+            _ = x.tick(t);
+        } else {
+            _ = g.tick(t, if (t == 0) centre else null);
+        }
         if (t < settle) continue;
         for (0..n) |i| parent[i] = @intCast(i);
         for (0..n) |i| {
@@ -242,7 +268,7 @@ pub fn measure(gpa: std.mem.Allocator, cfg: px.Config, ticks: i64, settle: i64, 
 }
 
 test "controls land where they should" {
-    const r = try measure(std.testing.allocator, .{ .display = .one_cell }, 400, 100, 2);
+    const r = try measure(std.testing.allocator, .{ .lattice = .{ .display = .one_cell } }, 400, 100, 2);
     try std.testing.expect(r.rate > 0.01);
     try std.testing.expectApproxEqAbs(0.5, r.independent.a, 0.05);
     try std.testing.expectApproxEqAbs(1.0, r.in_step.a, 0.05);
