@@ -32,7 +32,7 @@ pub fn orbit(gpa: std.mem.Allocator, title: []const u8, x_lo: f64, x_hi: f64, s:
     var out: std.Io.Writer.Allocating = .init(gpa);
     errdefer out.deinit();
     const w = &out.writer;
-    try frame(w, title, "x (orbit period)", "S(x)");
+    try frame(w, title, "loop length", "strength (down = dip)");
     const pw = width - left - right;
     const ph = height - top - bottom;
     var lo: f64 = 0;
@@ -69,7 +69,7 @@ pub fn orbit(gpa: std.mem.Allocator, title: []const u8, x_lo: f64, x_hi: f64, s:
     while (x_tick <= x_hi) : (x_tick += 0.5) {
         try w.print("<text x=\"{d:.1}\" y=\"{d}\" text-anchor=\"middle\" font-size=\"11\">{d:.1}</text>\n", .{ X.f(x_tick, x_lo, x_hi, pw), height - bottom + 16, x_tick });
     }
-    try w.print("<text x=\"{d}\" y=\"{d}\" font-size=\"11\" fill=\"#555\">red lines: log p (dark) and log p^k (light)</text>\n", .{ width - right - 260, height - bottom + 34 });
+    try w.print("<text x=\"{d}\" y=\"{d}\" font-size=\"11\" fill=\"#555\">red lines: log of each prime (dark) and prime powers (light)</text>\n", .{ width - right - 260, height - bottom + 34 });
     try w.writeAll("</svg>\n");
     return out.toOwnedSlice();
 }
@@ -79,7 +79,7 @@ pub fn spacing(gpa: std.mem.Allocator, title: []const u8, hist: [30]f64) ![]u8 {
     var out: std.Io.Writer.Allocating = .init(gpa);
     errdefer out.deinit();
     const w = &out.writer;
-    try frame(w, title, "spacing s (unfolded)", "P(s)");
+    try frame(w, title, "gap size (1 = average gap)", "how often");
     const pw = width - left - right;
     const ph = height - top - bottom;
     const ymax = 1.1;
@@ -88,7 +88,7 @@ pub fn spacing(gpa: std.mem.Allocator, title: []const u8, hist: [30]f64) ![]u8 {
         const y = top + ph * (1 - @min(h, ymax) / ymax);
         try w.print("<rect x=\"{d:.1}\" y=\"{d:.1}\" width=\"{d:.1}\" height=\"{d:.1}\" fill=\"#c9d6ea\" stroke=\"#8aa3c8\"/>\n", .{ x, y, pw / 30.0, height - bottom - y });
     }
-    const curves = .{ .{ levels.Ensemble.poisson, "#999", "Poisson" }, .{ levels.Ensemble.goe, "#2a9d4b", "GOE" }, .{ levels.Ensemble.gue, "#d33", "GUE" } };
+    const curves = .{ .{ levels.Ensemble.poisson, "#999", "random" }, .{ levels.Ensemble.goe, "#2a9d4b", "avoid" }, .{ levels.Ensemble.gue, "#d33", "avoid strongly" } };
     inline for (curves, 0..) |c, k| {
         try w.print("<polyline fill=\"none\" stroke=\"{s}\" stroke-width=\"2\" points=\"", .{c[1]});
         for (0..301) |i| {
@@ -97,7 +97,7 @@ pub fn spacing(gpa: std.mem.Allocator, title: []const u8, hist: [30]f64) ![]u8 {
             try w.print("{d:.1},{d:.1} ", .{ left + pw * s / 3.0, y });
         }
         try w.writeAll("\"/>\n");
-        try w.print("<text x=\"{d}\" y=\"{d}\" fill=\"{s}\" font-weight=\"600\">{s}</text>\n", .{ width - right - 90, top + 20 + 20 * @as(f64, k), c[1], c[2] });
+        try w.print("<text x=\"{d}\" y=\"{d}\" fill=\"{s}\" font-weight=\"600\">{s}</text>\n", .{ width - right - 140, top + 20 + 20 * @as(f64, k), c[1], c[2] });
     }
     for (0..4) |i| try w.print("<text x=\"{d:.1}\" y=\"{d}\" text-anchor=\"middle\" font-size=\"11\">{d}</text>\n", .{ left + pw * @as(f64, @floatFromInt(i)) / 3.0, height - bottom + 16, i });
     try w.writeAll("</svg>\n");

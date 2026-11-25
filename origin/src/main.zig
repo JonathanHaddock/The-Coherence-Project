@@ -80,7 +80,7 @@ fn help() void {
         \\  origin catalogue
         \\  origin constants
         \\  origin observe <particle>
-        \\  origin levels [zeros|box|all] [t_max]   level statistics vs the zeta zeros
+        \\  origin levels [zeros|box|all] [t_max]   does a spectrum carry the primes?
         \\  origin dataset
         \\  origin analyze [dataset]
         \\  origin koide
@@ -1500,10 +1500,20 @@ fn levelsReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iter
     std.debug.print(
         \\
         \\========================================
-        \\          LEVEL STATISTICS
+        \\          LEVELS
         \\========================================
-        \\Does a spectrum look like the Riemann zeta zeros?
-        \\Tests: spacing (Poisson / GOE / GUE), rigidity, orbit periods at log p^k.
+        \\Question: does a list of energy levels carry the same fingerprint
+        \\as the zeta zeros (the "notes" that rebuild the primes)?
+        \\
+        \\Four checks, run the same way on every list:
+        \\  1. LINE UP     stretch the list so the average gap is 1
+        \\  2. GAPS        do neighbouring levels avoid each other, and how hard?
+        \\  3. STIFFNESS   over long stretches, does the count stay steady or wander?
+        \\  4. LOOPS       hidden repeating paths in the list; for the zeros these
+        \\                 should land exactly on log 2, log 3, log 5, ... (the primes)
+        \\
+        \\The control is a particle in a box: a system with no chaos, where none
+        \\of this should show up.
         \\
     , .{});
     const do_zeros = !std.mem.eql(u8, which, "box");
@@ -1512,6 +1522,8 @@ fn levelsReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iter
     if (do_zeros) n_zeros = try levelsOne(io, gpa, .zeros, t_max, 0);
     if (do_box) _ = try levelsOne(io, gpa, .box, t_max, n_zeros);
 }
+
+const pattern_names = [_][]const u8{ "no avoidance (random)", "avoid (time-symmetric)", "avoid strongly (zeta-like)" };
 
 fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count: usize) !usize {
     const lv = switch (src) {
@@ -1527,39 +1539,61 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
     switch (src) {
         .zeros => std.debug.print(
             \\
-            \\--- ZETA ZEROS (Riemann-Siegel, 0 < t < {d:.0}) ---
-            \\zeros found {d}   smooth count N(t_max) {d:.1}
-            \\first five: {d:.6} {d:.6} {d:.6} {d:.6} {d:.6}
+            \\################ ZETA ZEROS ################
+            \\Computed here, every zero up to height {d:.0}: {d} found (expected about {d:.0}).
+            \\First five heights: {d:.3} {d:.3} {d:.3} {d:.3} {d:.3}
             \\
         , .{ t_max, lv.len, levels.zetaSmoothCount(t_max), lv[0], lv[1], lv[2], lv[3], lv[4] }),
         .box => std.debug.print(
             \\
-            \\--- CONTROL: RECTANGULAR BOX (integrable, side ratio^2 = golden ratio) ---
-            \\levels {d}   E range {d:.2} .. {d:.1}
+            \\################ CONTROL: PARTICLE IN A BOX ################
+            \\{d} energy levels. No chaos, so expect: no avoidance, no stiffness, no prime loops.
             \\
-        , .{ lv.len, lv[0], lv[lv.len - 1] }),
+        , .{lv.len}),
     }
 
+    // 1. Line up.
     const u = try levels.unfold(gpa, lv, smooth);
     defer gpa.free(u);
     const sp = try levels.spacings(gpa, u);
+    std.debug.print("\n1. LINE UP: average gap after stretching = {d:.4}  ({s})\n", .{ sp.mean, if (@abs(sp.mean - 1) < 0.01) "good" else "off - later checks unreliable" });
+
+    // 2. Gaps.
+    const best = std.mem.indexOfMin(f64, &sp.ks);
     std.debug.print(
         \\
-        \\SPACING  (mean unfolded gap {d:.4}; should be 1)
-        \\  KS distance   Poisson {d:.4}   GOE {d:.4}   GUE {d:.4}   (smaller = closer)
-        \\  gaps < 0.25   measured {d:.4}   Poisson {d:.4}   GOE {d:.4}   GUE {d:.4}
+        \\2. GAPS: how often two levels sit very close (gap under a quarter of average)
+        \\     measured                     {d:>6.2}%
+        \\     if levels ignored each other {d:>6.2}%
+        \\     if they avoid each other     {d:>6.2}%
+        \\     if they avoid strongly       {d:>6.2}%
+        \\   Whole gap shape is closest to: {s}
         \\
-    , .{ sp.mean, sp.ks[0], sp.ks[1], sp.ks[2], sp.small_frac, sp.small_expected[0], sp.small_expected[1], sp.small_expected[2] });
-    const ks_names = [_][]const u8{ "Poisson", "GOE", "GUE" };
-    const best = std.mem.indexOfMin(f64, &sp.ks);
-    std.debug.print("  closest: {s}\n", .{ks_names[best]});
+    , .{ 100 * sp.small_frac, 100 * sp.small_expected[0], 100 * sp.small_expected[1], 100 * sp.small_expected[2], pattern_names[best] });
 
-    std.debug.print("\nRIGIDITY  number variance Sigma^2(L)\n  {s:>6} {s:>10} {s:>10} {s:>10} {s:>10}\n", .{ "L", "measured", "Poisson", "GOE", "GUE" });
+    // 3. Stiffness.
+    std.debug.print(
+        \\
+        \\3. STIFFNESS: pick a stretch L gaps long; how much does the number of
+        \\   levels inside it wobble from place to place? (spread of the count)
+        \\     {s:>6} {s:>9} {s:>9} {s:>9} {s:>9}
+        \\
+    , .{ "L", "measured", "random", "avoid", "strong" });
+    var last: f64 = 0;
     for (levels.rigidity_lengths) |l| {
-        std.debug.print("  {d:>6.1} {d:>10.4} {d:>10.4} {d:>10.4} {d:>10.4}\n", .{ l, levels.numberVariance(u, l), l, levels.numberVarianceTheory(.goe, l), levels.numberVarianceTheory(.gue, l) });
+        last = levels.numberVariance(u, l);
+        std.debug.print("     {d:>6.1} {d:>9.3} {d:>9.3} {d:>9.3} {d:>9.3}\n", .{ l, last, l, levels.numberVarianceTheory(.goe, l), levels.numberVarianceTheory(.gue, l) });
     }
+    const flat = last < levels.numberVarianceTheory(.gue, 50) * 0.7;
+    const wander = last > 10;
+    std.debug.print("   Reading: {s}\n", .{if (flat)
+        "wobble stops growing over long stretches - something sets a longest\n            wavelength. For the zeros that is the shortest prime loop, log 2."
+    else if (wander)
+        "wobble keeps growing with length - levels drift freely, no stiffness."
+    else
+        "stiff, grows slowly."});
 
-    // Orbit test on the raw levels (heights t for the zeros).
+    // 4. Loops.
     const x_lo = 0.3;
     const x_hi = 4.2;
     const nx: usize = 7801;
@@ -1568,7 +1602,6 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
     levels.orbitSignal(lv, x_lo, x_hi, s);
     const dx = (x_hi - x_lo) / @as(f64, @floatFromInt(nx - 1));
 
-    // Strongest extrema of |S|.
     const Ext = struct { x: f64, v: f64 };
     var ext: std.ArrayList(Ext) = .empty;
     defer ext.deinit(gpa);
@@ -1584,7 +1617,14 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
     const top_n = @min(ext.items.len, 20);
     var on_log_q: usize = 0;
     var dips: usize = 0;
-    std.debug.print("\nORBITS  strongest {d} features of S(x) = sum w cos(E x), x in [{d:.1}, {d:.1}]\n  {s:>8} {s:>10}  nearest log q\n", .{ top_n, x_lo, x_hi, "x", "S/|S|max" });
+    std.debug.print(
+        \\
+        \\4. LOOPS: treat the levels as a chord and find the strongest hidden
+        \\   repeats in it. Each repeat is a loop length. For the zeros, loops
+        \\   should sit at log(prime). A dip means the loop removes, not adds.
+        \\     {s:>7} {s:>9} {s:>5}  on a prime?
+        \\
+    , .{ "length", "strength", "kind" });
     const smax = @abs(ext.items[0].v);
     for (ext.items[0..top_n]) |e| {
         const q_near: u32 = @intFromFloat(@round(@exp(e.x)));
@@ -1593,13 +1633,14 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
         const hit = pp != null and @abs(off) < 0.005;
         if (hit) on_log_q += 1;
         if (e.v < 0) dips += 1;
-        std.debug.print("  {d:>8.4} {d:>10.3}  {s}", .{ e.x, e.v / smax, if (hit) "log " else "-   " });
-        if (hit) std.debug.print("{d} (off {d:.4})\n", .{ q_near, off }) else std.debug.print("\n", .{});
+        std.debug.print("     {d:>7.4} {d:>9.2} {s:>5}  ", .{ e.x, @abs(e.v) / smax, if (e.v < 0) "dip" else "peak" });
+        if (hit) {
+            if (pp.?.k == 1) std.debug.print("log {d}\n", .{q_near}) else std.debug.print("log {d} = {d} loops of log {d}\n", .{ q_near, pp.?.k, pp.?.p });
+        } else std.debug.print("no\n", .{});
     }
-    std.debug.print("  on log(prime power) within 0.005: {d}/{d}   dips (negative): {d}/{d}\n", .{ on_log_q, top_n, dips, top_n });
+    std.debug.print("   Reading: {d} of {d} strongest loops land on a prime (or prime power); {d} of {d} are dips.\n", .{ on_log_q, top_n, dips, top_n });
 
     if (src == .zeros) {
-        // Depth at each log q vs the explicit-formula prediction log p / p^(k/2).
         const at = struct {
             fn f(sig: []const f64, x: f64, lo: f64, d: f64) f64 {
                 const c: usize = @intFromFloat(@round((x - lo) / d));
@@ -1611,28 +1652,42 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
         }.f;
         const ref = at(s, @log(2.0), x_lo, dx);
         const ref_pred = @log(2.0) / @sqrt(2.0);
-        std.debug.print("\n  explicit formula: dip depth at log q relative to q = 2\n  {s:>4} {s:>4} {s:>10} {s:>10}\n", .{ "q", "p^k", "measured", "predicted" });
+        std.debug.print(
+            \\
+            \\   How deep each prime's dip should be, if the primes really are the loops
+            \\   (rule: depth ~ log p / sqrt(p), and a loop run k times is weaker).
+            \\   Shown relative to the 2-dip:
+            \\     {s:>4} {s:>9} {s:>9}
+            \\
+        , .{ "q", "measured", "rule" });
         var q: u32 = 2;
         while (q <= 32) : (q += 1) {
             const pp = levels.primePower(q) orelse continue;
             const pf: f64 = @floatFromInt(pp.p);
             const pred = @log(pf) / std.math.pow(f64, pf, @as(f64, @floatFromInt(pp.k)) / 2.0) / ref_pred;
-            std.debug.print("  {d:>4} {d:>2}^{d} {d:>10.3} {d:>10.3}\n", .{ q, pp.p, pp.k, at(s, @log(@as(f64, @floatFromInt(q))), x_lo, dx) / ref, pred });
+            std.debug.print("     {d:>4} {d:>9.2} {d:>9.2}{s}\n", .{ q, at(s, @log(@as(f64, @floatFromInt(q))), x_lo, dx) / ref, pred, if (pp.k > 1) "   (repeat loop)" else "" });
         }
     }
+
+    std.debug.print("\nVERDICT ({s}): gaps {s}; stiffness {s}; prime loops {s}.\n", .{
+        name,
+        if (best == 2) "zeta-like" else if (best == 0) "random" else "avoiding, not zeta-like",
+        if (flat) "zeta-like" else if (wander) "none" else "partial",
+        if (on_log_q * 4 >= top_n * 3) "YES" else "no",
+    });
 
     // Files.
     try std.Io.Dir.cwd().createDirPath(io, store.results_dir);
     var csv: std.Io.Writer.Allocating = .init(gpa);
     defer csv.deinit();
-    try csv.writer.writeAll("x,S\n");
+    try csv.writer.writeAll("loop_length,strength\n");
     for (s, 0..) |v, i| try csv.writer.print("{d:.5},{d:.6}\n", .{ x_lo + dx * @as(f64, @floatFromInt(i)), v });
     const csv_path = try std.fmt.allocPrint(gpa, "{s}/levels-{s}-orbits.csv", .{ store.results_dir, name });
     defer gpa.free(csv_path);
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = csv_path, .data = csv.written() });
     std.debug.print("\nWrote {s}\n", .{csv_path});
 
-    const t1 = try std.fmt.allocPrint(gpa, "Orbit signal: {s} ({d} levels)", .{ name, lv.len });
+    const t1 = try std.fmt.allocPrint(gpa, "Hidden loops in the {s} ({d} levels)", .{ if (src == .zeros) "zeta zeros" else "box (control)", lv.len });
     defer gpa.free(t1);
     const svg1 = try levels_svg.orbit(gpa, t1, x_lo, x_hi, s);
     defer gpa.free(svg1);
@@ -1640,7 +1695,7 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
     defer gpa.free(f1);
     try writeAndOpen(io, gpa, f1, svg1, false);
 
-    const t2 = try std.fmt.allocPrint(gpa, "Nearest-neighbour spacing: {s}", .{name});
+    const t2 = try std.fmt.allocPrint(gpa, "Gaps between neighbouring levels: {s}", .{if (src == .zeros) "zeta zeros" else "box (control)"});
     defer gpa.free(t2);
     const svg2 = try levels_svg.spacing(gpa, t2, sp.hist);
     defer gpa.free(svg2);
