@@ -64,3 +64,19 @@ zig build -Doptimize=ReleaseFast
 ./zig-out/bin/origin holes 150
 ./zig-out/bin/origin record mode=lattice display=one_cell ticks=20000   # flash gaps in results/runs/.../gaps.csv
 ```
+
+## Does the engine flash at the halfway falloff? (`origin scaling`)
+
+The ½ in the gate world means each state's strength falls as 1/√(size): members held together as one identity but each keeping its own timing. Measured on the 3D lattice: cubes of n pixels (1 to 13,824), wobble of the flash count per window, fit wobble ~ n^a. Controls land exactly: independent 0.500, in step 1.000.
+
+| Display rule | Window (ticks) | a, all flashes | a, identity groups | Pixels per identity group |
+|---|---|---|---|---|
+| one_cell | 2 | 0.69 | 0.68 | 1.07 |
+| one_cell | 8 | 0.75 | 0.74 | 1.07 |
+| one_cell | 32 | 0.79 | 0.78 | 1.07 |
+| one_cell | 128 | 0.82 | 0.81 | 1.07 |
+| flip_all | 2 | 0.73 | 0.72 | 1.20 |
+
+(hold and fill_empty flash every pixel every tick, so they say nothing here.)
+
+Reading: the engine's regions are more in step than halfway at every scale, and more so over longer windows: flashes travel as waves, so neighbours share timing. Identity groups barely form (about one pixel each), so counting by identity changes almost nothing. Under the current rules, identity does not yet bind pixels into one thing. The halfway falloff does not appear.

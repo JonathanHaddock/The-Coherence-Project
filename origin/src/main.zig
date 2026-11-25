@@ -31,6 +31,7 @@ const photo = @import("engine/photo.zig");
 const levels = @import("analysis/levels.zig");
 const hydrogen = @import("analysis/hydrogen.zig");
 const holes = @import("analysis/holes.zig");
+const scaling = @import("engine/scaling.zig");
 const levels_svg = @import("visualization/levels_svg.zig");
 
 test {
@@ -60,6 +61,7 @@ test {
     _ = levels;
     _ = hydrogen;
     _ = holes;
+    _ = scaling;
     _ = levels_svg;
     _ = @import("visualization/labels.zig");
 }
@@ -90,6 +92,7 @@ fn help() void {
         \\  origin levels gates                    gate world: prime holes joined by multiplying
         \\  origin levels pair                     two hydrogens joined: does avoidance survive?
         \\  origin holes [n_max]                    which pixel scales can be built from smaller ones?
+        \\  origin scaling [ticks] [window] [display]  does a region flash like n or like sqrt(n)?
         \\  origin dataset
         \\  origin analyze [dataset]
         \\  origin koide
@@ -1501,6 +1504,44 @@ fn photoReport(args: anytype) void {
     std.debug.print("MEASURED (PMNS columns, D): nu1 0.083  nu2 0.001  nu3 0.129\n", .{});
 }
 
+fn scalingReport(gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
+    const ticks = if (args.next()) |a| std.fmt.parseInt(i64, a, 10) catch 20000 else 20000;
+    const window = if (args.next()) |a| std.fmt.parseInt(i64, a, 10) catch 2 else 2;
+    const disp_name = args.next() orelse "one_cell";
+    const disp = std.meta.stringToEnum(engine.Display, disp_name) orelse .one_cell;
+    std.debug.print(
+        \\
+        \\========================================
+        \\          SCALING
+        \\========================================
+        \\Cubes of n pixels on the 3D lattice. Count flashes per cube over windows of {d}
+        \\ticks and measure how much the count wobbles. Fit wobble ~ n^a:
+        \\  a = 1    members flash in step
+        \\  a = 1/2  members keep their own timing (the halfway falloff: per
+        \\           member, strength ~ 1/sqrt(n), the zeta zeros' 1/2)
+        \\Engine: 3D lattice 48^3, display {s}, {d} ticks (first 1000 skipped to settle).
+        \\
+    , .{ window, disp_name, ticks });
+    const r = try scaling.measure(gpa, .{ .display = disp }, ticks, 1000, window);
+    std.debug.print("Average flashes per pixel per tick {d:.4}; pixels per identity group {d:.2}\n\n", .{ r.rate, r.mean_group });
+    std.debug.print("     {s:>6}  {s:>13} {s:>13} {s:>13} {s:>13}\n", .{ "n", "pixels", "identities", "independent", "in step" });
+    for (scaling.sides, 0..) |sd, k| {
+        std.debug.print("     {d:>6}  {d:>13.4} {d:>13.4} {d:>13.4} {d:>13.4}\n", .{ sd * sd * sd, r.pixels.wobble[k], r.identities.wobble[k], r.independent.wobble[k], r.in_step.wobble[k] });
+    }
+    std.debug.print(
+        \\     (wobble of the block count, averaged over blocks)
+        \\
+        \\  fitted a:   pixels {d:.3}   identities {d:.3}   independent {d:.3}   in step {d:.3}
+        \\
+    , .{ r.pixels.a, r.identities.a, r.independent.a, r.in_step.a });
+    const read = struct {
+        fn f(a: f64) []const u8 {
+            return if (@abs(a - 0.5) < 0.05) "halfway (1/2): members keep their own timing" else if (@abs(a - 1.0) < 0.05) "in step (1)" else if (a < 0.5) "below halfway: members cancel each other more than chance" else "between halfway and in step";
+        }
+    }.f;
+    std.debug.print("  Reading:\n    pixels:     {s}\n    identities: {s}\n", .{ read(r.pixels.a), read(r.identities.a) });
+}
+
 fn holesReport(gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
     const n_max = if (args.next()) |a| std.fmt.parseInt(usize, a, 10) catch 40 else 40;
     std.debug.print(
@@ -2179,6 +2220,8 @@ pub fn main(init: std.process.Init) void {
         clocksReport(&args);
     } else if (std.mem.eql(u8, command, "engine")) {
         engineReport(&args);
+    } else if (std.mem.eql(u8, command, "scaling")) {
+        scalingReport(init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "holes")) {
         holesReport(init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "levels")) {
