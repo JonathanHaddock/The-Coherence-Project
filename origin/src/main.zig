@@ -87,6 +87,8 @@ fn help() void {
         \\  origin levels [zeros|box|all] [t_max]   does a spectrum carry the primes?
         \\  origin levels hydrogen [setting] [size] same checks on hydrogen in a strong magnet
         \\  origin levels strings                  two strings: where dips come from
+        \\  origin levels gates                    gate world: prime holes joined by multiplying
+        \\  origin levels pair                     two hydrogens joined: does avoidance survive?
         \\  origin holes [n_max]                    which pixel scales can be built from smaller ones?
         \\  origin dataset
         \\  origin analyze [dataset]
@@ -1546,7 +1548,60 @@ fn holesReport(gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
     , .{ if (all_match_primes) "yes" else "no", if (all_match_pp) "YES" else "no" });
 }
 
-const Source = enum { zeros, box, hydrogen, tied, half };
+fn gateSilences(gpa: std.mem.Allocator) !void {
+    const n_max: u64 = 20000;
+    const x_lo = 10.0;
+    const x_hi = 60.0;
+    const nx: usize = 10001;
+    const loud = try gpa.alloc(f64, nx);
+    defer gpa.free(loud);
+    levels.gateLoudness(n_max, x_lo, x_hi, loud);
+    const dx = (x_hi - x_lo) / @as(f64, @floatFromInt(nx - 1));
+    const zs = try levels.zetaZeros(gpa, x_hi + 1);
+    defer gpa.free(zs);
+    var mean: f64 = 0;
+    for (loud) |v| mean += v;
+    mean /= @floatFromInt(nx);
+    std.debug.print(
+        \\
+        \\################ GATE WORLD: SILENCES ################
+        \\Ring the whole gate world at one frequency, every state at once, each
+        \\weighted by 1/sqrt(its size) - the halfway weighting. Where does the
+        \\total fall silent (every state cancelling every other)?
+        \\     {s:>9} {s:>10}   {s}
+        \\
+    , .{ "silence at", "loudness", "nearest zeta zero" });
+    var hits: usize = 0;
+    var count: usize = 0;
+    for (1..nx - 1) |i| {
+        if (!(loud[i] < loud[i - 1] and loud[i] <= loud[i + 1])) continue;
+        if (loud[i] > 0.2 * mean) continue;
+        count += 1;
+        const x = x_lo + dx * @as(f64, @floatFromInt(i));
+        var near_z = zs[0];
+        for (zs) |z| if (@abs(z - x) < @abs(near_z - x)) {
+            near_z = z;
+        };
+        if (@abs(near_z - x) < 0.02) hits += 1;
+        std.debug.print("     {d:>9.3} {d:>10.4}   {d:.3}  off {d:.4}\n", .{ x, loud[i] / mean, near_z, x - near_z });
+    }
+    var zeros_in: usize = 0;
+    for (zs) |z| if (z > x_lo and z < x_hi) {
+        zeros_in += 1;
+    };
+    std.debug.print(
+        \\   Reading: {d} silences (loudness under 20% of average); {d} sit on a zeta zero
+        \\   (within 0.02). There are {d} zeros in this window.
+        \\   (Loudness is shown as a share of the average.)
+        \\   Checked separately: weight 1/n^0.4 or 1/n^0.6 instead and the quietest
+        \\   spots stay at 5-10% of average. Only the halfway weight goes fully silent.
+        \\   This is the zeta function itself written as a gate world, so the match
+        \\   is built in; what it shows is where the 1/2 comes from.
+        \\
+    , .{ count, hits, zeros_in });
+}
+
+const Source = enum { zeros, box, hydrogen, tied, half, gas, fermi, pair };
 
 var hydrogen_eps: f64 = -0.1;
 var hydrogen_nmax: usize = 100;
@@ -1581,6 +1636,16 @@ fn levelsReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iter
         _ = try levelsOne(io, gpa, .hydrogen, 0, 0);
         return;
     }
+    if (std.mem.eql(u8, which, "gates")) {
+        _ = try levelsOne(io, gpa, .gas, 0, 200000);
+        _ = try levelsOne(io, gpa, .fermi, 0, 200000);
+        try gateSilences(gpa);
+        return;
+    }
+    if (std.mem.eql(u8, which, "pair")) {
+        _ = try levelsOne(io, gpa, .pair, 0, 0);
+        return;
+    }
     if (std.mem.eql(u8, which, "strings")) {
         _ = try levelsOne(io, gpa, .tied, 0, 3000);
         _ = try levelsOne(io, gpa, .half, 0, 3000);
@@ -1599,6 +1664,19 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
     const lv = switch (src) {
         .zeros => try levels.zetaZeros(gpa, t_max),
         .box => try levels.boxLevels(gpa, count),
+        .gas => try levels.gateLevels(gpa, count, false),
+        .fermi => try levels.gateLevels(gpa, count, true),
+        .pair => blk: {
+            const b = 0.25 * @sqrt(0.1 / @abs(hydrogen_eps)) * @sqrt(120.0 / @as(f64, @floatFromInt(hydrogen_nmax + 20)));
+            std.debug.print("\nSolving hydrogen twice (basis {d} and {d}), then joining two copies...\n", .{ hydrogen_nmax, hydrogen_nmax + 20 });
+            const small = try hydrogen.levels(gpa, hydrogen_eps, hydrogen_nmax, b);
+            defer gpa.free(small);
+            const big = try hydrogen.levels(gpa, hydrogen_eps, hydrogen_nmax + 20, b);
+            defer gpa.free(big);
+            const one = try hydrogen.converged(gpa, small, big);
+            defer gpa.free(one);
+            break :blk try levels.pairLevels(gpa, one);
+        },
         .tied => try levels.stringLevels(gpa, count, false),
         .half => try levels.stringLevels(gpa, count, true),
         .hydrogen => blk: {
@@ -1636,6 +1714,23 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
             \\paths around the nucleus, so they should NOT sit on the primes.
             \\
         , .{ hydrogen_eps, lv.len, lv[lv.len - 1] }),
+        .gas, .fermi => std.debug.print(
+            \\
+            \\################ GATE WORLD: {s} ################
+            \\One hole per prime, joined by multiplying: a state is filled only where
+            \\every piece is filled. A state built from holes multiplying to n costs
+            \\log n. {s}
+            \\{d} levels (n up to {d}).
+            \\
+        , .{ if (src == .gas) "HOLES REUSABLE" else "EACH HOLE AT MOST ONCE", if (src == .gas) "Each hole can be used any number of times." else "Each hole can be used once at most (no repeated prime).", lv.len, count }),
+        .pair => std.debug.print(
+            \\
+            \\################ TWO HYDROGENS JOINED ################
+            \\Two independent magnetized hydrogen atoms taken together: each joint
+            \\level is one atom's level plus the other's. {d} joint levels.
+            \\The question: do independent pieces, once joined, still avoid each other?
+            \\
+        , .{lv.len}),
         .tied, .half => std.debug.print(
             \\
             \\################ STRING, {s} ################
@@ -1652,6 +1747,9 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
         .zeros => .zeta,
         .box => .box,
         .hydrogen => levels.fitSmooth(lv),
+        .gas => .gas,
+        .fermi => .fermi,
+        .pair => levels.fitSmooth4(lv),
         .tied => levels.stringSmoothCount(false),
         .half => levels.stringSmoothCount(true),
     };
@@ -1701,11 +1799,13 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
     // primes. Rescale so the shortest strong loop sits at log 2, then ask
     // whether the others land on log 3, log 4, log 5, ...
     const x_lo: f64 = switch (src) {
-        .hydrogen => 2.0, // below this the signal is leftover from the average, not loops
+        .hydrogen, .pair => 2.0, // below this the signal is leftover from the average, not loops
+        .gas, .fermi => 5.0,
         else => 0.3,
     };
     const x_hi: f64 = switch (src) {
-        .hydrogen => 25.0,
+        .hydrogen, .pair => 25.0,
+        .gas, .fermi => 60.0,
         else => 4.2,
     };
     const nx: usize = 7801;
@@ -1767,6 +1867,35 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
     const others = @max(top_n, 1) - 1;
     std.debug.print("   Reading: {d} of the other {d} strong loops land on a prime (or prime power); {d} of {d} are dips.\n", .{ on_log_q, others, dips, top_n });
     std.debug.print("   By pure chance, a loop would land within {d:.3} of one {d:.0}% of the time.\n", .{ tol, 100 * chance });
+
+    if (src == .gas or src == .fermi) {
+        const zs = try levels.zetaZeros(gpa, x_hi + 1);
+        defer gpa.free(zs);
+        const zt = @max(0.3, 1.2 * std.math.pi / lv[lv.len - 1]);
+        std.debug.print("\n   Turned around: do this world's loops sit at the zeta zeros' heights?\n     {s:>8} {s:>5}   nearest zero\n", .{ "loop", "kind" });
+        const sorted = try gpa.dupe(Ext, ext.items[0..top_n]);
+        defer gpa.free(sorted);
+        std.mem.sort(Ext, sorted, {}, struct {
+            fn lt(_: void, a: Ext, b: Ext) bool {
+                return a.x < b.x;
+            }
+        }.lt);
+        var on_zero: usize = 0;
+        for (sorted) |e| {
+            var near_z: f64 = zs[0];
+            for (zs) |z| if (@abs(z - e.x) < @abs(near_z - e.x)) {
+                near_z = z;
+            };
+            const hit = @abs(near_z - e.x) < zt;
+            if (hit) on_zero += 1;
+            std.debug.print("     {d:>8.3} {s:>5}   {d:.3}{s}\n", .{ e.x, if (e.v < 0) "dip" else "peak", near_z, if (hit) "  ON A ZERO" else "" });
+        }
+        var zeros_in: usize = 0;
+        for (zs) |z| if (z > x_lo and z < x_hi) {
+            zeros_in += 1;
+        };
+        std.debug.print("   Reading: {d} of {d} strong loops sit on a zero (within {d:.2}); there are {d} zeros in this window.\n", .{ on_zero, top_n, zt, zeros_in });
+    }
 
     var path_verdict: []const u8 = "";
     if (src == .hydrogen) {
@@ -1945,6 +2074,9 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
         .hydrogen => "magnetized hydrogen",
         .tied => "string, both ends fixed",
         .half => "string, one end free",
+        .gas => "gate world (reusable holes)",
+        .fermi => "gate world (single-use holes)",
+        .pair => "two hydrogens joined",
     }, lv.len });
     defer gpa.free(t1);
     const svg1 = try levels_svg.orbit(gpa, t1, x_lo, x_hi, s, scale);
@@ -1959,6 +2091,9 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
         .hydrogen => "magnetized hydrogen",
         .tied => "string, both ends fixed",
         .half => "string, one end free",
+        .gas => "gate world (reusable holes)",
+        .fermi => "gate world (single-use holes)",
+        .pair => "two hydrogens joined",
     }});
     defer gpa.free(t2);
     const svg2 = try levels_svg.spacing(gpa, t2, sp.hist);

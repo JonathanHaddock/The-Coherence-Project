@@ -250,11 +250,17 @@ pub const Smooth = union(enum) {
     zeta,
     box,
     poly: [3]f64,
+    poly4: [5]f64,
+    gas,
+    fermi,
     pub fn count(self: Smooth, e: f64) f64 {
         return switch (self) {
             .zeta => zetaSmoothCount(e),
             .box => boxSmoothCount(e),
             .poly => |c| c[0] + c[1] * e + c[2] * e * e,
+            .poly4 => |c| c[0] + e * (c[1] + e * (c[2] + e * (c[3] + e * c[4]))),
+            .gas => GateSmooth.gas(e),
+            .fermi => GateSmooth.fermi(e),
         };
     }
 };
@@ -428,4 +434,132 @@ pub fn signalAt(s: []const f64, x_lo: f64, dx: f64, x: f64, win: f64) f64 {
         best = s[i];
     };
     return best;
+}
+
+// ------------------------------------------------------------- gate world
+// Independent holes, one per prime, that combine by multiplying (a state is
+// filled only where every piece is filled). Each prime hole costs log p, so
+// a state made of holes multiplying to n costs log n: the levels are log n.
+//   gas:   each hole can be used any number of times (all n)
+//   fermi: each hole at most once (n with no repeated prime factor)
+
+pub fn squarefree(n: u64) bool {
+    var p: u64 = 2;
+    var m = n;
+    while (p * p <= m) : (p += 1) {
+        if (m % (p * p) == 0) return false;
+        if (m % p == 0) m /= p;
+    }
+    return true;
+}
+
+pub fn gateLevels(gpa: std.mem.Allocator, n_max: u64, fermi: bool) ![]f64 {
+    var list: std.ArrayList(f64) = .empty;
+    errdefer list.deinit(gpa);
+    var n: u64 = 2;
+    while (n <= n_max) : (n += 1) {
+        if (fermi and !squarefree(n)) continue;
+        try list.append(gpa, @log(@as(f64, @floatFromInt(n))));
+    }
+    return list.toOwnedSlice(gpa);
+}
+
+/// Smooth counts: all n <= e^E is e^E - 3/2 (starting at 2); squarefree
+/// numbers have density 6/pi^2.
+pub const GateSmooth = struct {
+    pub fn gas(e: f64) f64 {
+        return @exp(e) - 1.5;
+    }
+    pub fn fermi(e: f64) f64 {
+        return 6.0 / (pi * pi) * @exp(e) - 1.0;
+    }
+};
+
+/// Pairs: two independent copies of a system joined, levels E_i + E_j
+/// (i <= j), kept only below the top single level so the list is complete.
+pub fn pairLevels(gpa: std.mem.Allocator, single: []const f64) ![]f64 {
+    const top = single[single.len - 1];
+    var list: std.ArrayList(f64) = .empty;
+    errdefer list.deinit(gpa);
+    for (single, 0..) |a, i| for (single[i..]) |b| {
+        if (a + b <= top) try list.append(gpa, a + b);
+    };
+    std.mem.sort(f64, list.items, {}, std.sort.asc(f64));
+    return list.toOwnedSlice(gpa);
+}
+
+/// Degree-4 fit of the staircase, for spectra whose count grows faster than
+/// a square (two joined systems). Levels are shifted to [0, 1] for stability.
+pub fn fitSmooth4(lv: []const f64) Smooth {
+    const lo = lv[0];
+    const span = lv[lv.len - 1] - lo;
+    var a: [5][6]f64 = @splat(@splat(0));
+    for (lv, 0..) |e, i| {
+        const t = (e - lo) / span;
+        var pw: [9]f64 = undefined;
+        pw[0] = 1;
+        for (1..9) |k| pw[k] = pw[k - 1] * t;
+        const nn = @as(f64, @floatFromInt(i)) + 0.5;
+        for (0..5) |r| {
+            for (0..5) |c| a[r][c] += pw[r + c];
+            a[r][5] += nn * pw[r];
+        }
+    }
+    for (0..5) |c| {
+        var piv = c;
+        for (c + 1..5) |r| if (@abs(a[r][c]) > @abs(a[piv][c])) {
+            piv = r;
+        };
+        std.mem.swap([6]f64, &a[c], &a[piv]);
+        for (0..5) |r| {
+            if (r == c) continue;
+            const f = a[r][c] / a[c][c];
+            for (c..6) |k| a[r][k] -= f * a[c][k];
+        }
+    }
+    var ct: [5]f64 = undefined; // coefficients in t
+    for (0..5) |k| ct[k] = a[k][5] / a[k][k];
+    // Convert to coefficients in e: t = (e - lo) / span.
+    var ce: [5]f64 = @splat(0);
+    for (0..5) |k| {
+        // ct[k] * ((e - lo)/span)^k expanded by the binomial rule
+        var binom: f64 = 1;
+        for (0..k + 1) |j| {
+            // term: C(k, j) e^j (-lo)^(k-j) / span^k
+            ce[j] += ct[k] * binom * std.math.pow(f64, -lo, @floatFromInt(k - j)) / std.math.pow(f64, span, @floatFromInt(k));
+            binom = binom * @as(f64, @floatFromInt(k - j)) / @as(f64, @floatFromInt(j + 1));
+        }
+    }
+    return .{ .poly4 = ce };
+}
+
+/// Gate-world silences. Ring the whole gate world at frequency x, with each
+/// state n (vacuum n = 1 included) weighted by 1/sqrt(n), and measure how
+/// loud the total is:   |sum_{n <= N} n^(-1/2) e^(-i x log n) - smooth part|.
+/// Returns the loudness at each x in [x_lo, x_hi].
+pub fn gateLoudness(n_max: u64, x_lo: f64, x_hi: f64, out: []f64) void {
+    const nf: f64 = @floatFromInt(n_max);
+    for (out, 0..) |*o, i| {
+        const x = x_lo + (x_hi - x_lo) * @as(f64, @floatFromInt(i)) / @as(f64, @floatFromInt(out.len - 1));
+        var re: f64 = 0;
+        var im: f64 = 0;
+        var n: u64 = 1;
+        while (n <= n_max) : (n += 1) {
+            const l = @log(@as(f64, @floatFromInt(n)));
+            const w = 1.0 / @sqrt(@as(f64, @floatFromInt(n)));
+            re += w * @cos(x * l);
+            im -= w * @sin(x * l);
+        }
+        // Smooth part from cutting the sum off at N: N^(1-s)/(1-s) + N^(-s)/2, s = 1/2 + i x.
+        const ln = @log(nf);
+        const mag1 = @sqrt(nf);
+        const c1 = [2]f64{ mag1 * @cos(-x * ln), mag1 * @sin(-x * ln) }; // N^(1/2 - i x)
+        const den = [2]f64{ 0.5, -x }; // 1 - s
+        const d2 = den[0] * den[0] + den[1] * den[1];
+        const t1 = [2]f64{ (c1[0] * den[0] + c1[1] * den[1]) / d2, (c1[1] * den[0] - c1[0] * den[1]) / d2 };
+        const t2 = [2]f64{ 0.5 * @cos(-x * ln) / mag1, 0.5 * @sin(-x * ln) / mag1 };
+        re -= t1[0] + t2[0];
+        im -= t1[1] + t2[1];
+        o.* = @sqrt(re * re + im * im);
+    }
 }
