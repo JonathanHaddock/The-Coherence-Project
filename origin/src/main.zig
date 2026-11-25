@@ -30,6 +30,7 @@ const record = @import("engine/record.zig");
 const photo = @import("engine/photo.zig");
 const levels = @import("analysis/levels.zig");
 const hydrogen = @import("analysis/hydrogen.zig");
+const holes = @import("analysis/holes.zig");
 const levels_svg = @import("visualization/levels_svg.zig");
 
 test {
@@ -58,6 +59,7 @@ test {
     _ = photo;
     _ = levels;
     _ = hydrogen;
+    _ = holes;
     _ = levels_svg;
     _ = @import("visualization/labels.zig");
 }
@@ -85,6 +87,7 @@ fn help() void {
         \\  origin levels [zeros|box|all] [t_max]   does a spectrum carry the primes?
         \\  origin levels hydrogen [setting] [size] same checks on hydrogen in a strong magnet
         \\  origin levels strings                  two strings: where dips come from
+        \\  origin holes [n_max]                    which pixel scales can be built from smaller ones?
         \\  origin dataset
         \\  origin analyze [dataset]
         \\  origin koide
@@ -1496,6 +1499,53 @@ fn photoReport(args: anytype) void {
     std.debug.print("MEASURED (PMNS columns, D): nu1 0.083  nu2 0.001  nu3 0.129\n", .{});
 }
 
+fn holesReport(gpa: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
+    const n_max = if (args.next()) |a| std.fmt.parseInt(usize, a, 10) catch 40 else 40;
+    std.debug.print(
+        \\
+        \\========================================
+        \\          HOLES
+        \\========================================
+        \\A ring of n pixels. Can every pattern on it be built from smaller
+        \\repeating patterns that fit the ring? Count what is still missing.
+        \\  add:      overlap by shining two patterns on the same pixels
+        \\  multiply: a pixel lit only where both patterns are lit
+        \\Missing > 0 means the scale is a hole: it can't be made from below.
+        \\
+        \\     {s:>4}  {s:>11}  {s:>16}  {s}
+        \\
+    , .{ "n", "add: missing", "multiply: missing", "n is" });
+    var mul_holes: std.ArrayList(usize) = .empty;
+    defer mul_holes.deinit(gpa);
+    var all_match_pp = true;
+    var all_match_primes = true;
+    for (2..n_max + 1) |n| {
+        const r = try holes.scale(gpa, n);
+        const pp = levels.primePower(@intCast(n));
+        const kind = if (pp) |q| (if (q.k == 1) "prime" else "prime power") else "mixed (two or more different primes)";
+        std.debug.print("     {d:>4}  {d:>11}  {d:>16}  {s}\n", .{ n, r.missing_add, r.missing_mul, kind });
+        const is_hole = r.missing_mul > 0;
+        if (is_hole) try mul_holes.append(gpa, n);
+        if (is_hole != (pp != null)) all_match_pp = false;
+        if (is_hole != (pp != null and pp.?.k == 1)) all_match_primes = false;
+    }
+    std.debug.print(
+        \\
+        \\Reading:
+        \\  Adding never builds a scale: every n leaves new patterns behind.
+        \\  Multiplying builds n exactly when it splits into smaller scales that
+        \\  share no common factor (6 = 2 x 3, 10 = 2 x 5, 12 = 4 x 3).
+        \\  Holes under multiplying: exactly the primes? {s}
+        \\  Holes under multiplying: exactly the primes AND prime powers? {s}
+        \\
+        \\  The prime powers (4, 8, 9, 16, 25, 27, ...) are holes too: 2 times 2
+        \\  only ever makes 2 again, so scale 4 cannot come from scale 2.
+        \\  Those are exactly the loop lengths in the zeros: log 2, log 3, log 4,
+        \\  log 5, log 7, log 8, log 9, ... - the prime powers, nothing else.
+        \\
+    , .{ if (all_match_primes) "yes" else "no", if (all_match_pp) "YES" else "no" });
+}
+
 const Source = enum { zeros, box, hydrogen, tied, half };
 
 var hydrogen_eps: f64 = -0.1;
@@ -1994,6 +2044,8 @@ pub fn main(init: std.process.Init) void {
         clocksReport(&args);
     } else if (std.mem.eql(u8, command, "engine")) {
         engineReport(&args);
+    } else if (std.mem.eql(u8, command, "holes")) {
+        holesReport(init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "levels")) {
         levelsReport(init.io, init.gpa, &args) catch |err| fail(err);
     } else if (std.mem.eql(u8, command, "koide")) {
