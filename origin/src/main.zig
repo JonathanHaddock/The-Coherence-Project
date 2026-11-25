@@ -84,6 +84,7 @@ fn help() void {
         \\  origin observe <particle>
         \\  origin levels [zeros|box|all] [t_max]   does a spectrum carry the primes?
         \\  origin levels hydrogen [setting] [size] same checks on hydrogen in a strong magnet
+        \\  origin levels strings                  two strings: where dips come from
         \\  origin dataset
         \\  origin analyze [dataset]
         \\  origin koide
@@ -1495,7 +1496,7 @@ fn photoReport(args: anytype) void {
     std.debug.print("MEASURED (PMNS columns, D): nu1 0.083  nu2 0.001  nu3 0.129\n", .{});
 }
 
-const Source = enum { zeros, box, hydrogen };
+const Source = enum { zeros, box, hydrogen, tied, half };
 
 var hydrogen_eps: f64 = -0.1;
 var hydrogen_nmax: usize = 100;
@@ -1530,6 +1531,11 @@ fn levelsReport(io: std.Io, gpa: std.mem.Allocator, args: *std.process.Args.Iter
         _ = try levelsOne(io, gpa, .hydrogen, 0, 0);
         return;
     }
+    if (std.mem.eql(u8, which, "strings")) {
+        _ = try levelsOne(io, gpa, .tied, 0, 3000);
+        _ = try levelsOne(io, gpa, .half, 0, 3000);
+        return;
+    }
     const do_zeros = !std.mem.eql(u8, which, "box");
     const do_box = !std.mem.eql(u8, which, "zeros");
     var n_zeros: usize = 10000;
@@ -1543,6 +1549,8 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
     const lv = switch (src) {
         .zeros => try levels.zetaZeros(gpa, t_max),
         .box => try levels.boxLevels(gpa, count),
+        .tied => try levels.stringLevels(gpa, count, false),
+        .half => try levels.stringLevels(gpa, count, true),
         .hydrogen => blk: {
             const b = 0.25 * @sqrt(0.1 / @abs(hydrogen_eps)) * @sqrt(120.0 / @as(f64, @floatFromInt(hydrogen_nmax + 20)));
             std.debug.print("\nSolving hydrogen twice (basis {d} and {d}) to see which levels have settled...\n", .{ hydrogen_nmax, hydrogen_nmax + 20 });
@@ -1578,6 +1586,15 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
             \\paths around the nucleus, so they should NOT sit on the primes.
             \\
         , .{ hydrogen_eps, lv.len, lv[lv.len - 1] }),
+        .tied, .half => std.debug.print(
+            \\
+            \\################ STRING, {s} ################
+            \\A wave on a string. One closed path: there and back, length 1.
+            \\{s}
+            \\Gaps and stiffness are meaningless here (the levels are perfectly even);
+            \\what matters is check 6, the signs of the repeats.
+            \\
+        , .{ if (src == .tied) "BOTH ENDS FIXED" else "ONE END FIXED, ONE FREE", if (src == .tied) "Each fixed end flips the wave over: two flips per trip, so they cancel." else "Only the fixed end flips the wave: one flip per trip." }),
     }
 
     // 1. Line up.
@@ -1585,6 +1602,8 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
         .zeros => .zeta,
         .box => .box,
         .hydrogen => levels.fitSmooth(lv),
+        .tied => levels.stringSmoothCount(false),
+        .half => levels.stringSmoothCount(true),
     };
     const u = try gpa.alloc(f64, lv.len);
     for (lv, u) |e, *o| o.* = smooth.count(e);
@@ -1799,6 +1818,58 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
         }
     }
 
+    // 6. Repeats: for each of the shortest new loops, is its 1st, 2nd, 3rd run a
+    // dip or a peak? Flips from bouncing off a wall pile up with each run, so
+    // they alternate. A minus sign on every run means something else.
+    {
+        const win = @max(2.0 * dx, 0.6 * std.math.pi / lv[lv.len - 1]);
+        var bases: [4]f64 = undefined;
+        var nb: usize = 0;
+        const by_len = try gpa.dupe(Ext, ext.items[0..top_n]);
+        defer gpa.free(by_len);
+        std.mem.sort(Ext, by_len, {}, struct {
+            fn lt(_: void, a: Ext, b: Ext) bool {
+                return a.x < b.x;
+            }
+        }.lt);
+        for (by_len) |e| {
+            if (nb == bases.len) break;
+            var is_repeat = false;
+            for (bases[0..nb]) |b| {
+                const k = @round(e.x / b);
+                if (k >= 2 and @abs(e.x - k * b) < 2 * win) is_repeat = true;
+                if (@abs(e.x - b) < 3 * win) is_repeat = true; // other half of the same feature
+            }
+            if (!is_repeat and 2 * e.x <= x_hi + win) {
+                bases[nb] = e.x;
+                nb += 1;
+            }
+        }
+        std.debug.print(
+            \\
+            \\6. REPEATS: run each of the shortest new loops 1, 2, 3 times. Dip or peak?
+            \\   A wall that flips the wave adds one flip per trip, so the signs
+            \\   alternate trip to trip. Dips on every run can't come from flips.
+            \\     {s:>7}   {s:>5} {s:>5} {s:>5}
+            \\
+        , .{ "loop", "x1", "x2", "x3" });
+        var all_dips: usize = 0;
+        var alternating: usize = 0;
+        for (bases[0..nb]) |b| {
+            var sg: [3]f64 = undefined;
+            std.debug.print("     {d:>7.3}  ", .{b});
+            for (0..3) |k| {
+                sg[k] = levels.signalAt(s, x_lo, dx, b * @as(f64, @floatFromInt(k + 1)), win);
+                const label = if (b * @as(f64, @floatFromInt(k + 1)) > x_hi) "  -  " else if (sg[k] < 0) " dip " else " peak";
+                std.debug.print(" {s}", .{label});
+            }
+            std.debug.print("\n", .{});
+            if (sg[0] < 0 and sg[1] < 0 and (b * 3 > x_hi or sg[2] < 0)) all_dips += 1;
+            if (sg[0] * sg[1] < 0) alternating += 1;
+        }
+        std.debug.print("   Reading: {d} of {d} loops dip on every run; {d} of {d} flip between run 1 and run 2.\n", .{ all_dips, nb, alternating, nb });
+    }
+
     std.debug.print("\nVERDICT ({s}): gaps {s}; stiffness {s}; prime loops {s}{s}.\n", .{
         name,
         if (best == 2) "zeta-like" else if (best == 0) "random" else "avoiding, not zeta-like",
@@ -1822,6 +1893,8 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
         .zeros => "zeta zeros",
         .box => "box (control)",
         .hydrogen => "magnetized hydrogen",
+        .tied => "string, both ends fixed",
+        .half => "string, one end free",
     }, lv.len });
     defer gpa.free(t1);
     const svg1 = try levels_svg.orbit(gpa, t1, x_lo, x_hi, s, scale);
@@ -1834,6 +1907,8 @@ fn levelsOne(io: std.Io, gpa: std.mem.Allocator, src: Source, t_max: f64, count:
         .zeros => "zeta zeros",
         .box => "box (control)",
         .hydrogen => "magnetized hydrogen",
+        .tied => "string, both ends fixed",
+        .half => "string, one end free",
     }});
     defer gpa.free(t2);
     const svg2 = try levels_svg.spacing(gpa, t2, sp.hist);

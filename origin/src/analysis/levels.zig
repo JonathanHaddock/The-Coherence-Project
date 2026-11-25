@@ -395,3 +395,37 @@ pub fn chanceOnPrime(lo: f64, hi: f64, tol: f64) f64 {
     }
     return @as(f64, @floatFromInt(hit)) / @as(f64, @floatFromInt(steps));
 }
+
+// ---------------------------------------------------------------- strings
+// A wave on a string of length 1/2. Its one closed path is there-and-back,
+// length 1, repeated at 2, 3, 4, ...
+//   tied: both ends held fixed. Each end flips the wave; two flips per trip.
+//   half: one end fixed, one free. One flip per trip.
+
+pub fn stringLevels(gpa: std.mem.Allocator, count: usize, half: bool) ![]f64 {
+    const out = try gpa.alloc(f64, count);
+    for (out, 0..) |*k, i| {
+        const n: f64 = @floatFromInt(i);
+        k.* = 2.0 * pi * (if (half) n + 0.5 else n + 1.0);
+    }
+    return out;
+}
+
+pub fn stringSmoothCount(half: bool) Smooth {
+    // tied: floor(k / 2pi) -> k / 2pi - 1/2 ; half: floor(k / 2pi + 1/2) -> k / 2pi
+    return .{ .poly = .{ if (half) 0 else -0.5, 1.0 / (2.0 * pi), 0 } };
+}
+
+/// Sign of the loop signal at `x`: the strongest value within `win` of it.
+pub fn signalAt(s: []const f64, x_lo: f64, dx: f64, x: f64, win: f64) f64 {
+    const c = (x - x_lo) / dx;
+    if (c < 0 or c >= @as(f64, @floatFromInt(s.len))) return 0;
+    const ci: usize = @intFromFloat(@round(c));
+    const w: usize = @intFromFloat(@ceil(win / dx));
+    var best: f64 = 0;
+    var i = ci -| w;
+    while (i <= ci + w and i < s.len) : (i += 1) if (@abs(s[i]) > @abs(best)) {
+        best = s[i];
+    };
+    return best;
+}
